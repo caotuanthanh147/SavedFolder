@@ -7,15 +7,17 @@ gets you from cold start to productive without rediscovering anything.
 ## Minute 0–3 — environment
 
 ```sh
-sh /home/z/SavedFolder/shared/tools/bootstrap.sh   # idempotent, ~10s
-. ~/.lua54-env.sh                                   # lua5.4 + luac5.4 on PATH
-sh /home/z/SavedFolder/shared/tools/poll.sh glm3 &  # your name; watch msgs
-sh /home/z/SavedFolder/shared/tools/watch_public.sh glm3 &  # watch game zips
+sh "$SF_DIR/shared/tools/bootstrap.sh"        # idempotent, ~10s
+. ~/.lua54-env.sh                              # lua5.4 + luac5.4 on PATH
+sh "$SF_DIR/shared/tools/poll.sh glm3" &       # your name; watch msgs
+sh "$SF_DIR/shared/tools/watch_public.sh glm3" &  # watch game zips
 ```
-bootstrap.sh installs portable Lua 5.4.7 (survives /tmp wipes — never compile
-from source again), clones both repos to ~/SavedFolder + ~/Public, and wires the
-push token silently. If the sandbox was reset and SavedFolder itself is gone:
-`git clone https://github.com/caotuanthanh147/SavedFolder.git /home/z/SavedFolder` first.
+Default clone paths: `$HOME/SavedFolder` and `$HOME/Public` (override with
+`SF_DIR` / `PUBLIC_DIR` env vars — every tool honors them). bootstrap.sh
+installs portable Lua 5.4.7 (survives /tmp wipes — never compile
+from source again), clones both repos, and wires the push token silently.
+If the sandbox was reset and SavedFolder itself is gone:
+`git clone https://github.com/caotuanthanh147/SavedFolder.git ~/SavedFolder` first.
 
 ## Minute 3–8 — mandatory reading, this order
 
@@ -73,8 +75,11 @@ push token silently. If the sandbox was reset and SavedFolder itself is gone:
   deletes it after handling. Check your inbox before + after any long operation.
 - Update `status/<you>.md` after EVERY step (Doing / Done this round / Stuck on
   / Files changed). Append-only entry per session in `logs/<you>.md`.
-- Small commits, `git pull --rebase` before push, NEVER force-push. On an
-  "AA conflict" in shared files (lessons/TASKS): merge content, don't pick sides.
+- Protocol step = edit → `sh shared/tools/sync.sh "<message>"`. It commits,
+  pulls --rebase (absorbs the other glm's parallel work), pushes, and VERIFIES
+  the remote actually moved — silent push failures lost us a full delivery day
+  once. NEVER force-push. On an "AA conflict" in shared files (lessons/TASKS):
+  merge content, don't pick sides.
 - Token: comes from the user in chat or lives in the local sandbox worklog.
   NEVER write it into this repo, logs, or messages. Tool output redacts
   `ghp_…` at DISPLAY time only — grep for it in the file instead of eyeballing.
@@ -91,6 +96,7 @@ glm1's set (2026-10-01) + glm2's set (same day, parallel) — unified:
 | `validate.sh <script>` | luac -p + template-diff measurement + style checks (glm2) |
 | `lua_lint.py --from/--to` | mechanical violations scoped to your game section (glm1) |
 | `repack_zip.py` / `repack.sh` | delivery repack with per-entry MD5 verification (two flavors: python API vs `--commit` push wrapper) |
+| `sync.sh "<msg>"` | the ONE command per protocol step: commit → pull --rebase → push → **verify remote moved** (~6s vs ~45s manual, and it can't silently fail) |
 | `watch_public.sh [--once]` | auto-detects new/closed game zips (T3); `--once` = single cycle (spot-check/testing) |
 | `selftest.sh` | 10-check kit smoke test (~5s): run it after ANY tool edit — newgame space-paths, deobf arg orders, repack MD5, watch --once, harness 12/12 |
 | `poll.sh` | SavedFolder msgs/pull loop |
@@ -116,7 +122,7 @@ Full smell catalog with §21/§23 mappings: `work/lua/clean-code-violations-scpi
 | `work/lua/TASK_SOURCE.md` | game history: processed / closed / open |
 | `work/lua/Template.lua` | canonical script template (re-sync from new zips) |
 | `work/lua/*.md` | analyses + notes (snack-macro, clean-code, …) |
-| `work/lua/worklog.md` | full scrubbed history (deep dives only — lessons.md is the distillate) |
+| `work/lua/worklog.md` | 50-line summary + pointer; FULL history in `work/lua/worklog-archive-*.md` (deep dives only — lessons.md is the distillate) |
 
 ## Time-sinks → shortcuts
 
@@ -128,9 +134,11 @@ Full smell catalog with §21/§23 mappings: `work/lua/clean-code-violations-scpi
   Linoria+cloneref-sim completeness); grep your mock for missing methods BEFORE
   debugging silent pcall failures (known gap class, see lessons).
 - "Token looks redacted" → display-only; grep the file for `ghp_`.
+- "Did my push actually land?" → it's built into `sync.sh`; manually:
+  `git ls-remote origin HEAD` vs `git rev-parse HEAD`.
 
 Stuck on something the dump can't answer? → `shared/SEARCH.md`.
 Building a harness? → `shared/HARNESS_KIT.md`.
 Just edited a shared tool? → `sh shared/tools/selftest.sh` (10 checks, all green = ship it).
-(An older parallel quickstart existed as `shared/GUIDE.md` — folded into this
-file 2026-10-01; GUIDE.md is now a pointer.)
+(The old `shared/GUIDE.md` quickstart was folded into this file 2026-10-01 and
+the pointer deleted 2026-10-02 — this file is the only onboarding doc.)

@@ -5,7 +5,8 @@
 #   ROOT-LEVEL *.zip list against the last state.
 # Reports to stdout AND /tmp/<name>.public.log (one event per line, doubles as history).
 # Usage:  sh watch_public.sh [--once] glm2 &   (from anywhere; default clone
-#         /home/z/Public). --once: run ONE cycle then exit (testing/spot-check).
+#         $HOME/Public, override with $PUBLIC_DIR or arg 2).
+#         --once: run ONE cycle then exit (testing/spot-check).
 # Event format:
 #   <utc-time> ZIP+     <name>  (new game zip — run the standard pipeline!)
 #   <utc-time> ZIP-     <name>  (game closed by user)
@@ -14,7 +15,7 @@
 ONCE=0
 [ "${1:-}" = "--once" ] && { ONCE=1; shift; }
 NAME="${1:-watcher}"
-PUBLIC_DIR="${2:-/home/z/Public}"
+PUBLIC_DIR="${2:-${PUBLIC_DIR:-${HOME:-/home/z}/Public}}"
 STATE="/tmp/${NAME}.public.state"
 LOG="/tmp/${NAME}.public.log"
 

@@ -2,7 +2,7 @@
 # newgame.sh <game.zip> [dest-dir] — start a new game task: extract the user's uploaded zip, inventory the deobf/dump/Template files, verify the expected structure, and print the Rule-18 pipeline checklist with concrete paths.
 set -u
 ZIP="${1:?usage: newgame.sh <game.zip> [dest-dir]}"
-DEST="${2:-/home/z/my-project/upload/$(basename "$ZIP" .zip | tr -d '[]()')}"
+DEST="${2:-${HOME:-/home/z}/my-project/upload/$(basename "$ZIP" .zip | tr -d '[]()')}"
 
 echo "== extracting $(basename "$ZIP")"
 mkdir -p "$DEST"

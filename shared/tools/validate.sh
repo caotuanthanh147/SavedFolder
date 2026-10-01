@@ -2,8 +2,8 @@
 # validate.sh <script.lua> [template.lua] — static validation for a game script: luac5.4 -p syntax check, template-verbatim diff (common head/tail prefix-suffix measurement), style checks (comment-only lines, goto/continue, trailing whitespace). Exit 0 only if syntax OK and template diff is confined to the middle game-section region + tail wiring lines.
 set -u
 SCRIPT="${1:?usage: validate.sh <script.lua> [template.lua]}"
-TEMPLATE="${2:-/home/z/SavedFolder/work/lua/Template.lua}"
-LUAC="${LUAC:-/home/z/bin/luac5.4}"
+TEMPLATE="${2:-${SF_DIR:-${HOME:-/home/z}/SavedFolder}/work/lua/Template.lua}"
+LUAC="${LUAC:-${HOME:-/home/z}/bin/luac5.4}"
 [ -x "$LUAC" ] || LUAC="$(command -v luac5.4 || true)"
 [ -n "$LUAC" ] || { echo "luac5.4 not found (run bootstrap.sh)"; exit 1; }
 [ -f "$SCRIPT" ] || { echo "missing script: $SCRIPT"; exit 1; }

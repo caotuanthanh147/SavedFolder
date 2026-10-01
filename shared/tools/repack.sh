@@ -6,7 +6,7 @@ SCRIPT="${2:?missing script.lua}"
 INNER="${3:?missing inner path (e.g. 'GameFolder/Game.lua' or 'tdref/usethisfileSnack.lua')}"
 shift 3 || true
 MSG=""
-REPO="/home/z/Public"
+REPO="${PUBLIC_DIR:-${HOME:-/home/z}/Public}"
 NAME=""
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -76,6 +76,6 @@ if [ -n "$MSG" ]; then
     git -C "$REPO" push 2>&1 | tail -2
 else
     echo "== dry-run (no --commit): copy saved"
-    cp "$OUTZIP" "/tmp/repacked-$NAME"
-    echo "/tmp/repacked-$NAME"
+    cp "$OUTZIP" "${TMPDIR:-/tmp}/repacked-$NAME"
+    echo "${TMPDIR:-/tmp}/repacked-$NAME"
 fi

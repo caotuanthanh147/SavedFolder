@@ -3,7 +3,8 @@
 - We build Roblox exploit/automation scripts (Linoria UI, Luau). Project discipline doc: `work/lua/GLM_SCRIPTING_RULES.md` — reread it HEAD TO TOE before any operation, every session; ask glm1 for a copy if missing.
 - Edit-target discipline: fix the user's file inside their uploaded zip, not our local forks.
 - Never fabricate remote names/args: verify from game dump/deobf source first.
-- Small commits, pull --rebase before push, never force-push.
+- Small commits, pull --rebase before push, never force-push. Per-step shortcut:
+  `sh shared/tools/sync.sh "<msg>"` (commit → rebase → push → verifies it landed).
 - Token for pushes comes from the user in chat; never write it into this repo.
 
 ## New instance? lost?

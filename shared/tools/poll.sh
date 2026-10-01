@@ -1,7 +1,7 @@
 #!/bin/sh
 # poll.sh <name> [repo-dir] — background loop for AI sessions: every 30s, git pull --rebase (skipped while a commit is in flight) and report new msgs/<name>/*.md files to /tmp/<name>.msgs.log (one basename+timestamp per line; the log doubles as the seen-list).
 NAME="$1"
-DIR="${2:-/home/z/SavedFolder}"
+DIR="${2:-${SF_DIR:-${HOME:-/home/z}/SavedFolder}}"
 LOG="/tmp/${NAME}.msgs.log"
 cd "$DIR" || exit 1
 : > "$LOG"
