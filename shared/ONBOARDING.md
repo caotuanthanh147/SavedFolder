@@ -1,0 +1,95 @@
+# ONBOARDING — new GLM instance? Start here (10 minutes flat)
+
+You are a GLM instance joining a small AI team building Roblox automation scripts
+(Linoria/Fluent UI, Luau, executor-side). glm1 is the senior instance. This file
+gets you from cold start to productive without rediscovering anything.
+
+## Minute 0–3 — environment
+
+```sh
+sh /home/z/SavedFolder/shared/tools/bootstrap.sh   # idempotent, ~10s
+. ~/.lua54-env.sh                                   # lua5.4 + luac5.4 on PATH
+sh /home/z/SavedFolder/shared/tools/poll.sh glm3 &  # your name; watch msgs
+sh /home/z/SavedFolder/shared/tools/watch_public.sh glm3 &  # watch game zips
+```
+bootstrap.sh installs portable Lua 5.4.7 (survives /tmp wipes — never compile
+from source again), clones both repos to ~/SavedFolder + ~/Public, and wires the
+push token silently. If the sandbox was reset and SavedFolder itself is gone:
+`git clone https://github.com/caotuanthanh147/SavedFolder.git /home/z/SavedFolder` first.
+
+## Minute 3–8 — mandatory reading, this order
+
+1. `shared/PROMPT.md` — group rules (short; overrides everything else).
+2. THIS file (you are here).
+3. `TASKS.md` — who owns what. Claim in the Owner column BEFORE starting work.
+4. `work/lua/GLM_SCRIPTING_RULES.md` — the discipline guide, **head to toe,
+   every session, before any operation** (this is a hard rule, not a suggestion;
+   past incidents were all "skipped the reread" incidents).
+5. `work/lua/TASK_SOURCE.md` — game history + per-game workflow notes.
+6. `shared/lessons.md` — tested traps (cloneref, wire-level payloads, zip
+   conventions, token redaction). ~100 lines, all paid for with real bugs.
+7. Latest entries in `logs/*.md`, all `status/*.md`, your `msgs/<you>/` inbox
+   (handle + delete messages addressed to you).
+
+## The two repos
+
+- **SavedFolder** (this repo): shared memory. Everything except deliverables.
+- **github.com/caotuanthanh147/Public**: the user's repo. Game zips arrive
+  there; ONLY finished deliverables go back (repacked game zip with the script
+  inside, at the root, commit message `"<game>: ..."`, originals byte-identical
+  — use `shared/tools/repack_zip.py`, it MD5-verifies for you).
+- A game is OPEN while its zip exists at the Public root; the user CLOSES games
+  by deleting the zip. Never resume a closed game without an explicit order in chat.
+- IM file attachments are unreliable; the repos are authoritative.
+
+## Standard pipeline (per game/fix)
+
+1. Reread the guide head-to-toe (Rule 19). `git -C ~/Public pull`.
+2. New zip → unzip to a scratch dir; note the 3 usual sources: your previous
+   `<Game>.lua` (if a fix), the game's `[Deob].lua` dumps, `game_dump.txt`.
+3. EVERY remote/payload/tag/attribute claim must be verified from the dump with
+   `shared/tools/deobf_search.py` (`remote NAME`, `fn LINE`, `find`, `tags`,
+   `attrs`) — never from memory, never invented.
+4. Build/fix inside the game section of the canonical `work/lua/Template.lua`
+   scaffold. The reference script's FEATURE SET defines scope — a remote
+   existing ≠ a feature (Rule 23).
+5. Mock harness in real Lua 5.4 (copy the kit from `work/lua/snack_harness.lua`,
+   see `shared/HARNESS_KIT.md`). Green harness only proves the harness's
+   protocol model — cross-check the model against the deobf call site.
+6. Gates before delivery, ALL must pass:
+   - `luac5.4 -p FILE` clean
+   - `python3 shared/tools/lua_lint.py --from <gameSectionStart> FILE` → 0 errors
+   - template diff = ONLY your intended regions (game section, SaveManager
+     folder path, reference-mandated tab/window extensions)
+   - harness suite green
+   - `python3 shared/tools/repack_zip.py` → [VERIFIED]
+7. Push to Public. Update: TASK_SOURCE table, TASKS.md, your status/ + logs/,
+   shared/lessons.md if you learned something testable, changelog row.
+8. Tell the user in chat what was delivered + known residual risks.
+
+## Working as a group
+
+- `msgs/<to>/<from>-<UTCtimestamp>.md` — short, one topic. The recipient
+  deletes it after handling. Check your inbox before + after any long operation.
+- Update `status/<you>.md` after EVERY step (Doing / Done this round / Stuck on
+  / Files changed). Append-only entry per session in `logs/<you>.md`.
+- Small commits, `git pull --rebase` before push, NEVER force-push. On an
+  "AA conflict" in shared files (lessons/TASKS): merge content, don't pick sides.
+- Token: comes from the user in chat or lives in the local sandbox worklog.
+  NEVER write it into this repo, logs, or messages. Tool output redacts
+  `ghp_…` at DISPLAY time only — grep for it in the file instead of eyeballing.
+
+## Tool index (all in shared/tools/, all battle-tested)
+
+| tool | what it saves you |
+|---|---|
+| `bootstrap.sh` | environment from cold sandbox in ~10s (was: compile Lua from source) |
+| `deobf_search.py` | dump archaeology: remote map / payload shapes / blocks / tags / attrs |
+| `repack_zip.py` | delivery zip repack with per-entry MD5 verification |
+| `lua_lint.py` | mechanical rule violations (comments, Luau-only, goto) — use `--from/--to` for your game section |
+| `watch_public.sh` | auto-detects new/closed game zips (T3) |
+| `poll.sh` | SavedFolder msgs/pull loop |
+| `lua54.tar.gz` | the portable Lua itself |
+
+Stuck on something the dump can't answer? → `shared/SEARCH.md`.
+Building a harness? → `shared/HARNESS_KIT.md`.

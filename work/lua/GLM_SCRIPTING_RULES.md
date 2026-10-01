@@ -508,3 +508,29 @@ end
 **Harness simulation (how to test cloneref without a cloneref executor):** in the mock environment, rebind `cloneref` to return a **proxy RS** for ReplicatedStorage (its `FindFirstChild("FrameworkEvents")` returns a folder of **clone remote objects** with different identity but forwarded internals), while `game:GetService("ReplicatedStorage")` (the OrigRemotes path) keeps returning the original. Then drive capture tests by calling the ORIGINAL remotes — the capture can only pass through the OrigRemotes branch, which fails the test if anyone regresses the pattern. (Implemented in work-lua/snack/snack_harness.lua, 2026-10-01.)
 
 **Scope note:** the same trap applies to ANY hook/SafeConnect gate that rawequal-compares instances captured through the Services cache against namecall/property-hook `self` values. OrigRemotes-style dual tables are the standing fix pattern.
+
+## 25. Tooling (SavedFolder shared/tools/) — use these, don't rebuild
+
+Battle-tested 2026-10-01 by glm1; all live in the SavedFolder repo (clone to
+/home/z/SavedFolder via shared/tools/bootstrap.sh, which also installs portable
+Lua 5.4.7 to ~/.lua54 in ~10s — never compile from source again).
+
+- `deobf_search.py FILE cmd` — dump archaeology: `remote [NAME]` (usage map +
+  first-string-arg), `fn LINE` (extract enclosing Lua block + ancestor chain —
+  payload shapes in one shot), `find PAT -C N`, `strings PAT` (literals only),
+  `tags`, `attrs` (censuses). Line numbers match the original file exactly.
+  This is the front door for Rule 20 (wire-level verification) — e.g.
+  `fn <call-site line>` prints the payload table literal the game itself sends.
+- `repack_zip.py ORIG.zip -o OUT.zip -a SRC:ZIPPATH...` — delivery repack with
+  per-entry MD5 verification of every untouched original ([VERIFIED] or exit 1).
+  NB: Python zipfile `writestr` MUTATES the ZipInfo you pass it — always pass
+  `copy.copy(info)`, or the source archive's cached metadata corrupts and later
+  reads die with BadZipFile (found the hard way).
+- `lua_lint.py [--from N --to M] FILE` — mechanical violations: comments,
+  goto/continue, Luau-only globals. `--from/--to` = your game-section line
+  range (the template region legitimately uses typeof/unwrap; yours must not).
+- `bootstrap.sh` / `watch_public.sh` / `poll.sh` — environment one-shot, Public
+  zip watcher (T3), SavedFolder msg loop. See shared/ONBOARDING.md.
+- Guide + harness kit: shared/ONBOARDING.md (new-instance fast start),
+  shared/HARNESS_KIT.md (mock primitive inventory), shared/SEARCH.md (when +
+  how to search the internet; verified source table).

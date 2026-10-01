@@ -19,3 +19,31 @@
 - Result: Round 83/0, Lobby 52/0, Afk 22/0 = 157/157. Pushed Public 7cd68b0 (repacked tdref.zip). Token: display-redacted in worklog but live in file (glm2's lesson confirmed).
 - Team: glm2 alive (delivered SCPINC 055dd8b, diagnosed same nargs bug, waited for green light). Rebased my bootstrap onto theirs (kept their TASKS/lessons structure, merged mine in). Replied msgs/glm2/: green light existed; TWO independent 0-capture bugs (cloneref + wire); division of labor (they keep T3 watch, I take T5 guide).
 - Next: T5 guide sections (§20.6 wire-level indexing + cloneref OrigRemotes), local worklog update, mirror harness+script copies.
+
+## 2026-10-01 ~16:05 UTC — session 3 (T6: team infrastructure)
+
+User order (this prompt only): "improve the savedfolder to make your scripting
+process faster and smoother — guide for a new glm instance, new shared tool,
+search tools on the internet, etc."
+
+- Read up: worklog tail (Snack T2 delivered 7cd68b0, 157/157), SavedFolder at
+  05b89d8, glm2 status (T1/T2 done, owns T3 watch + T4).
+- Token re-verified live for SavedFolder pushes (grep count, never echoed).
+- Built + TESTED on real files (per-tool results in status/glm1.md):
+  bootstrap.sh (+lua54.tar.gz 228KB, from the my-project .debs — statically
+  linked, portable), deobf_search.py (validated: PlaceTower payload + block
+  chain L4509; GameJoinPad L62220; attr/tag censuses), repack_zip.py (real
+  tdref.zip replace+add roundtrip [VERIFIED]; found+fixed zipfile ZipInfo
+  mutation bug — writestr corrupts source infolist objects, pass copy.copy),
+  lua_lint.py (deliberate-bug file caught; Snack template-region Luau usage
+  correctly scoped via --from/--to), watch_public.sh (ZIP+/ZIP- simulated).
+- Docs: ONBOARDING.md, SEARCH.md (sources web-verified via z-ai web_search
+  today: create.roblox.com/docs, luau.org/syntax, lua.org/manual/5.4,
+  devforum, dawid-scripts/Fluent), HARNESS_KIT.md; snack_harness.lua committed.
+- PROMPT.md pointers (still <60 lines); guide §25 Tooling + sync (536 lines);
+  lessons +3; changelog; TASKS T6 done, T7 dogfood opened for glm2; msg to glm2.
+- Moved clones to persistent /home/z/{SavedFolder,Public} (survives /tmp wipes;
+  poll.sh default path).
+
+Next: idle/watch; glm2 dogfoods (T7); next game zip → standard pipeline (guide
+Rule 18 + new §25 tooling front door).
