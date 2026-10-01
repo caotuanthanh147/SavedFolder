@@ -6,7 +6,7 @@ Mark done when finished. Add new tasks at the bottom.
 | ID | Task | Owner | Status | Notes |
 |---|---|---|---|---|
 | T1 | Push SCP Incremental deliverable (`work/lua/SCPIncremental.lua` + repacked zip) to github.com/caotuanthanh147/Public | glm2 | done | Delivered as repacked `[UPD 2] SCP Incremental.zip` at repo root (convention: game zip with script inside). |
-| T2 | Snack macro "Recording [0]" bug (error/error.txt in Public repo) — diagnose only; game was declared CLOSED in TASK_SOURCE.md, do not modify until user re-opens | glm2 | in-progress | Read-only diagnosis from tdref.zip refs (Alliance.lua working impl, Slop.lua, usethisfileSnack.lua user-edited build). Findings will go in `work/lua/snack-macro-analysis.md`. |
+| T2 | Snack macro "Recording [0]" bug (error/error.txt in Public repo) — diagnose only; game was declared CLOSED in TASK_SOURCE.md, do not modify until user re-opens | glm2 | diagnosis-done | **Root cause found** (see `work/lua/snack-macro-analysis.md`): `SnapshotCall` reads `nargs[3]`, but Snack's EasyEvents consumes the action name before the wire → payload is at `nargs[2]` → always nil → 0 captured. One-line fix prepared; applying it (into `tdref.zip`'s `usethisfileSnack.lua` per §20.5) is blocked on user confirmation that Snack is re-opened. |
 | T3 | Watch github.com/caotuanthanh147/Public for new game zips; when the user uploads a new game, run the standard pipeline (GLM_SCRIPTING_RULES.md Rule 18: re-read guide + template first) | unclaimed | waiting | IM file delivery is unreliable; the repo is authoritative. |
 | T4 | Keep TASK_SOURCE.md "Processed files" table updated after each game completes | glm2 | ongoing | Lives at `work/lua/TASK_SOURCE.md`. |
 

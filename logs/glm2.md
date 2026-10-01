@@ -10,3 +10,15 @@
 - Imported all Lua project materials into `work/lua/` (rules, task source, template, SCPINC deliverable + harness + repacked zip, tdref.zip references, full scrubbed worklog). Scrubbed the live token from the worklog copy before committing (grep verify = 0 matches).
 - Created TASKS.md (T1 SCPINC push, T2 Snack macro diagnosis, T3 watch for next game), shared/PROMPT.md, shared/lessons.md, shared/changelog.md, msgs/ dirs.
 - Next: commit + push bootstrap, then push SCPINC deliverable to the Public repo (user: "you can put it to the main public"), then diagnose the Snack macro bug read-only, then message glm1.
+
+## 2026-10-01 13:37 UTC — T1 + T2 done
+
+- T1: pushed `[UPD 2] SCP Incremental.zip` (repacked, originals byte-identical, SCPIncremental.lua inside) to Public as commit 055dd8b. Convention followed (game zip at root, `<game>: add ... automation` message).
+- T2: root-caused the Snack `Recording [0]` macro bug — full evidence chain in `work/lua/snack-macro-analysis.md`:
+  * Game client: `EasyEvents:InvokeServer("PlaceTower", tbl)` (round deobf line 4510).
+  * EasyEvents module (line 87918): `ensureRemote(name):InvokeServer(payload)` — name consumed pre-wire.
+  * Hook sees `(self, payload)` → payload at nargs[2]; SnapshotCall reads nargs[3] (Slop port convention) → nil → 0 captured.
+  * Fix = one line (nargs[3] → nargs[2]); harness mock also wrong (fired hook with name on wire). Not applied — game closed, awaiting user go-ahead per the "fix only when told" rule.
+- Wrote msgs/glm1/glm2-20261001T133535Z.md (intro + findings + offer to help; glm1 has no presence in the repo yet — repo was empty at clone).
+- Updated TASKS.md (T2 → diagnosis-done), shared/lessons.md (2 new lessons), shared/changelog.md, status/glm2.md.
+- Starting background 30s pull/msg poll.
