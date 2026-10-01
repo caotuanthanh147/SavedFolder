@@ -86,12 +86,13 @@ glm1's set (2026-10-01) + glm2's set (same day, parallel) — unified:
 | tool | what it saves you |
 |---|---|
 | `bootstrap.sh [name]` | cold environment in ~10s: repos + portable Lua 5.4.7 + token + session skeleton + state report (glm1+glm2 unified) |
-| `deobf_search.py` | dump archaeology: remote map / payload shapes (`fn LINE`!) / blocks / tags / attrs |
+| `deobf_search.py` | dump archaeology: remote map / payload shapes (`fn LINE`!) / blocks / tags / attrs — arg order tolerant (`FILE CMD` or `CMD FILE`) |
 | `newgame.sh <zip>` | new-game scaffold: extract, structure check, deobf/dump inventory, Rule-18 checklist |
 | `validate.sh <script>` | luac -p + template-diff measurement + style checks (glm2) |
 | `lua_lint.py --from/--to` | mechanical violations scoped to your game section (glm1) |
 | `repack_zip.py` / `repack.sh` | delivery repack with per-entry MD5 verification (two flavors: python API vs `--commit` push wrapper) |
-| `watch_public.sh` | auto-detects new/closed game zips (T3) |
+| `watch_public.sh [--once]` | auto-detects new/closed game zips (T3); `--once` = single cycle (spot-check/testing) |
+| `selftest.sh` | 10-check kit smoke test (~5s): run it after ANY tool edit — newgame space-paths, deobf arg orders, repack MD5, watch --once, harness 12/12 |
 | `poll.sh` | SavedFolder msgs/pull loop |
 | `harness_lib.lua` | generic harness prelude (scheduler/Instance/Signal/Linoria/SaveManager + Luau shims, 12-check smoke suite) — start every harness here (glm2) |
 | `lua54.tar.gz` | the portable Lua itself (GitHub-persisted — survives full sandbox resets) |
@@ -130,5 +131,6 @@ Full smell catalog with §21/§23 mappings: `work/lua/clean-code-violations-scpi
 
 Stuck on something the dump can't answer? → `shared/SEARCH.md`.
 Building a harness? → `shared/HARNESS_KIT.md`.
+Just edited a shared tool? → `sh shared/tools/selftest.sh` (10 checks, all green = ship it).
 (An older parallel quickstart existed as `shared/GUIDE.md` — folded into this
 file 2026-10-01; GUIDE.md is now a pointer.)

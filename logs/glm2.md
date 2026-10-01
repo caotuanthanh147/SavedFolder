@@ -35,3 +35,23 @@
 Stage Summary:
 - SavedFolder now has a tested toolchain: bootstrap → newgame → (build) → validate → repack --commit, plus a reusable harness prelude — the next game session's bring-up drops from hours to ~1.
 - SCPINC clean-code debt fully documented and rule-mapped (user's "take notes" delivered); no fixes applied per order.
+
+---
+Task ID: session-3
+Agent: glm2
+Task: T7 — dogfood the tooling kit from a fresh session (user: "keep improving SavedFolder, parallel to the other glm, watch overlap")
+
+Work Log:
+- Pulled first: T6 already done by both instances + unified by glm1 (ONBOARDING.md canonical, bootstrap.sh merged, tool table combined). T7 was open and assigned to me — the fresh-session dogfood. Claimed it in status/glm2.md BEFORE any work (6301161) to stay off the parallel rounds' toes (glm1 claimed T8 mid-session: trim bloat + env-var paths + time-sink + MATI dogfood).
+- Cold-started bootstrap.sh from a genuinely empty env (no lua5.4, no ~/Public, no ~/.lua54-env.sh; token only in the local sandbox worklog): 4.2s total — Public cloned to /home/z/Public, portable Lua 5.4.7 from the repo tarball, token wired into both remotes + ls-remote verified, state report + unread msgs + task owners printed.
+- Ran one REAL use per tool category: harness_lib.lua smoke 12/12; validate.sh on SCPIncremental.lua (reproduced the session-2 baseline exactly: 783/890/18, 0 comment-only lines); lua_lint.py --from 784 (0 errors, 21 template-region warnings correctly downgraded); newgame.sh on the REAL new game /home/z/Public/MATI.zip (2 sub-games, 2 deobfs + 2 dumps, no Template); repack.sh dry-run on MATI.zip (4→5 members, originals byte-identical, injected MD5 OK); deobf_search.py remote/fn/tags/attrs on the real MATI deobf (var15:InvokeServer(var1.payload) wire, Fx* attrs, no tags); watch_public.sh single cycle.
+- 4 frictions found + fixed + re-tested (commit 57de403): (1) newgame.sh `for d in $(find …)` word-split space/emoji paths → while-read; (2) repack.sh --repo default /tmp/Public (stale pre-unification) → /home/z/Public; (3) deobf_search.py FILE-first-only parsing (glm1's own doc phrasing invites CMD-first; I hit the traceback) → arg-order tolerance + usage-restating error; (4) watch_public.sh had no once-mode → --once flag.
+- Built shared/tools/selftest.sh — 10-check kit smoke test on tiny fixtures (~5s; auto-sources ~/.lua54-env.sh): 10/10 green. Purpose: run after ANY tool edit; will guard glm1's T8a env-var refactor.
+- Docs/process: ONBOARDING.md tool table + time-sinks updated; lessons +2 (space/emoji word-splitting, flexible arg order); changelog row; TASKS.md T7 → done; status/glm2.md final; friction report + MATI intel + acks in msgs/glm1/glm2-20261001T165800Z.md; 3 handled inbox msgs deleted.
+- Discovered mid-session: my session-1 SCPINC delivery push NEVER landed on origin (glm1 verified + re-pushed it as 5521079). Adopted the verify-after-push rule (git ls-remote origin after every push) — my pushes this session all confirmed live.
+- MATI.zip landed on Public 16:35 UTC (user's dea6ee8). Division per glm1's msg: glm1 does T8c tool-dogfood + mati-analysis.md; the MATI SCRIPT build is mine (T3) when the user orders it.
+
+Stage Summary:
+- The T6 tool kit is verified end-to-end from a true cold start: 8/8 categories real-use pass, 4 sharp edges fixed, and a 5-second selftest now guards the whole kit against future edits.
+- Process hardened: claim-before-work prevented overlap with both parallel rounds (glm1 T8, session-2 T3); push failures are now caught (ls-remote verify) instead of silently believed.
+- Ready state for the next game: MATI.zip intel recorded (wire shape, attrs, no tags); glm1's T8c notes + user order are the remaining triggers for the T3 pipeline.
