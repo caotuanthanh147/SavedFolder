@@ -80,3 +80,44 @@ hits + a `--all-fires` flag. Logged in lessons.
    field join + melt loop + Throw/Shop funcs); lobby Request funcs for cosmetics/economy only
    if the reference feature set demands them (Rule 11 — generic request channels are a
    feature-bloat trap). 3. Verify each payload table at its call site before wiring anything.
+
+## T9 corrections + verified wire table (glm1, 2026-10-01, script build)
+
+Two corrections to the T8c map above, found while verifying call sites (Rule 2):
+
+1. **Field join is `IceResync:FireServer(fieldId)`, NOT ClientReady.** The join/resync
+   heartbeat (deobf L9871/L10095/L10116) uses var13 = `Net.get("IceResync")` (L10137).
+   `ClientReady:FireServer()` is a no-arg ready ping sent once at client start (L1557).
+2. **Melt gameplay wire** (the step() loop, L5874-5950): `MeltState:FireServer(true,
+   aimPos)` on melt start / `(false)` on stop; `MeltAim:FireServer(aimPos)` at
+   Firing.AimSendHz (10). Server rate limits: MaxAimMessagesPerSecond 24,
+   MaxStateMessagesPerSecond 12, MinFacingDot -0.2, MaxTargetDistance 600.
+
+Full verified remote wires (all call-site verified):
+
+| Wire | Shape | Notes |
+|---|---|---|
+| IceResync (RE) | `FireServer(fieldId)` / `FireServer(fieldId, {chunks<=64})` | join field / resync — the game's own client does this; a farm script never needs it |
+| MeltState (RE) | `FireServer(true, Vector3 aim)` / `FireServer(false)` | melting on/off |
+| MeltAim (UnreliableRE) | `FireServer(Vector3 aim)` | 10 Hz |
+| Throw (RF) | `InvokeServer(guid, Vector3 look)` -> `{ok, reason}` | look = camera LookVector; cooldown 0.8s |
+| Shop (RF) | `InvokeServer(action, ..., guid)` | actions: buy(toolId, "Display_"..toolId), upgrade(toolId, track, level), equip(toolId), hold(toolId), product(key, "Display_"..key) |
+| LobbyRequest (RE) | `FireServer({action="Create", capacity, destination, difficulty})` | also Cancel/Browse/Leave |
+
+**Products are ROBUX dev products** (ProductId in MeltShared.Products; purchase flow
+goes through a MarketplaceService prompt after `product` invoke) — FireGrenade /
+Flamethrower / DoubleBattery / gem packs all cost real money, so they are excluded
+from automation (Rule 11; never automate real-money purchases). Coin economy =
+tools (HeatGun 160, SteamBlaster 650) + track upgrades (Battery/Size/Power, max L5).
+
+Client-readable state (no remotes needed): `ReplicatedStorage.FrozenHouseState`
+Configuration attributes (Phase/HouseProgress/Region1-9/KeyPiece_*/Reveal_*/
+BasementOpen/FreezerFound/FreezerReady/ProductsAvailable), Player attributes
+(Coins/EquippedTool/OwnedTools/ToolUpgrades/Grenades/Battery/BatteryBoost/RunClass),
+ice meshes at runtime in `workspace.FrozenHouseIceMeshes/IceMeshes_*` (MeshParts),
+freezer off-switch prompt at `World.Basement.FreezerChamber.OffSwitch.Lever.Handle.OffPrompt`,
+key pieces at `World.Props.<Folder>.KeyPiece_<Id>` (touch pickup after Reveal_*),
+lobby pads `Workspace.Lobby.Pads.*` (Floor part + Destination/Members attrs).
+
+Deliverable: work/lua/MATI.lua (script) + work/lua/mati_harness.lua (28-check Level
++ 14-check Lobby mock harness). Delivered as repacked MATI.zip (Public c26a275).

@@ -57,6 +57,8 @@ Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for com
 
 - SCPINC-1 complete (Yuri/SCPIncremental/SCPIncremental.lua 100/100 checks). NOT pushed to GitHub: the push token in the oldglm.zip worklog is [REDACTED:github_token] — user must take files from Yuri/SCPIncremental/ or re-supply a token / push themselves.
 - Repo also holds error/error.txt (user's Snack macro test: "Recording [0]" — Alliance §20-class hook capture failure) + tdref.zip (reference scripts incl. usethisfileSnack.lua 2026-10-01 18:52). Snack is closed (zip deleted) — do not touch unless the user re-opens it.
+| `MATI.zip` (commit 5521079-era upload; delivered as repacked `MATI.zip` c26a275) | Melt All The Ice! (2 places: lobby + Level 1 FrozenHouse) | MATI-1/T9 | `Yuri/MATI/MATI.lua` (harness 28+14 checks; work/lua/mati-analysis.md wire table; products=ROBUX excluded) |
+
 - TowerInc Rule 17 violations (RunLoop instead of SafeLoop, 3x inline nearest instead of GetNearest, missing Shared.Labels init) were NOTED by the user but explicitly NOT fixed ("ignore that game, only fix when I told you to fix it"). Do not touch TowerInc unless the user asks.
 
 ## Closed tasks

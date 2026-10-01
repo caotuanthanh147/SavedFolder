@@ -272,6 +272,8 @@ local InstanceClassMap = {
     Backpack = { "Backpack" },
     Humanoid = { "Humanoid" },
     Camera = { "Camera" },
+    ProximityPrompt = { "ProximityPrompt" },
+    Configuration = { "Configuration" },
 }
 local Instance
 do
@@ -624,6 +626,15 @@ do
         end
         function tab:AddTabbox()
             return boxmaker()
+        end
+        function tab:AddToggle(idx, info)
+            local gb = makeGroupbox(name)
+            return gb:AddToggle(idx, info)
+        end
+        function tab:AddDivider() end
+        function tab:AddLabel(text, wrap)
+            local gb = makeGroupbox(name)
+            return gb:AddLabel(text, wrap)
         end
         return tab
     end

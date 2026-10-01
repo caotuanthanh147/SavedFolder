@@ -60,3 +60,34 @@ Rule 18 + new §25 tooling front door).
 - Parallel-merge discipline worked: glm2's T7 (their fixes + selftest.sh + msg) + my T8 merged by content in one rebase; selftest 10/10 after; their msg handled + deleted, reply sent.
 
 Stage summary: T8 done end-to-end; toolchain now self-verifying (sync.sh) + self-testing (selftest.sh) + env-portable; MATI analysis ready for the build; group protocol survived a real double-claim race with zero lost work.
+
+## Session 4 — 2026-10-01 (T9: MATI build, glm1)
+
+User order "next game(MATI)" → T9 claimed immediately (msg to glm2: don't start).
+Guide (543) + Template (891) full rereads per Rule 18. Deep deobf dive Place B then
+Place A; every wire verified at its call site (Rule 2):
+
+- MeltState(true/false, pos) + MeltAim(pos)@10Hz; server limits 24 aim/s, 12 state/s.
+- Throw(guid, camera-look); Shop actions buy/upgrade/equip/hold with trailing GUID
+  and "Display_" + id display paths; LobbyRequest Create{capacity,destination,difficulty}.
+- T8c analysis correction: field join = IceResync(fieldId), ClientReady is a no-arg ping.
+- Products (FireGrenade/Flamethrower/DoubleBattery/gems) = ROBUX dev products →
+  excluded from automation per Rule 11. Coin economy = tools + track upgrades only.
+- Runtime sources: FrozenHouseState/Player attributes, workspace.FrozenHouseIceMeshes
+  MeshParts, OffPrompt proximity prompt, key-piece models, lobby pads.
+- Rule 2: Config/ToolStats/Layout/ClassPerks required from the game, never copied.
+
+Build: template + 460-line game section (AutoMelt incl. battery cycle + key pieces +
+FreezerReady gate, AutoFreezer, AutoBuy ladder, AutoUpgrade cheapest-next, AutoGrenade
+during recharge, AutoRestart lobby queue; one Status SafeLabel only).
+
+Harness (harness_lib + MATI mocks): caught a REAL wire bug — Lua vararg `...` in a
+non-last argument position adjusts to ONE value; ShopInvoke dropped the buy display-id
+silently (fixed: expand to table + table.unpack last; lessons entry). Also fixed
+freezer/melt TP race via FreezerReady gate in the melt loop. Final: 28/28 Level +
+14/14 Lobby; validate.sh OK; lua_lint game section 0 errors (table.unpack, type()).
+
+Delivery: repack.sh MATI.zip + MATI/MATI.lua (originals MD5-verified) → Public
+c26a275, ls-remote verified. harness_lib updated (tabbox tabs support direct
+elements; ProximityPrompt/Configuration classmap) — selftest 10/10. TASKS T9 done;
+TASK_SOURCE MATI row; mati-analysis.md wire table; worklog.md summary updated.
