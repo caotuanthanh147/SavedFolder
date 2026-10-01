@@ -19,7 +19,7 @@ tmpl=$(find "$DEST" -type f -name "Template.lua" | head -5)
 echo "lua files:  $(find "$DEST" -type f -name "*.lua" | wc -l)  txt dumps: $(find "$DEST" -type f -name "*.txt" | wc -l)"
 
 echo "== structure notes"
-for d in $(find "$DEST" -type d | head -8); do echo "  dir: $d"; done
+find "$DEST" -type d | head -8 | while IFS= read -r d; do echo "  dir: $d"; done
 
 cat << 'EOF'
 

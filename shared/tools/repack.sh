@@ -6,7 +6,7 @@ SCRIPT="${2:?missing script.lua}"
 INNER="${3:?missing inner path (e.g. 'GameFolder/Game.lua' or 'tdref/usethisfileSnack.lua')}"
 shift 3 || true
 MSG=""
-REPO="/tmp/Public"
+REPO="/home/z/Public"
 NAME=""
 while [ $# -gt 0 ]; do
     case "$1" in

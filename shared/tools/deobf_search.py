@@ -25,7 +25,7 @@ Examples:
   python3 deobf_search.py game_deobf.lua find "GetTagged\(" -C 3
   python3 deobf_search.py game_dump.txt tags
 """
-import re, sys
+import re, sys, os
 from collections import defaultdict
 
 MASK_RE = re.compile(
@@ -175,8 +175,19 @@ def cmd_attrs(lines, masked):
 def main():
     if len(sys.argv) < 3:
         print(__doc__); sys.exit(2)
+    COMMANDS = {"find", "strings", "fn", "remote", "tags", "attrs"}
     path, cmd = sys.argv[1], sys.argv[2]
     args = sys.argv[3:]
+    # arg-order tolerance — command-first forms all work:
+    #   deobf_search.py CMD FILE [ARGS]     deobf_search.py CMD [ARGS] FILE
+    if path in COMMANDS:
+        for i in range(2, len(sys.argv)):
+            if os.path.isfile(sys.argv[i]):
+                path, cmd = sys.argv[i], path
+                args = sys.argv[2:i] + sys.argv[i+1:]
+                break
+    if not os.path.isfile(path):
+        print(f"not a file: {path}  (usage: deobf_search.py FILE COMMAND [ARGS])"); sys.exit(2)
     ctx = 2
     if "-C" in args:
         i = args.index("-C"); ctx = int(args[i+1]); del args[i:i+2]

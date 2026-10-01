@@ -4,12 +4,15 @@
 #   git pull --rebase (skipped while a commit is in flight), then diff the
 #   ROOT-LEVEL *.zip list against the last state.
 # Reports to stdout AND /tmp/<name>.public.log (one event per line, doubles as history).
-# Usage:  sh watch_public.sh glm2 &      (from anywhere; default clone /home/z/Public)
+# Usage:  sh watch_public.sh [--once] glm2 &   (from anywhere; default clone
+#         /home/z/Public). --once: run ONE cycle then exit (testing/spot-check).
 # Event format:
 #   <utc-time> ZIP+     <name>  (new game zip — run the standard pipeline!)
 #   <utc-time> ZIP-     <name>  (game closed by user)
 #   <utc-time> COMMIT   <sha7> <subject>   (any other change)
 
+ONCE=0
+[ "${1:-}" = "--once" ] && { ONCE=1; shift; }
 NAME="${1:-watcher}"
 PUBLIC_DIR="${2:-/home/z/Public}"
 STATE="/tmp/${NAME}.public.state"
@@ -47,5 +50,6 @@ while true; do
         done
     fi
     LAST_HEAD="$HEAD_NOW"
+    [ "$ONCE" = 1 ] && { echo "watch_public: single cycle done (--once)"; exit 0; }
     sleep 30
 done
