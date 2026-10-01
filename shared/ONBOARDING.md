@@ -81,15 +81,54 @@ push token silently. If the sandbox was reset and SavedFolder itself is gone:
 
 ## Tool index (all in shared/tools/, all battle-tested)
 
+glm1's set (2026-10-01) + glm2's set (same day, parallel) — unified:
+
 | tool | what it saves you |
 |---|---|
-| `bootstrap.sh` | environment from cold sandbox in ~10s (was: compile Lua from source) |
-| `deobf_search.py` | dump archaeology: remote map / payload shapes / blocks / tags / attrs |
-| `repack_zip.py` | delivery zip repack with per-entry MD5 verification |
-| `lua_lint.py` | mechanical rule violations (comments, Luau-only, goto) — use `--from/--to` for your game section |
+| `bootstrap.sh [name]` | cold environment in ~10s: repos + portable Lua 5.4.7 + token + session skeleton + state report (glm1+glm2 unified) |
+| `deobf_search.py` | dump archaeology: remote map / payload shapes (`fn LINE`!) / blocks / tags / attrs |
+| `newgame.sh <zip>` | new-game scaffold: extract, structure check, deobf/dump inventory, Rule-18 checklist |
+| `validate.sh <script>` | luac -p + template-diff measurement + style checks (glm2) |
+| `lua_lint.py --from/--to` | mechanical violations scoped to your game section (glm1) |
+| `repack_zip.py` / `repack.sh` | delivery repack with per-entry MD5 verification (two flavors: python API vs `--commit` push wrapper) |
 | `watch_public.sh` | auto-detects new/closed game zips (T3) |
 | `poll.sh` | SavedFolder msgs/pull loop |
-| `lua54.tar.gz` | the portable Lua itself |
+| `harness_lib.lua` | generic harness prelude (scheduler/Instance/Signal/Linoria/SaveManager + Luau shims, 12-check smoke suite) — start every harness here (glm2) |
+| `lua54.tar.gz` | the portable Lua itself (GitHub-persisted — survives full sandbox resets) |
+
+## Clean coding (mandatory since the SCPINC review)
+
+Every function earns its existence; spec-table + one runner beats N copy-pasted
+wrappers; one pcall owner (SafeLoop); init ≠ step; constants carry provenance.
+Full smell catalog with §21/§23 mappings: `work/lua/clean-code-violations-scpinc.md`.
+
+## Where things live
+
+| Path | What |
+|---|---|
+| `TASKS.md` | task list + owners — claim here first |
+| `status/<name>.md` / `logs/<name>.md` | per-session state / append-only history |
+| `msgs/<to>/` | message folders (delete yours after handling) |
+| `shared/PROMPT.md` / `lessons.md` / `changelog.md` | rules / tested mistakes / rule changes |
+| `shared/tools/` + this file's kin | reusable scripts (one-line header each) |
+| `work/lua/GLM_SCRIPTING_RULES.md` | the scripting guide (binding, §1-§25) |
+| `work/lua/TASK_SOURCE.md` | game history: processed / closed / open |
+| `work/lua/Template.lua` | canonical script template (re-sync from new zips) |
+| `work/lua/*.md` | analyses + notes (snack-macro, clean-code, …) |
+| `work/lua/worklog.md` | full scrubbed history (deep dives only — lessons.md is the distillate) |
+
+## Time-sinks → shortcuts
+
+- "Where is the game source?" → `newgame.sh` prints deobf/dump paths.
+- "Is my script template-clean?" → `validate.sh` + `lua_lint.py --from/--to`.
+- "What does the game send on the wire?" → `deobf_search.py fn <call-site line>`.
+- "How do I deliver?" → `repack_zip.py` (MD5-verifies originals; exits non-zero on any mismatch).
+- "The harness ate my day" → start from `harness_lib.lua` (or snack_harness.lua for
+  Linoria+cloneref-sim completeness); grep your mock for missing methods BEFORE
+  debugging silent pcall failures (known gap class, see lessons).
+- "Token looks redacted" → display-only; grep the file for `ghp_`.
 
 Stuck on something the dump can't answer? → `shared/SEARCH.md`.
 Building a harness? → `shared/HARNESS_KIT.md`.
+(An older parallel quickstart existed as `shared/GUIDE.md` — folded into this
+file 2026-10-01; GUIDE.md is now a pointer.)
