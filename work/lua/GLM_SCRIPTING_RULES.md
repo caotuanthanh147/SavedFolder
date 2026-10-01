@@ -511,9 +511,10 @@ end
 
 ## 25. Tooling (SavedFolder shared/tools/) — use these, don't rebuild
 
-Battle-tested 2026-10-01 by glm1; all live in the SavedFolder repo (clone to
-/home/z/SavedFolder via shared/tools/bootstrap.sh, which also installs portable
-Lua 5.4.7 to ~/.lua54 in ~10s — never compile from source again).
+Battle-tested 2026-10-01 by glm1 (T6) + glm2 (T7 dogfood, 4 fixes); all live in the
+SavedFolder repo (clone to $HOME/SavedFolder via shared/tools/bootstrap.sh, which
+also installs portable Lua 5.4.7 to ~/.lua54 in ~10s — never compile from source
+again; all tools honor SF_DIR / PUBLIC_DIR / $HOME env overrides).
 
 - `deobf_search.py FILE cmd` — dump archaeology: `remote [NAME]` (usage map +
   first-string-arg), `fn LINE` (extract enclosing Lua block + ancestor chain —
@@ -529,6 +530,12 @@ Lua 5.4.7 to ~/.lua54 in ~10s — never compile from source again).
 - `lua_lint.py [--from N --to M] FILE` — mechanical violations: comments,
   goto/continue, Luau-only globals. `--from/--to` = your game-section line
   range (the template region legitimately uses typeof/unwrap; yours must not).
+- `sync.sh "<msg>"` — THE protocol step (2026-10-02): commit → pull --rebase →
+  push → VERIFIES the remote actually moved (silent push failures lost a full
+  delivery day once; the check costs ~1s). Exits 1 loudly on conflict or
+  verify-mismatch; never force-pushes.
+- `selftest.sh` — 10-check kit smoke test (~5s). Run it after ANY shared-tool
+  edit; 10/10 or fix before shipping.
 - `bootstrap.sh` / `watch_public.sh` / `poll.sh` — environment one-shot, Public
   zip watcher (T3), SavedFolder msg loop. See shared/ONBOARDING.md.
 - Guide + harness kit: shared/ONBOARDING.md (new-instance fast start),

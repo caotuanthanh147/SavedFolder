@@ -47,3 +47,16 @@ search tools on the internet, etc."
 
 Next: idle/watch; glm2 dogfoods (T7); next game zip → standard pipeline (guide
 Rule 18 + new §25 tooling front door).
+
+---
+## Session 3 — 2026-10-02 (T8: user-ordered trim-bloat + speed round + MATI dogfood)
+
+- Recovered state, reread guide (Rule 18/19). Public pull revealed DIVERGENT history: user's dea6ee8 (MATI.zip added; tdref.zip + error/ deleted) vs our two "pushed" commits — BOTH 2026-10-01 deliveries (SCP 055dd8b, snack 7cd68b0) had never landed on origin. Resolved: dropped the empty snack commit (user closed the round; fix preserved in work/lua/tdref.zip + git objects), rebased + pushed glm2's SCP delivery (now live: 5521079). Lesson banked: verify every push.
+- Claimed T8 (overlap protection; glm2 racing on T7 dogfood — their claim landed 3 min before mine, no conflict). Msg'd glm2 the division: MATI tool-dogfood mine, script build theirs.
+- T8a: worklogs 2019→54 (local) / 1980→40 (repo) with archives; GUIDE.md pointer deleted; ONBOARDING/PROMPT updated.
+- T8b: env-var paths (SF_DIR/PUBLIC_DIR/$HOME) across all tools; repack.sh stale /tmp/Public default = live bug found by BOTH glm2 and me same hour (content-merged mine as superset).
+- T8c time-sink tool: NEW sync.sh (commit → pull --rebase → push → ls-remote VERIFY). Dogfooded live: caught my own mid-flight conflict with glm2's T7 push (clean abort, content merge, no force), then two clean verified pushes (~3s each). Before/after: 4-cmd dance ~45s/step + ~4min incident recovery + silent-failure class (1 lost delivery day) → 1 cmd ~3s verified.
+- T8d MATI dogfood: newgame.sh 1.0s (emoji/space paths intact); remote map + fn + manual trace ≈15 min total → VERIFIED 2-place remote map (LobbyNet: generic LobbyRequest event + Shop/Class/Record/Completion/Skin/Trade/Gift/Community *Request RemoteFunctions, ask-queue 3-retry, {ok=...} results; FrozenHouseNet: ClientReady…GrenadeFx events, MeltAim/HeatFx = UnreliableRemoteEvents, Shop/Throw funcs, FireServer(fieldId) field-join). mati-analysis.md committed for glm2's T3. Friction fed back: remote-map Fire: rows include BindableEvents (lesson added).
+- Parallel-merge discipline worked: glm2's T7 (their fixes + selftest.sh + msg) + my T8 merged by content in one rebase; selftest 10/10 after; their msg handled + deleted, reply sent.
+
+Stage summary: T8 done end-to-end; toolchain now self-verifying (sync.sh) + self-testing (selftest.sh) + env-portable; MATI analysis ready for the build; group protocol survived a real double-claim race with zero lost work.
