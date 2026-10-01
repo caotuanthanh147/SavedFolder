@@ -237,37 +237,31 @@ Loaded via `loadstring(game:HttpGet("https://raw.githubusercontent.com/iLove-yur
 
 ---
 
-## 14. Main Template (Yuri/Template.lua)
+## 14. Main Template (Yuri/Template.lua — USER-EDITED VERSION, 2026-09-28+)
 
-The user confirmed the Template.lua is the same every game — they will tell us when they make their own edits. An **improved main template** now lives at **`Yuri/Template.lua`** (built from the user's leaf Template.lua, 754 → 907 lines, compile-verified with lua5.4). Use it as the base for every new game script.
+**The canonical main template is now the user's own Template.lua delivered INSIDE the game zips** (first seen in genshin.zip, 853 lines). User instruction (2026-09-28): *"use the template in the zip file as your main template from now on."* It replaced the previous 907-line "improved" template (retired; backup at `Yuri/Template_old_907.lua.bak`). `Yuri/Template.lua` is now a byte-identical copy of the user's zip template. When a new game zip contains a Template.lua, re-sync `Yuri/Template.lua` from it — the user edits the template themselves now, and their version wins over anything we remember.
 
-### 14.1 What the main template fixed vs. the original
+### 14.1 What the user's template KEPT from the improved version
 
-- `firetouchinterest(part, root, true/false)` — **boolean** third arg (Section 12), was `1/0`.
-- `setfpscap(2000)` on uncap (doc-recommended), was `999`.
-- `fire_event` — captures `local args = {...}` BEFORE the connection loop (vararg-in-closure bug), prefers `connection:Fire(unpack(args))` (works on ForeignState connections where `.Function` is nil), `task.spawn(conn.Function, ...)` only as last resort.
-- `AntiAFK` — single-connection grab with **reversible** `:Disable()`/`:Enable()` (re-enables on toggle-off and on Unload), VirtualUser fallback.
-- `AntiKick` — actually implemented now (the original toggle was dead): `hookmetamethod(game, "__namecall", newcclosure(...))` filtering `getnamecallmethod() == "Kick"` on LocalPlayer, `Support.HookMeta`-gated.
-- `Serverhop` — the original button fetched servers and did nothing; now a real multi-page (up to 3 cursor pages) lowest-population `TeleportToPlaceInstance` hop, preferring non-empty servers.
-- `AutoServerhop` toggle — actually wired to a timed loop now (was dead in the original).
-- `Support` table extended: `QueueOnTeleport` checks **both** `queue_on_teleport` and `queueonteleport`, plus `HookMeta`, `Firesignal`.
-- Unload — re-enables the Idled connection, resets fps cap, cleans Connections/Flags before `Library:Unload()`.
+- `firetouchinterest` boolean third arg; `setfpscap(2000)` uncap; `fire_event` with args captured before the loop and `conn:Fire(unpack(args))` preferred; reversible AntiAFK (`:Disable()`/`:Enable()`); real multi-page lowest-population `Serverhop`; wired `AutoServerhop`; Support table with both API spellings; Unload cleanup (fps cap reset, `Cleanup(Connections)`, `Cleanup(Flags)`); `SetLoadingOrder(true, {...})`; DPI scale by device; `SaveManager:LoadAutoloadConfig()` in `task.defer`.
 
-### 14.2 Universal helpers added (use these, stop re-writing them per game)
+### 14.2 What the user REMOVED (do NOT re-add or re-implement these)
 
-| Helper | Signature | Purpose |
-|---|---|---|
-| `GetSafeModule` | `(parent, name) -> table?` | Instant `FindFirstChild` + `pcall(require)`, nil on failure |
-| `LoadModuleAsync` | `(parent, name, onLoaded)` | Spawns a waiter: `WaitForChild` retry loop up to 30s → `pcall(require)` → `onLoaded(module)` — use for modules that arrive late (StreamingEnabled/deferred requires); repopulate dropdowns via `Options[id]:SetValues(...)` inside the callback |
-| `GetSafeRemote` | `(parent, name) -> Remote?` | Typed lookup (RemoteEvent/RemoteFunction check) |
-| `FireRemote` | `(remote, ...) -> bool` | pcall-wrapped `FireServer` with nil-guard + notyuri on error |
-| `AddMultiDropdown` | `(group, id, config) -> getSelection, refresh, baseValues` | The "All" multi-select pattern. `config = { Values = baseArray, label = labelToIdMap?, Text, Default, Callback }`. **`baseValues` is the caller's table — mutate it in place** (insert/remove) then call `refresh()` so the dropdown + "All" stay live. `getSelection()` returns `{[id]=true}` (label→id mapped) |
-| `GetNearest` | `(list, filterFn) -> inst, dist` | Nearest instance by magnitude (BasePart/Model pivot aware) |
-| `Serverhop` | `()` | Real lowest-population hop (see 14.1) |
-| `QueueOnTeleportExec` | `(code)` | Both queueonteleport spellings |
-| `GetCharacter/TPTo/gsc/FireCD/FirePP/FireTI/SafeInvoke/SafeConnect/Thread/SafeLoop/Cleanup/AddSliderToggle` | unchanged | Same as user's template — keep using them |
+- **AntiKick** — the toggle, the hookmetamethod implementation, and `Support.HookMeta` usage are all gone. Do not add anti-kick hooks to game scripts.
+- **`FireRemote` / `GetSafeRemote`** — no template remote-firing helper anymore. Game scripts resolve remotes into the template's `Remotes = {}` table themselves (game-specific logic) and fire them directly (`Remotes.X:FireServer(...)`, pcall-wrapped where failure is expected). `SafeInvoke(remote, ...)` (2s-timeout RemoteFunction invoke) is still in the template — use it for InvokeServer.
+- **`LoadModuleAsync`** — gone. Use `GetSafeModule(parent, name)` (kept) or the game's own lazy-wait patterns.
+- **`QueueOnTeleportExec`** — gone.
 
-### 14.3 Template conventions to preserve
+### 14.3 What the user ADDED / CHANGED
+
+- **`SafeLabel(target, id, text)`** — label manager. Create with a groupbox + id + text (returns the label); update later by calling `SafeLabel(id, newText)` with the id string (marks `Shared.Labels[id]` dirty; a background thread flushes `SetText` calls every frame, pcall-guarded). Use for live stats lines instead of hand-rolled SetText loops.
+- **`AddMultiDropdown` — new dual-mode signature:**
+  - Create: `AddMultiDropdown(group, id, {Text=, Values=, Default=, Callback=})` → prepends `"All"` to Values, creates a Multi+Searchable dropdown, returns `Options[id]`. Default is an ARRAY (e.g. `{"All"}`) — Linoria iterates pairs on Multi SetValue.
+  - Read: `AddMultiDropdown(id)` (id string) → returns the currently-selected **map** `{[label]=true}` with `"All"` expanded to every non-All value. Call this fresh inside each loop iteration — do not cache the returned table.
+- Everything else (`GetObject`, `GetSafeModule`, `AddSliderToggle`, `SafeConnect`, `Thread`, `SafeLoop`, `Cleanup`, `CommaFormat`, `Abbreviate`, `GetCharacter`, `TPTo`, `GetNearest`, `gsc`, `FireCD`, `FirePP(target, teleport)`, `FireTI`, `Serverhop`, `missing`) — unchanged, keep using them.
+- Standard tabs/tabs layout the template ships: `Tabs = {Main, Player, Config}`, `TB`/`TB_Tabs`/`GB` tables, Main tabbox left "Autofarm" / right "Config" tabs, Player General/Server/Game groupboxes, Config Menu groupbox — extend these, don't rebuild them.
+
+### 14.4 Template conventions to preserve
 
 - Guard name `getgenv().ayasemiyatongekissazumirisa` (set immediately after Linoria loads, reset on Unload).
 - `notyuri` logger + `1log.txt` reset at start; silent debug hooks (`dcmm`) are the user's style — a no-op `local function dcmm() end` with calls left in place is acceptable.
@@ -299,20 +293,24 @@ Also remember when rewriting/porting: an early `return` inside a helper (e.g. `i
 
 ## 17. Template Helper Mandate (no re-implementations)
 
-**Before writing ANY new helper function in a game script, check `Yuri/Template.lua` first. If the template already provides an equivalent, USE the template's helper — do NOT write a new one.** This is a hard rule, not a style preference. Violations seen in KickUma.lua: a hand-rolled `WaitModule(path)` that re-implements `GetObject`+`GetSafeModule`/`LoadModuleAsync`, and a custom name-based `Fire` that duplicated `FireRemote`'s job.
+**Before writing ANY new helper function in a game script, check `Yuri/Template.lua` first. If the template already provides an equivalent, USE the template's helper — do NOT write a new one.** This is a hard rule, not a style preference. Violations seen in KickUma.lua: a hand-rolled `WaitModule(path)` that re-implemented `GetObject`+`GetSafeModule`/`LoadModuleAsync`, and a custom name-based `Fire` that duplicated `FireRemote`'s job. Violations seen in TowerInc.lua (user-flagged 2026-10-01, left unfixed per user order): a game-section `RunLoop(toggle, step, interval, label)` that re-implemented `SafeLoop`'s pcall+notify loop wrapper, and three inline `best/bestDist = nil, math.huge` nearest-scans that duplicated `GetNearest`.
 
-The template's canonical helper set (Section 14.2 has the full table) — these are the ONLY approved implementations:
+The template's canonical helper set (the 2026-09-28 user-edited zip template — Section 14.3) — these are the ONLY approved implementations:
 
-- Instance/module access: `GetObject(parent, "A.B.C")`, `GetSafeModule(parent, name)`, `LoadModuleAsync(parent, name, onLoaded)`
-- Remotes: `GetSafeRemote(parent, name)`, `FireRemote(remote, ...)`, `SafeInvoke(remote, ...)`
-- UI: `AddMultiDropdown(group, id, config)`, `AddSliderToggle(Config)`, `AddInfo(Window)`
+- Instance/module access: `GetObject(parent, "A.B.C")`, `GetSafeModule(parent, name)`
+- Remotes: `SafeInvoke(remote, ...)` — the ONLY template remote helper left; resolve remotes into the template's `Remotes = {}` table and fire `Remotes.X:FireServer(...)` directly (game-specific resolver logic is allowed; re-adding a generic `FireRemote`/`GetSafeRemote` is NOT)
+- UI: `AddMultiDropdown(group, id, config)` (create) / `AddMultiDropdown(id)` (read selected map) / `SafeLabel(group|id, ...)` (create/update live labels) / `AddSliderToggle(Config)` / `AddInfo(Window)`
 - Threads/loops/connections: `Thread(path, fn, state)`, `SafeLoop(name, func)`, `SafeConnect(key, getSignalFn, handler)`, `Cleanup(tbl)`
-- World interaction: `GetCharacter()`, `TPTo(target, offset)`, `GetNearest(list, filterFn)`, `gsc(guiObject)`, `FireCD(target)`, `FirePP(target, teleport)`, `FireTI(target, offset)`
-- Misc: `CommaFormat(n)`, `Abbreviate(n)`, `Serverhop()`, `QueueOnTeleportExec(code)`, `missing(t, f, fallback)`, `fire_event(signal, ...)`
+- World interaction: `GetCharacter()`, `TPTo(target, offset)`, `GetNearest(list, filterFn)`, `gsc(guiObject)`, `FireCD(target)`, `FirePP(target, teleport)`, `FireTI(target)`
+- Misc: `CommaFormat(n)`, `Abbreviate(n)`, `Serverhop()`, `missing(t, f, fallback)`, `fire_event(signal, ...)`
 
 What still MAY be written fresh in a game script: **game-specific logic only** — value/metadata lookups for that game's modules (e.g. `BrainrotValue(name)`), game-object structure walkers (e.g. slot scanning), game-mechanic sequences (e.g. escape-wave logic), and game-state parsing (e.g. `ParseNumber` for that game's number format). The test: if the function would work in ANY game unchanged, it must be the template's version, not yours.
 
 Rationale: every duplicated helper is a second copy that can drift (bug fixes applied to one but not the other), bloats the file, and makes the user angry. One behavior, one implementation, in the template.
+
+**Scope note (user instruction 2026-10-01): pointing out a rule violation in previous work is FEEDBACK for the next script, not a fix request. Only edit/fix a previous game's script when the user EXPLICITLY says "fix it" — a "next game" message means move on (Rule 16) and apply the lesson to the new script only.**
+
+**Also from the 2026-10-01 template re-sync: the user's canonical template now ships `TweenTo(speed, target, offset)` (Stepped-frame smooth movement, preserves rotation) and `SafeInvoke(remote, skip, ...)` where the 2nd arg `skip` makes it fire-and-forget — use these instead of hand-rolled tween/wait-invoke code.**
 
 ---
 
@@ -392,3 +390,121 @@ Also: cross-executor variance is real — the same script can behave differently
 ### 20.5 Edit-target discipline
 
 "make edit on the version inside the zip file not yours" — when the user reports a bug in THEIR build (`Alliancev1.lua` inside their uploaded zip), the fix goes into THAT file (repack/upload the zip version), not into our maintained `Yuri/<Game>/` copy and not into a re-derived rewrite. Diagnose against the user's exact build; patch the user's exact build.
+
+### 20.6 Wire-level payload indexing (Snack case, 2026-10-01 — two independent 0-capture bugs found in one round)
+
+Hook argument indices come from the **WIRE-level namecall**, never from the wrapper method's signature. When a game routes remotes through a resolver module (EasyEvents-style), trace the wrapper to the raw instance call in the deobf before coding ANY hook arg indexing:
+
+- Snack's client calls `EasyEvents:InvokeServer(name, payload)`; EasyEvents is a thin resolver — `tbl.InvokeServer = function(_, arg2, ...) return ensureRemote(arg2, "RemoteFunction"):InvokeServer(...) end` — **the name is the lookup key and never reaches the wire**.
+- The `__namecall` hook therefore sees `(self, payload)`: payload at `nargs[2]`, NOT `nargs[3]` (Slop's wire really had the name at [2]; porting the index without re-tracing the wire silently captured nothing).
+- Symptom pair: recorder logs "Recording [0]" while the executor's remote-spy shows the remote firing — AND the mock harness stays green because it modeled the wrapper signature, not the wire. **A green mock harness only validates the harness's protocol model** — cross-check every mock protocol against the deobf call site (§20.1 discipline applied to test mocks).
+- Corollary: when a recorded-macro bug report exists, check BOTH the hook gate (§20.2/§24) AND the payload indexing in the same pass — Snack had one of each, and fixing either alone still yields 0 captures.
+
+Also from this round: capture-after-original (§20.3) reads server-mutated state. If the captured field is "resulting level" semantics (Snack `LVL` = `cfg.Upgrades[LVL]` tier index AND the replay skip level), read it post-original WITHOUT a `+1`; the server already applied the mutation during `originalNamecall(...)`. Pre-state semantics (rare) require snapshotting before the original — pick one, document it in the entry format, and make the replay logic consume the same semantic.
+
+---
+
+## 21. Clean Coding Principles (internet-sourced, mandatory for every script)
+
+Researched 2026-10-01 per user order ("read the clean coding principles on the internet and save it to the glm guide"). Sources: *Clean Code* (Robert C. Martin) summaries (gist.github.com, dev.to, thewolfsound.com, blog.codacy.com), KISS/DRY/YAGNI/SoC articles (c-sharpcorner.com, daily.dev, softaai.com), YAGNI/dead-code articles (dev.to "Delete Code", Turing Codex "Clean Code: A Psychological Perspective", "A Great Programmer Removes, Doesn't Add"). Mapped to our Lua scripting context:
+
+1. **KISS — Keep It Simple.** Don't overcomplicate. The simplest code that does the job wins. No wrapper functions around existing helpers, no extra indirection layers, no "defensive" re-checks the helper already does.
+2. **DRY — Don't Repeat Yourself.** One behavior = one implementation. If two functions differ only by an argument, parametrize ONE function (Slop's `Func_AutoVote(toggle, flag, remote, option, errLabel)` serving three toggles is the model), don't copy-paste three near-identical Funcs.
+3. **YAGNI — You Aren't Gonna Need It.** Never add code "for later". No speculative abstractions, no forward-declared `local X = nil` placeholders assigned 1000 lines later, no feature nobody asked for. If the reference (Slop.lua) doesn't have it, the port doesn't get it.
+4. **Dead code is dead weight.** Delete unused functions, unused locals, unused branches, commented-out code. A local that is read once and only to re-wrap something (e.g. `local TemplatesFolder = ...` used only to build five more locals) is a wall of wasted names.
+5. **Meaningful, minimal names.** Descriptive but SHORT. No redundant context prefixes (`SnackAutoPlace` inside the Snack script, `GB_SnackFarm` inside the only GUI it could possibly mean) — the file/game is already the context. No `Snack.` prefixes on thread names. No encoding schemes (`Autofarm2.T1` is fine — it's the template's own name).
+6. **Functions do one thing, at one level of abstraction.** Small functions. If a Func_ body needs an inner `if place == "Lobby" then` fork, it's two things — split or flatten.
+7. **No side-effect surprises / least astonishment.** A function named `GetX` should not fire remotes, notify, or set state.
+8. **Boy Scout Rule.** Leave the code cleaner than found — but scope-limited: clean THE script you're writing (or the one the user ordered fixed), never volunteer rewrites of other games (Rule 17 scope note).
+9. **Minimal scope.** Declare locals at the innermost scope that needs them; don't hoist 14 module locals to file scope when 6 functions each use one of them once — resolve at point of use (`GetSafeModule(GetObject(RS, "A.B"), "C")` inline is the Slop pattern; `require` is cached by Roblox so re-resolving is cheap).
+10. **Delete > add.** "A great programmer removes, doesn't add." When reviewing your own draft, the question is not "what else could this feature have" but "what can I delete while keeping the feature working".
+11. **Structure mirrors the reference.** When porting from a reference script (Slop.lua), the structure IS the spec: same section order, same naming shape, same UI wiring shape. Improvising "a better architecture" than the reference = violating all of the above at once.
+
+---
+
+## 22. Slop.lua Structural Canon (tdref/Slop.lua — the mandatory TD reference shape)
+
+Full reread 2026-10-01 (3419 lines). Slop.lua is the canonical TD-script architecture. Every tower-defense port (Camera, CTD, Snack, ...) MUST follow this shape — structure is part of the spec, not a suggestion:
+
+1. **ONE code path — no place/lobby branching.** No `IsRound`/`IsLobby`/`S.Place` detection, no `RemotesForPlace()`, no `if not FrameworkReady then Notify else` wrappers, no AFK-place notify branches. ONE `PopulateRemotes()` at load resolves EVERY remote name (game + lobby lists together); features that don't apply in the current place simply see `Remotes.X == nil` or absent game state and return early (`if Remotes.ActivateAbility and IsMatchActive()`).
+2. **Modules resolve at point of use** — `GetSafeModule(RS, "LVLs")` inside `GetNextUpgrade`, `modules and GetSafeModule(modules, "TowersPlacementsMax")` inside `GetPlacementMax`. NEVER a top-of-file wall of module locals.
+3. **Game state lives in the template's `Shared` table** with named subtables (`MState` macro state, `Memo` one-shot dedupes, `Place` placement caches, `ElevState`), declared at the top of the game section. No parallel `local S = { 30 fields }` mega-table.
+4. **UI skeleton = the template's base extended EXACTLY like Slop.lua does — nothing invented.** (Corrected 2026-10-01 after the user's second review: cramming macro/lobby/webhook onto the template's two tabs is ALSO a violation — "doesn't match the template(slop.lua)".) The template's `Tabs`/`TB_Tabs`/`GB` blocks get Slop's exact extension and nothing else: Tabs += `AutoPlay = Window:AddTab("Auto Play")` + `Webhook = Window:AddTab("Webhook")` between Player and Config; `TB_Tabs.Autofarm = { T1 "Game", T2 "Macro", T3 "Lobby" }`; `TB_Tabs.Autofarm2 = { T1 "Config", T2 "LobbyConfig" }`; `GB += Webhook = { Left = { Webhook = Tabs.Webhook:AddLeftGroupbox("Webhook") } }`. Then: elements go DIRECTLY on the `TB_Tabs.*.T*` tabs (`TB_Tabs.Autofarm.T1:AddToggle(...)`, dividers between clusters) — NEVER a groupbox inside a tabbox tab ("a tab that creates a tab that creates another tab"). Groupboxes live ONLY on Window-level tabs (Player/AutoPlay/Webhook/Config), and groupbox locals only when heavily reused (Slop: `APLeft`/`APRight`, `MenuGroup`). Tab names come from Slop's set (Game/Macro/Lobby/Config/LobbyConfig/Auto Play/Webhook) — no per-game tab names, no Stats tabs, no per-game groupbox locals (`GB_GameFarm` etc.).
+5. **Element ids are plain feature names**: `AutoPlace`, `MacroRecord`, `LoadMacro`, `WHMatchEnd`, `WebhookURL`. Thread/SafeLoop names are plain too: `Thread("AutoPlace", SafeLoop("AutoPlace", Func_AutoPlace), state)`. NO game-name prefixes anywhere — the script already knows what game it's for.
+6. **`AddMultiDropdown` is used directly**: create at UI build with `AddMultiDropdown(group, id, config)`, read at use site with `local wanted = AddMultiDropdown(id)`. NEVER wrap it in `XGetSelection = function() return AddMultiDropdown(...) end` + `X and X() or {}` guard chains — the helper's string-mode already handles everything.
+7. **Loop shape**: `local function Func_AutoX() while Toggles.AutoX.Value do local ok, err = pcall(function() ...step... end) if not ok then notyuri(...) end task.wait(interval) end end` — pcall wraps the STEP inside the while, wired via `Toggles.AutoX:OnChanged(function(state) Thread("AutoX", SafeLoop("AutoX", Func_AutoX), state) end)`.
+8. **Remote wrappers**: ONE `Invoke(remote, ...)` (marks `Shared.SelfThreads[coroutine.running()]` + `SelfFire` so the macro hook excludes our own calls, then `SafeInvoke(remote, 1, ...)`) and ONE `Fire(remote, ...)` (SelfFire + FireServer pcall). All game calls go through these two. The macro hook gates on `not Shared.SelfThreads[coroutine.running()]`.
+9. **Listeners**: `SafeConnect("PlainName", function() return signal end, handler)` inside a single `do ... end` block after `PopulateRemotes()` — each guarded by instance existence.
+10. **Webhook**: one `SendWebhook(title, description)` with `if not request then return end` at top + random yuri image embed; callers build the description string.
+11. **Functional labels only**: `SafeLabel(group, "Macro", "Idle")` (record/replay status) and `SafeLabel(APLeft, "Positions", ...)` (saved-slot state) are fine — they DO something for the user. Currency/wave/gems "live stats" labels are USELESS (Rule 23.3) — never make them.
+12. **Unload handler** resets game state (`Shared.MState.Rec/Rep/Cur/Load/Pending`) before `Cleanup(Connections)` + `Cleanup(Flags)` + `Library:Unload()`.
+13. **Section order**: Shared state → game helpers → macro machinery → placement logic → Func_ loops → PopulateRemotes → listeners do-block → UI values-builders → UI elements → template player wiring → antiAFK → game toggle wiring → MenuGroup/SaveManager. (`LoadMDir()`/`LoadPositions()` right after UI creation.)
+
+---
+
+## 23. Snack.lua Violation Catalog (2026-10-01 user review — all fixed in the rewrite, never repeat)
+
+The user's review of the first Snack.lua build ("what the fuck is this", "waste of locals", "useless", "there are bunch more btw"). Full catalog with fixes — every item is an anti-pattern to check for in EVERY future script:
+
+1. **Wrapper-function indirection**: `local TraitGetSelection = nil` ... later ... `TraitGetSelection = function() return AddMultiDropdown("SnackTraitTowers") end` ... and at every use site `local selected = TraitGetSelection and TraitGetSelection() or {}` — five of these (Macro/Upgrade/Target/Sell/Trait). Fix: call `AddMultiDropdown("TraitTowers")` directly at the use site. The `X and X() or {}` double-guard is doubly stupid: the helper already returns a table.
+2. **Stats labels**: `FuncStats`/`FuncLobbyStats` + 10 `SnackStat*` SafeLabels (wave/cash/base/gems/dice/streak...). User: "the Stats labels you made are useless **never make or add them in any game**". Fix: deleted. Only functional labels (Macro status) survive.
+3. **Lobby/game code separation**: `S.Place`/`IsRound`/`IsLobby` + `if IsRound then ... elseif IsLobby then ... else AFK-notify end` splitting the whole game section in three. User: "useless lobby/game seperation, do you see the slop.lua have it?" Fix: one code path (Rule 22.1) — features no-op when their state/remotes are absent.
+4. **Waste of locals**: 14-line block of `TemplatesFolder/FrameworkSettings/TowersMod/TowerTraits/TowerStars/SummonDictionary/QuestsMod/MapsFolder/LevelCurve/RoundCodeFolder/ClientUtilities/PlacementMath/PlacementArea/FrameworkReady` at file scope. Fix: resolve at point of use (Rule 22.2).
+5. **Useless forward declarations**: the five `XGetSelection = nil` locals (see 1). Fix: none.
+6. **Useless readiness gating**: `FrameworkReady` + `if not FrameworkReady then Library:Notify("framework modules unavailable") else ... end` wrapping the ENTIRE game section, plus redundant `local SnackOk = false do ... SnackOk = true end` inside the template's own pcall wrapper. Fix: gone — template's `eh_success` wrapper is the only error shell; missing modules degrade per-feature.
+7. **`RemotesForPlace()`**: place-filtered remote resolution + a 30s retry task loop. Fix: one `PopulateRemotes()` resolving all names once (Rule 22.1), functions check `Remotes.X` at runtime.
+8. **Game-name prefixes**: toggle ids `SnackAutoPlace`/`SnackWebhook`/..., thread names `Thread("Snack.AutoTrait", SafeLoop("Snack.AutoTrait", ...))`. User: "who ask you to add Snack. behind stuff". Fix: plain ids/names (`AutoPlace`, `AutoTrait`).
+9. **GUI template violations**: game section created its own tabs (`TB.Main.Right.Autofarm:AddTab("Macro")` / `"Stats"` / `"Inventory"`) and groupbox locals (`GB_SnackFarm`, `GB_SnackFlow`, `GB_SnackMacro`, `GB_SnackStats`, `GB_Queue`, ...). User: "you also violate the useless feature coding by changing the gui template" + "ok so there is a tab, that tab creates a tab and then you just use it to create another tab(gb) inside that tab?". Fix: elements directly on the template's `TB_Tabs.Autofarm.T1` / `TB_Tabs.Autofarm2.T1` with dividers (Rule 22.4). The template's GUI skeleton (Tabs/TB/TB_Tabs/GB blocks) stays byte-identical.
+10. **Ad-hoc send helper**: `SnackSend` (FireServer pcall wrapper) bypassing SelfFire marking → macro record would capture our own autofarm fires as user actions. Fix: Slop's `Invoke`/`Fire` wrappers (Rule 22.8).
+
+**Second review (same day, after the first rewrite) — "useless code change, features: ... doesn't match the template(slop.lua)".** The first rewrite fixed the structure but kept invented features. New catalog items 11-16:
+
+11. **Invented config fields**: `Placeholder = "auto = timestamp"` on the macro-name input and `Placeholder = "discord.com/api/webhooks/..."` on the webhook input. Slop's webhook input has NO Placeholder; its FileName input uses `Placeholder = "yuriyuri"`. Never invent config fields a reference element doesn't have — copy the reference element verbatim.
+12. **Invented features not in the reference**: `AutoQuests` ("Auto Claim Quests"), `AutoIndex`, `GroupReward`, `AfkTeleport`, `EquipBest` toggles. Slop has none of them (its quest/gift code paths are UI-less leftovers). A remote existing in the game is NOT a reason to automate it — the reference's feature set defines the scope.
+13. **Tower-selection multidropdowns + mode dropdown + delay slider**: `PlaceTowers`/`UpgradeTowers`/`SellTowers`/`TargetTowers` multidropdowns, `TargetMode` dropdown, `PlaceDelay` slider. Slop's model instead: positions system (`Shared.Place.SlotPositions[map][slot]`, HandleSlotPos set/massset/reset, SetSlotSelect/ResetSlotSelect dropdowns + buttons + Positions label) + per-slot Limits (PlaceOrder/PlaceWave/PlaceLimit/UpgradeLimit sliders 1-6) + UpgradeMethod dropdown + PlaceAndUpgrade + AutoSell-at-wave slider-toggle. When the reference has a mechanism for the same job, PORT THE MECHANISM, don't invent a parallel config scheme.
+14. **Webhook controls on the Config tab**: Slop puts WebhookURL + WHMatchEnd on a dedicated Webhook WINDOW tab (with the `Support.Webhook` orange label). Match the reference placement.
+15. **Wire-format bug class**: `Invoke` passed the remote NAME as the first wire arg. The game's EasyEvents `InvokeServer(name, ...)`/`SendEvent(name, ...)` resolve `RS.FrameworkEvents[name]` and forward ONLY the varargs — the name is the lookup key, never on the wire. Always read the wrapper's implementation (deobf `tbl1.SendEvent = function(_, arg2, ...) ensureRemote(arg2,...):FireServer(...) end`), not just the call-site notation.
+16. **SelfFire hook-gate bug class**: the macro hook must gate ONLY on `not Shared.SelfThreads[coroutine.running() or false]` (Slop's exact condition). Adding `and not SelfFire` makes captures permanently break after any Func loop is cancelled mid-invoke (Thread-off during SafeInvoke leaves SelfFire stuck true). SelfFire stays as Invoke/Fire bookkeeping (Slop parity) but the hook never reads it.
+
+Checklist before delivering ANY script: no `X and X() or` chains; no stats labels; no place-branching; no module-local walls; no forward decls; no readiness gates; no game-prefix ids/threads; no groupboxes inside tabbox tabs; no invented features/config fields beyond the reference set; UI skeleton = template + Slop's exact extension; template diff confined to the UI-def blocks + game section + SaveManager folder.
+
+---
+
+## 24. Cobalt/cloneref Executors — OrigRemotes Pattern (Snack case, 2026-10-01, user-ordered save)
+
+**The trap.** The main template's Services metatable deliberately wraps every service fetch in `cloneref(...)` (§12.2.7 — so the script's references can't be compared against the game's own). On cloneref executors (Cobalt confirmed by user; error.txt evidence: hook installs, remote fires, "Recording [0]") this means:
+
+- The script's `Remotes.X` (resolved through the cloneref'd `RS`) are **clone refs** — proxy objects.
+- The game's own `LocalScript` calls the remote on the **original** instance, so the `self` reaching our `__namecall` hook is the original.
+- `rawequal(self, Remotes.X)` is therefore **always false** → the hook's remote-kind gate never matches → 0 captures, with a perfectly healthy "hook installed" log. Indistinguishable symptom from §20.2 and §20.6 — which is why Snack had all three failure layers stacked.
+
+**The fix (verified in Alliance by the user; re-verified in Snack via harness simulation):**
+
+```lua
+local OrigRemotes = {}
+local function ResolveOrigRemotes()
+    pcall(function()
+        local origRS = game:GetService("ReplicatedStorage")   -- FRESH fetch, bypasses the
+        local folder = origRS:FindFirstChild("FrameworkEvents") -- script's cloneref'd cache
+        if not folder then return end
+        for name in pairs(MacroRemoteKinds) do
+            local remote = folder:FindFirstChild(name)
+            if remote and not OrigRemotes[name] then OrigRemotes[name] = remote end
+        end
+    end)
+end
+local function GetMacroRemoteKind(self)
+    if OrigRemotes.X and rawequal(self, OrigRemotes.X) then return "..." end   -- originals FIRST
+    if Remotes.X and rawequal(self, Remotes.X) then return "..." end          -- then script refs
+    return nil
+end
+```
+
+- Call `ResolveOrigRemotes()` inside `InstallMacroHook()` after the remote-wait pass. `game:GetService` from the hook-installing scope returns originals even when the Services cache holds clones.
+- The double-rawequal covers both executor worlds: on cloneref executors the OrigRemotes branch matches; on plain executors (or when clones and originals coincide) the Remotes branch matches.
+- The supplementary `hookfunction` (§20.2 belt-and-suspenders) must target the ORIGINAL's method: `hookTarget = (OrigRemotes.PlaceTower and OrigRemotes.PlaceTower.InvokeServer) or (Remotes.PlaceTower and Remotes.PlaceTower.InvokeServer)` — dedupe against the namecall hook via a thread marker (`NCSeen[coroutine.running() or false]`).
+- Log the resolved count (`notyuri("hook active; orig remote refs resolved:", tostring(refCount))`) so an empty resolve is visible in 1log.txt — refCount 0 means the OrigRemotes path is dead and cloneref executors will capture nothing.
+
+**Harness simulation (how to test cloneref without a cloneref executor):** in the mock environment, rebind `cloneref` to return a **proxy RS** for ReplicatedStorage (its `FindFirstChild("FrameworkEvents")` returns a folder of **clone remote objects** with different identity but forwarded internals), while `game:GetService("ReplicatedStorage")` (the OrigRemotes path) keeps returning the original. Then drive capture tests by calling the ORIGINAL remotes — the capture can only pass through the OrigRemotes branch, which fails the test if anyone regresses the pattern. (Implemented in work-lua/snack/snack_harness.lua, 2026-10-01.)
+
+**Scope note:** the same trap applies to ANY hook/SafeConnect gate that rawequal-compares instances captured through the Services cache against namecall/property-hook `self` values. OrigRemotes-style dual tables are the standing fix pattern.
