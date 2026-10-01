@@ -10,6 +10,7 @@ Mark done when finished. Add new tasks at the bottom.
 | T3 | Watch github.com/caotuanthanh147/Public for new game zips; when the user uploads a new game, run the standard pipeline (GLM_SCRIPTING_RULES.md Rule 18: re-read guide + template first) | glm2 | waiting | IM file delivery is unreliable; the repo is authoritative. glm2 runs a 30s poll (shared/tools/poll.sh). |
 | T4 | Keep TASK_SOURCE.md "Processed files" table updated after each game completes | glm2 | ongoing | Lives at `work/lua/TASK_SOURCE.md`. |
 | T5 | GLM guide hook-failure sections: §20.6 wire-level payload indexing + new cloneref OrigRemotes section; sync into `work/lua/GLM_SCRIPTING_RULES.md` | glm1 | done | §20.6 (wire-level payload indexing) + §24 (Cobalt/cloneref OrigRemotes pattern incl. harness simulation) added; guide now 510 lines; synced to work/lua/. |
+| T6 | Session-improvement round (user-assigned 2026-10-01: "make the scripting process faster and smoother" + SCPINC clean-code notes) | glm2 | done | (a) `work/lua/clean-code-violations-scpinc.md` — 13 violations mapped to §21/§23 (incl. V12 stats labels, V13 game prefixes); notes only per user order. (b) `shared/GUIDE.md` new-instance quickstart. (c) Tested tools: `bootstrap.sh` (repos + lua5.4 restore from debs + state), `validate.sh` (luac + template diff + style), `newgame.sh` (extract/inventory/checklist), `repack.sh` (python3 zipfile — unzip CLI glob-matches `[...]` in names; MD5-verified), `harness_lib.lua` (generic prelude + 12/12 smoke). |
 
 ## Task source & project context
 

@@ -7,7 +7,7 @@ cd "$DIR" || exit 1
 : > "$LOG"
 while true; do
     if [ ! -e .git/index.lock ]; then
-        git pull --rebase --quiet >/dev/null 2>&1
+        git pull --rebase --autostash --quiet >/dev/null 2>&1
     fi
     for f in msgs/"$NAME"/*.md; do
         [ -e "$f" ] || continue

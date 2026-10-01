@@ -22,3 +22,16 @@
 - Wrote msgs/glm1/glm2-20261001T133535Z.md (intro + findings + offer to help; glm1 has no presence in the repo yet — repo was empty at clone).
 - Updated TASKS.md (T2 → diagnosis-done), shared/lessons.md (2 new lessons), shared/changelog.md, status/glm2.md.
 - Starting background 30s pull/msg poll.
+
+## 2026-10-01 16:00 UTC — session 2: T6 session-improvement round (user-assigned)
+
+- Sandbox reset at session start: SavedFolder clone + /tmp gone; re-cloned from GitHub (glm1 had joined: T2 Snack fix delivered Public 7cd68b0 with cloneref OrigRemotes + my wire-args diagnosis both applied; T5 guide §20.6+§24 done; message for me in msgs/glm2/).
+- Handled glm1's message: work/lua/ credential audit CLEAN (git grep 0, per-member zip scans 0); noted their FindFirstChildOfClass point (SCPINC mock HAS it — but found the related Parent-vs-AddChild silent registration gap); deleted handled message; replied in msgs/glm1/glm2-20261001T155912Z.md.
+- User assignment this prompt: improve SavedFolder for faster/smoother scripting + take clean-code violation notes for SCPIncremental.lua (StepRebirth example, "there's more") — notes only, no fixes.
+- Web-searched clean-code principles (Lua best practices, function-indirection articles) — guide §21 by glm1 turned out to already codify the rule; my catalog cross-references it.
+- BUILT + TESTED: work/lua/clean-code-violations-scpinc.md (13 violations V1-V13 incl. stats labels §23.2 + game prefixes §23.8); shared/GUIDE.md (new-instance quickstart); shared/tools/bootstrap.sh (repos + lua5.4-from-debs restore + state summary — its own reset-recovery was the test), validate.sh (luac + template-diff 783/890/18 verified + style checks incl. double-pcall hint), newgame.sh (extract/inventory/checklist), repack.sh (python3 zipfile core — FOUND+documented the unzip CLI glob-class trap: "[UPD 2]" patterns silently extract nothing → vacuous MD5 passes; MD5-verified replace+add paths), harness_lib.lua (generic prelude lines 8-688 of scpinc_harness + 12/12 smoke checks; gotchas in header: AddChild registration, snapshot-vs-getter, WhichIsA/OfClass gaps).
+- TASKS.md T6 added (done); lessons +4 (unzip glob trap, AddChild gap, snapshot-vs-getter, task.spawn immediate-run); changelog updated; restarting poll.sh.
+
+Stage Summary:
+- SavedFolder now has a tested toolchain: bootstrap → newgame → (build) → validate → repack --commit, plus a reusable harness prelude — the next game session's bring-up drops from hours to ~1.
+- SCPINC clean-code debt fully documented and rule-mapped (user's "take notes" delivered); no fixes applied per order.
