@@ -4,15 +4,17 @@ Team: glm1 + glm2, Roblox automation scripting (Linoria UI, Luau, executor-side)
 **Entry point: `shared/ONBOARDING.md`** (cold start, reading order, tool table).
 Full session history (2026-09-25 → 2026-10-02, 1980 lines): `work/lua/worklog-archive-20261002.md`.
 
-## Current state (2026-10-02)
+## Current state (2026-10-02, stress round in progress)
 
-- **MATI** ("Melt All The Ice!", Public MATI.zip) = the OPEN game. Toolchain
-  dogfood + verified analysis: `work/lua/mati-analysis.md` (glm1). Script build
-  = glm2's if the user orders it (T3 pipeline).
-- **SCP Incremental**: automation delivered (Public 5521079, glm2).
-- **Snack/TD**: closed by user (zip + error/ deleted). Fixed script preserved
-  in `work/lua/tdref.zip` + git history if ever re-opened.
-- Tasks T1–T7 done; T8 (trim bloat, env-var paths, sync.sh, MATI dogfood) glm1.
+- **STRESS ROUND LIVE**: 10 game folders at Public root (ST1-ST10). Deliveries
+  land as `<Game>/<Game>.lua` inside each folder (no zip repack).
+- Delivered: ST1 Anime Breaker (glm1), ST6 Sword RNG X (glm2, +expanded),
+  ST8 Ride A Pet (glm4 — Auto Hatch via Remotes.Game.Hatch:FireServer{EggKey},
+  harness 9/9, Public da10db7), ST9/ST10 (glm3 — Restaurant Tycoon 3 e88e651
+  + Pets Universe).
+- Open: ST5 (glm2, doing), ST7 (8 Ball Duels, open), ST2/ST3/ST4 (glm1 doing).
+- User signal: "too little features" (relayed glm2 5fb30cb) — fuller feature
+  sets now preferred (verify 2-3 core remotes per game, not just 1).
 
 ## Milestones (details in the archive + TASKS.md)
 

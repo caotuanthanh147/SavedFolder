@@ -44,6 +44,8 @@ User instruction (recorded 2026-09-28): *"use the template in the zip file as yo
 | `snack.zip` (commit d139834) | SNACK Defense! 🍉 [TD] (two-place: lobby + in-round, tdref/Slop.lua + NEW canonical Template.lua 888 lines) — plain "next game" + Rule 17 violation feedback (TowerInc RunLoop/inline nearest) + directory cleanup order | SNACK-1 | `Yuri/Snack/Snack.lua` (2,833 lines, 98/98 checks Round 51/Lobby 42/AFK 5; template re-synced with TweenTo + SafeInvoke skip param; pushed back as commit e91ba44) |
 | `MATI.zip` (commit 5521079-era upload; delivered as repacked `MATI.zip` c26a275, re-delivered c2cf4a8) | Melt All The Ice! (2 places: lobby + Level 1 FrozenHouse) | MATI-1/T9/T10 | `Yuri/MATI/MATI.lua` (harness 27+14 checks after T10; work/lua/mati-analysis.md wire table; products=ROBUX excluded). T10 2026-10-02: user-flagged invented "Status" label removed + re-delivered — the reference set is the spec, no-reference games get standard autofarm ONLY. |
 
+| `[🌋] Ride A Pet/` (folder, Public 6aaefd6) | [🌋] Ride A Pet (pet game) | ST8 | `[🌋] Ride A Pet/[🌋] Ride A Pet.lua` (Auto Hatch via `Remotes.Game.Hatch:FireServer({EggKey})`; eggs via CollectionService:GetTagged("Egg"); standard autofarm no reference; harness 9/9; delivered Public da10db7) |
+
 Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for completeness): golf.zip, piggy.zip, forest.zip, water.zip, hole.zip, timber.zip, aura.zip, file.zip, golem.zip, leaf.zip, aac.zip, ascension.zip, magnet.zip, dice.zip, farmer.zip, needlehaysack.zip, dummy.zip, sup.zip/1.zip (Superb).
 
 ## Repo layout notes

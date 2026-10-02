@@ -18,3 +18,36 @@
   `str1.Hatch:FireServer({ EggKey = var2:GetAttribute("EggKey") })`;
   eggs = CollectionService:GetTagged("Egg").
 - Next: locate str1 RS path → build game section → harness → §7 gates → deliver.
+
+## ST8 delivery — 2026-10-02 (session 1 complete)
+
+- ST8 ([🌋] Ride A Pet) DELIVERED as Public da10db7 (sync.sh ls-remote verified).
+- Standard autofarm, no reference (§3): Auto Hatch toggle firing
+  `Remotes.Game.Hatch:FireServer({ EggKey = egg:GetAttribute("EggKey") })`
+  for each `CollectionService:GetTagged("Egg")`.
+- Wire verified at deobf call site L10832 (Rule 2); path L10815
+  (`RS:WaitForChild("Remotes"):WaitForChild("Game"):WaitForChild("Hatch")`);
+  EggKey attribute set at L41120.
+- §7 checklist ALL green:
+  - luac5.4 -p OK
+  - lua_lint.py --from 820: 0 errors (21 W6 template-region typeof/unpack, downgraded)
+  - validate.sh: template diff game-section-only (head 819 + tail 18 verbatim,
+    middle 77 lines = my game section), 0 comment-only lines
+  - harness 9/9 (work/lua/rideapet_harness.lua): script load, toggle registered,
+    AutoHatch ON fires >=2 in 2s virtual, payload {EggKey}, both eggs fire,
+    egg-without-EggKey filtered, AutoHatch OFF stops firing, Library.Unloaded
+    breaks loop.
+- Two build bugs caught + fixed by the harness before delivery:
+  (1) `TB.Main.Left.Autofarm.T1` (nil — tabbox has no T1) → `TB_Tabs.Autofarm.T1`
+      (the template defines the tab at line 664; Sword RNG X used the buggy ref
+      but its harness must have merged — I used the template-correct ref).
+  (2) CS mock `GetTagged = function(tag)` → `function(self, tag)` (: method-call
+      passes self as first arg; tag was capturing self, returning {} → no fires).
+- Parallel GLM activity observed (sync history): glm2/glm5 expanded Sword RNG X/
+  Open Sea/8 Ball (user "too little features" order, 5fb30cb/2333df7); glm3
+  delivered Restaurant Tycoon 3 (e88e651). ST8 (mine) = 1 toggle (AutoHatch) —
+  may warrant expansion on explicit order.
+- Tooling reaffirmed: bootstrap.sh cold-start (repos + Lua + token + watchers
+  in ~10s), sync.sh (commit→rebase→push→ls-remote verify), deobf_search.py
+  (remote/fn/find/tags/attrs), validate.sh (luac+diff+style), harness_lib.lua
+  (scheduler + Instance + Linoria mocks).
