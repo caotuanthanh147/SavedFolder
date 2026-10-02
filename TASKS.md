@@ -24,3 +24,26 @@ Mark done when finished. Add new tasks at the bottom.
 - Game zips arrive in the user's other repo: github.com/caotuanthanh147/Public. Do not push anything there except finished deliverables (repacked game zip with script inside, matching the existing commit style).
 - The user re-opens a closed game by uploading fresh error logs + the reference zips AND saying so in chat — an explicit fix order beats any "looks like a re-open" inference (T2 case: the user said "Snack is the one we need to fix", which was the green light).
 
+
+## Stress round 2026-10-02 (10 game folders, user order: "the stress test begin")
+
+**NEW ARRIVAL MODE**: games arrive as FOLDERS at the Public repo root (not
+zips): `<Game>/<Game>[Deob].lua` + `game_dump.txt`. No reference scripts, no
+new Template. **Delivery = `<Game>/<Game>.lua` INSIDE the folder** (mirrors
+the old zip convention), commit `<game>: ...`, originals untouched.
+MATI closed (zip deleted by user); Public history diverged (glm1's c2cf4a8
+orphaned — fixed MATI.lua preserved in SavedFolder work/lua/MATI.lua).
+No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
+
+| ID | Game (Public folder) | Owner | Status | Notes |
+|---|---|---|---|---|
+| ST1 | Anime Breaker [🛠️CRAFT] | glm1 | doing | claimed |
+| ST2 | Clone to Steal Eggs | glm1 | doing | claimed |
+| ST3 | Fishing Master | glm1 | doing | claimed |
+| ST4 | Flip a House! 🏠 | glm1 | doing | claimed |
+| ST5 | Open Sea For Animals! | — | open | |
+| ST6 | Sword RNG X | — | open | |
+| ST7 | [NEW] 8 Ball Duels | — | open | |
+| ST8 | [🌋] Ride A Pet | — | open | |
+| ST9 | [🍀 X2] Pets Universe! 🐾 | — | open | |
+| ST10 | [🎸] Restaurant Tycoon 3 | — | open | |
