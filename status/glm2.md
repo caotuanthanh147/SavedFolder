@@ -1,20 +1,19 @@
 # glm2 status
 
-**Updated**: 2026-10-02 (session 4 — stress round, ST6 done)
+**Updated**: 2026-10-02 (session 4 — stress round, ST5+ST6+ST7 done)
 
-**Doing**: ST6 (Sword RNG X) delivered. Claiming next game (ST5/ST7/ST8 open).
+**Doing**: All my stress-round games delivered. Standing by for new games or messages.
 
 **Progress (session 4 — stress round)**:
-- Cold-started from wiped sandbox: re-cloned SavedFolder, bootstrap.sh 4.9s (repos + portable Lua + token). Read all 3 glm1 inbox msgs (stress round conventions, MATI build claim, T8 ack). Claimed ST6 (Sword RNG X) BEFORE any work — sync.sh verified e9036b8.
-- deobf_search on Sword RNG X: remote census found 2 server remotes (Combat RemoteEvent + RemoteFunction). `fn` extraction on L17930/L17940 revealed the networker wrapper pattern: `tbl1.fire(name, ...) → RemoteEvent:FireServer(name, ...)`. Found the remote path in game_dump: `ReplicatedStorage.Packages._Index.leifstout_networker@0.3.1.networker._remotes.Combat.RemoteEvent`.
-- Wire verification: `requestHit` call site L34049 — `fire("requestHit", uid, attackTargetUid, lastSwingCenter)`. Caller L36015: `requestHit(arg1.uid, arg1.attackTargetUid, arg1.lastSwingCenter)`. Deobf L36263: `attackTargetUid = nil` (area attack valid). Enemy uid = model Name (getEnemyRig L32541: `FindFirstChild(arg1)` where arg1 = uid).
-- Built game section (123 lines, replacing 90-line template middle): resolve Combat RemoteEvent via WaitForChild chain (versioned folder `leifstout_networker@0.3.1`), GetEnemies (scan workspace:GetDescendants for Model+Humanoid+Health>0 excluding players), Func_AutoAttack (while loop: GetNearest enemy, FireServer("requestHit", target.Name, nil, hrp.Position)), AutoAttack toggle on Autofarm tab wired via Thread+SafeLoop. SaveManager folder "Yuri/SwordRNGX".
-- §3 compliance (no reference = standard autofarm ONLY): ONE toggle (Auto Attack), ZERO labels, ZERO stats, ZERO convenience buttons. §17 compliance: template helpers only (GetCharacter, GetNearest, SafeLoop, Thread).
-- Gates ALL green: luac5.4 -p OK, lua_lint 0 errors (21 template-region warnings downgraded), validate.sh 783/18/123 diff (game section only), harness 8/8 (wire format verified: arg1="requestHit", arg2=enemyUid, arg3=nil, arg4=Vector3).
-- Delivered: `Sword RNG X/Sword RNG X.lua` inside the game folder (stress-round convention). Public fe3e703, ls-remote verified.
+- Cold-started from wiped sandbox. Delivered 3 stress-round games:
+  - **ST6 (Sword RNG X)** — Public fe3e703: Auto Attack via Combat RemoteEvent `requestHit` wire. Gates: luac+lint+validate 783/18/123+harness 8/8.
+  - **ST5 (Open Sea For Animals!)** — Public 6f78f7f: Auto Collect (TP to nearest pickup in workspace.CollectEventPickups, game proximity auto-collects). Gates: luac+lint+validate 783/18/109+harness 6/6.
+  - **ST7 (8 Ball Duels)** — Public 424791d: Auto Queue via Pool RemoteEvent `FireServer("Queue", "Brazil")`. Gates: luac+lint+validate 783/18+harness 5/5.
+- All 3 games: §3 compliance (no reference = standard autofarm ONLY — one toggle, zero labels, zero extras). §17 compliance (template helpers only: GetCharacter, GetNearest, TPTo, SafeLoop, Thread). §2 compliance (every wire verified at call site via deobf_search/grep).
+- All deliveries push-verified (ls-remote). All claims synced before work (no overlap with glm1 ST1-ST4, glm3 ST9-ST10, glm4 ST8).
 
 **Stuck on**: nothing.
 
-**Files changed (mine)**: work/lua/SwordRNGX.lua (new), work/lua/swordrng_harness.lua (new), TASKS.md (ST6 done), status/glm2.md, logs/glm2.md, msgs/glm2/ (3 handled msgs deleted).
+**Files changed (mine)**: work/lua/{SwordRNGX.lua, swordrng_harness.lua, OpenSeaForAnimals.lua, opensea_harness.lua, EightBallDuels.lua, eightball_harness.lua} (all new), TASKS.md (ST5/ST6/ST7 done), status/glm2.md, logs/glm2.md.
 
-**Next**: claim ST5/ST7/ST8 (open games); keep the ~6-min budget; same pipeline.
+**Next**: all 10 ST games claimed (glm1: ST1 done + ST2-ST4 doing; glm2: ST5/ST6/ST7 done; glm4: ST8 doing; glm3: ST9+ST10 doing). Standing by for new games or user orders.

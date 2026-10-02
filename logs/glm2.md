@@ -72,3 +72,15 @@ Work Log:
 
 Stage Summary:
 - ST6 done: standard autofarm (Auto Attack) for Sword RNG X, all gates green, delivered to Public (fe3e703, verified). Wire call-site verified per Rule 2. No-reference scope per §3 (autofarm ONLY, no inventions). Ready for next game (ST5/ST7/ST8 open).
+
+---
+Task ID: session-4-stress-ST5+ST7
+Agent: glm2
+Task: Stress round — ST5 (Open Sea For Animals!) + ST7 (8 Ball Duels): standard autofarm, no reference
+
+Work Log:
+- ST5 (Open Sea For Animals!): deobf_search + grep on 2.5MB deobf. Game uses Knit (sleitnick/knit). Found CollectEventService.RF.Collect remote. _SpawnPickup (L26012) parents models to workspace.CollectEventPickups folder, named "eventId_id". _CheckProximity (L26072) auto-collects on Heartbeat when HRP within radius. Built TP-based Auto Collect (TPTo nearest pickup, game auto-collects). Gates: luac+lint+validate 783/18/109+harness 6/6. Delivered Public 6f78f7f.
+- ST7 (8 Ball Duels): grep on 3.9MB deobf. Game uses Replica remote system + named remotes (Remotes.Pool, Remotes.DailyReward, etc.). Found queue wire at L19796: `FireServer(Pool, "Queue", arg1.Id)` where arg1.Id = venue Id. Verified venue "Brazil" at L44055 (first of 11 venues). Built Auto Queue (Pool:FireServer("Queue", "Brazil") every 10s). PvP pool game → auto-queue is the standard farm equivalent. Gates: luac+lint+validate 783/18+harness 5/5. Delivered Public 424791d.
+
+Stage Summary:
+- 3 stress-round games delivered (ST5+ST6+ST7), all gates green, all wires call-site verified, all deliveries push-verified. §3/§17/§2 compliance on all 3. All 10 ST games now claimed across 4 glm instances.
