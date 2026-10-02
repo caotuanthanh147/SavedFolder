@@ -1,19 +1,21 @@
 # glm2 status
 
-**Updated**: 2026-10-02 (session 4 — stress round, ST5+ST6+ST7 done)
+**Updated**: 2026-10-02 (session 5 — ST-QA1 fix round: ST5/ST6/ST7 re-delivered)
 
-**Doing**: All my stress-round games delivered. Standing by for new games or messages.
+**Doing**: Standing by for glm1's re-QA pass + new games/user orders.
 
-**Progress (session 4 — stress round)**:
-- Cold-started from wiped sandbox. Delivered 3 stress-round games:
-  - **ST6 (Sword RNG X)** — Public fe3e703: Auto Attack via Combat RemoteEvent `requestHit` wire. Gates: luac+lint+validate 783/18/123+harness 8/8.
-  - **ST5 (Open Sea For Animals!)** — Public 6f78f7f: Auto Collect (TP to nearest pickup in workspace.CollectEventPickups, game proximity auto-collects). Gates: luac+lint+validate 783/18/109+harness 6/6.
-  - **ST7 (8 Ball Duels)** — Public 424791d: Auto Queue via Pool RemoteEvent `FireServer("Queue", "Brazil")`. Gates: luac+lint+validate 783/18+harness 5/5.
-- All 3 games: §3 compliance (no reference = standard autofarm ONLY — one toggle, zero labels, zero extras). §17 compliance (template helpers only: GetCharacter, GetNearest, TPTo, SafeLoop, Thread). §2 compliance (every wire verified at call site via deobf_search/grep).
-- All deliveries push-verified (ls-remote). All claims synced before work (no overlap with glm1 ST1-ST4, glm3 ST9-ST10, glm4 ST8).
+**Progress (session 5 — glm1's ST-QA1 audit fixes)**:
+- Read 3 msgs in msgs/glm2/: glm1's audit (all 3 games BROKEN AT LOAD — T1 nil) + glm5 x2 (expansion verified at 5fb30cb, Auto Roll wired, thread closed).
+- Re-delivered all 3 games at Public **3a54453** (push ls-remote verified):
+  - **T1 load bug fixed**: 16x `TB.Main.Left.Autofarm.T1` → `TB_Tabs.Autofarm.T1`; dropped manual `Toggles.X =` (lib registers by Idx).
+  - **§22-7 loops**: `while Toggles.X.Value do pcall(step); notyuri; task.wait(x) end` — work-then-wait, per-step pcall.
+  - **L819 boundary**: game section after the antiAFK block; duplicated antiAFK copies deleted. validate: head 819 verbatim / tail 18 / 0 comments.
+  - **ST6 wire-semantics correction** (beyond glm1's flags): requestHit takes (swordUid, enemyUid, swingCenter) — old call had enemy name in the sword slot. Now: sword uid via PlayerDataClient:get().equipped, enemy uid via CombatClient:getEnemyModels() keys, center = HRP pos. GetDescendants scan removed (enemies = Parts in workspace.CombatVisuals per makeEnemyModel L32959).
+- **Harnesses rebuilt to load the real script**: io.open+loadstring+spawn, assert no ERROR notify + Library.Toggles registration + wire counts/payload tuples + toggle-off stop. ST6 16/16, ST5 11/11, ST7 11/11 — verified against the delivered Public bytes.
+- Replied to glm1 (msgs/glm1/glm2-20261002T061459Z.md) with fix list + their qa_load mock gaps (missing Roll/Rebirth folders etc. — my harnesses are game-accurate for their re-pass).
 
 **Stuck on**: nothing.
 
-**Files changed (mine)**: work/lua/{SwordRNGX.lua, swordrng_harness.lua, OpenSeaForAnimals.lua, opensea_harness.lua, EightBallDuels.lua, eightball_harness.lua} (all new), TASKS.md (ST5/ST6/ST7 done), status/glm2.md, logs/glm2.md.
+**Files changed (mine)**: work/lua/{SwordRNGX.lua, OpenSeaForAnimals.lua, EightBallDuels.lua} (rebuilt: head 819 + section + tail 72), work/lua/{swordrngx,opensea,eightball}_harness.lua (real-load versions), work/lua/{swordrngx,opensea,eightball}_section.lua (build inputs), TASKS.md (rows done), status/glm2.md, logs/glm2.md, msgs/glm1/glm2-20261002T061459Z.md.
 
-**Next**: all 10 ST games claimed (glm1: ST1 done + ST2-ST4 doing; glm2: ST5/ST6/ST7 done; glm4: ST8 doing; glm3: ST9+ST10 doing). Standing by for new games or user orders.
+**Next**: await glm1 re-QA; poll Public for new games; ST3 (Fishing Master) still blocked on user decision per glm1's row.

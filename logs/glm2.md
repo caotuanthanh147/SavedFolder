@@ -117,3 +117,20 @@ Work Log:
 
 Stage Summary:
 - 3 scripts now at glm1/MATI feature parity: 6/6/4 toggles vs 1 each before. The §3 lesson recorded: clause 1 (build the standard autofarm) and clause 2 (nothing else) are two gates — I was only honoring clause 2. Rule 11 bar: wire every remote with genuine automation value.
+
+---
+Task ID: ST-QA1-fix (glm2 side)
+Agent: glm2
+Task: Fix + re-deliver ST5/ST6/ST7 after glm1's ST-QA1 audit (all three broken at load)
+
+Work Log:
+- Read glm1's audit msg (T1 nil at load — TB.Main.Left.Autofarm.T1 doesn't exist, TB_Tabs.Autofarm.T1 is the template's own var) + glm5's two msgs (expansion verified, Auto Roll wired, thread closed — no action needed there).
+- Fixed all 3 scripts: (a) 16x `TB.Main.Left.Autofarm.T1` → `TB_Tabs.Autofarm.T1`, dropped manual `Toggles.X =` assignment (lib registers by Idx into Library.Toggles); (b) §22-7 loop shape `while Toggles.X.Value do pcall(step); notyuri on err; task.wait(x) end` — work-then-wait, per-step pcall; (c) game section moved after template L819 (antiAFK block stays verbatim in head — my old scripts had a DUPLICATE antiAFK copy in the game section); (d) ST6 GetDescendants scan deleted.
+- ST6 deeper find while fixing: old Auto Attack wire args were semantically wrong. sendHit L35984/L36015 + swing-state init L36261 (`uid = k4` from equipped-sword reconcile L36180) prove requestHit(swordUid, attackTargetUid, swingCenter) — sword uid = inventory uid of equipped sword (PlayerDataClient:get().equipped, module at RS.Source.Features.PlayerData.PlayerDataClient, required at L32833), enemy uid = CombatClient registry key (getEnemyModels L34180, registry populated by combatSnapshot L33164). makeEnemyModel L32959: enemy hitboxes are Parts named Enemy_<enemyId> in workspace.CombatVisuals (old scan looked for Models-with-Humanoid = would find nothing). New fire: FireServer("requestHit", swordUid, nearestEnemyUid, hrp.Position). Requires pcall-wrapped so missing modules degrade only Auto Attack.
+- Rebuilt all 3 harnesses glm1-style: io.open + loadstring + task.spawn the REAL script; assert no ERROR notify, Library.Toggles registration, wire counts + payload tuples after SetValue(true)+pump, loop stops after SetValue(false); ST6 also retarget-after-enemy-removal + module mocks (G.require registry, PlayerDataClient/CombatClient) + full 6-remote networker tree. 16/16, 11/11, 11/11 — run against the DELIVERED Public bytes.
+- Gates on all 3: luac OK, lint 0 errors (game section from 820), validate.sh head 819 verbatim / tail 18 / 0 comments / SaveManager-only tail edit.
+- Delivered Public 3a54453 (commit + push + ls-remote verified). Replied to glm1 (msgs/glm1/glm2-20261002T061459Z.md) incl. note that their qa_load mocks for my games have world gaps (swordrngx missing Roll/Rebirth folders; opensea mock = swordrngx world; eightball mock has no RS.Remotes) — my harnesses are the game-accurate ones for their re-pass.
+- Deleted processed msgs from msgs/glm2/ (glm1 + glm5 x2).
+
+Stage Summary:
+- ST5/ST6/ST7 re-delivered load-clean with real-script-verified harnesses. Feature counts unchanged (6/6/4 toggles). Two durable lessons: (1) harness must load the delivered script — green harnesses that re-implement the logic validate nothing; (2) verifying a wire's CALL SITE shape isn't enough — arg SEMANTICS need their producer traced (sword uid vs enemy uid both "uids" at the same call site). glm1 re-QA pending.

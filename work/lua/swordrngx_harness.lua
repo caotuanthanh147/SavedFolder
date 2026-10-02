@@ -738,6 +738,14 @@ character:AddChild(humanoid)
 character.PrimaryPart = charRoot
 PLR.Character = character
 
+local ModuleRegistry = {}
+G.require = function(obj)
+    if ModuleRegistry[obj] then
+        return ModuleRegistry[obj]
+    end
+    error("mock require: unregistered module " .. tostring(obj and obj.Name))
+end
+
 local function makeRemote(name, className)
     local r = Instance.new(className, name)
     r.Fires = {}
@@ -756,33 +764,65 @@ local Packages = Instance.new("Folder", "Packages")
 RS:AddChild(Packages)
 local Index = Instance.new("Folder", "_Index")
 Packages:AddChild(Index)
-local knit = Instance.new("Folder", "sleitnick_knit@1.7.0")
-Index:AddChild(knit)
-local knitRoot = Instance.new("Folder", "knit")
-knit:AddChild(knitRoot)
-local KnitServices = Instance.new("Folder", "Services")
-knitRoot:AddChild(KnitServices)
+local nw = Instance.new("Folder", "leifstout_networker@0.3.1")
+Index:AddChild(nw)
+local netw = Instance.new("Folder", "networker")
+nw:AddChild(netw)
+local rem = Instance.new("Folder", "_remotes")
+netw:AddChild(rem)
+local CombatEvent = nil
 local RFs = {}
-for _, spec in ipairs({ { "InventoryService", "SellAll" }, { "AnimalService", "CollectOfflineCash" }, { "SpinWheelService", "SpinWheel" }, { "DailyRewardService", "ClaimReward" }, { "RebirthService", "Rebirth" } }) do
-    local svc = Instance.new("Folder", spec[1])
-    KnitServices:AddChild(svc)
-    local rf = Instance.new("Folder", "RF")
-    svc:AddChild(rf)
-    local r = makeRemote(spec[2], "RemoteFunction")
-    rf:AddChild(r)
-    RFs[spec[2]] = r
+for _, spec in ipairs({ "Ascension", "Evolution", "Shop", "Roll", "Rebirth" }) do
+    local folder = Instance.new("Folder", spec)
+    rem:AddChild(folder)
+    local r = makeRemote("RemoteFunction", "RemoteFunction")
+    folder:AddChild(r)
+    RFs[spec] = r
+end
+do
+    local folder = Instance.new("Folder", "Combat")
+    rem:AddChild(folder)
+    CombatEvent = makeRemote("RemoteEvent", "RemoteEvent")
+    folder:AddChild(CombatEvent)
 end
 
-local Pickups = Instance.new("Folder", "CollectEventPickups")
-WS:AddChild(Pickups)
-local function addPickup(name, x, y, z)
-    local p = Instance.new("Part", name)
-    p.CFrame = CFrame.new(Vector3.new(x, y, z))
-    Pickups:AddChild(p)
+local SourceRoot = Instance.new("Folder", "Source")
+RS:AddChild(SourceRoot)
+local Features = Instance.new("Folder", "Features")
+SourceRoot:AddChild(Features)
+local CombatFolder = Instance.new("Folder", "Combat")
+Features:AddChild(CombatFolder)
+local PlayerDataFolder = Instance.new("Folder", "PlayerData")
+Features:AddChild(PlayerDataFolder)
+local CombatClientModule = Instance.new("ModuleScript", "CombatClient")
+CombatFolder:AddChild(CombatClientModule)
+local PlayerDataClientModule = Instance.new("ModuleScript", "PlayerDataClient")
+PlayerDataFolder:AddChild(PlayerDataClientModule)
+
+local CombatVisuals = Instance.new("Folder", "CombatVisuals")
+WS:AddChild(CombatVisuals)
+local function addEnemy(uid, x)
+    local p = Instance.new("Part", "Enemy_" .. uid)
+    p.CFrame = CFrame.new(Vector3.new(x, 5, 0))
+    CombatVisuals:AddChild(p)
     return p
 end
-addPickup("eventId_1", 3, 0, 2)
-addPickup("eventId_2", 90, 0, 90)
+local enemyA = addEnemy("e-42", 5)
+local enemyB = addEnemy("e-77", 50)
+local EnemyRegistry = {
+    ["e-42"] = { model = enemyA },
+    ["e-77"] = { model = enemyB },
+}
+ModuleRegistry[CombatClientModule] = {
+    getEnemyModels = function(self)
+        return EnemyRegistry
+    end,
+}
+ModuleRegistry[PlayerDataClientModule] = {
+    get = function(self)
+        return { equipped = { [1] = "sword-uid-1" }, inventory = { ["sword-uid-1"] = { id = "b" } } }
+    end,
+}
 
 local oldLoadstring = G.loadstring
 G.loadstring = function(src, name)
@@ -798,7 +838,7 @@ Services.RunService = { Stepped = Signal.new(), Heartbeat = Signal.new(), Render
 Services.HttpService = { GenerateGUID = function() return "g1" end, JSONEncode = function() return "{}" end, JSONDecode = function() return {} end }
 Services.GuiService = { SelectedObject = nil, ErrorMessageChanged = Signal.new() }
 Services.TeleportService = { Teleport = function() end, TeleportToPlaceInstance = function() end }
-Services.MarketplaceService = { GetProductInfo = function() return { Name = "Open Sea For Animals!" } end }
+Services.MarketplaceService = { GetProductInfo = function() return { Name = "Sword RNG X" } end }
 Services.UserInputService = { TouchEnabled = false, KeyboardEnabled = true }
 Services.VirtualUser = { CaptureController = function() end, ClickButton2 = function() end }
 Services.Lighting = { GlobalShadows = true, FogEnd = 1, Brightness = 1, ClockTime = 14, GetChildren = function() return {} end }
@@ -821,7 +861,7 @@ G.game = {
 G.workspace = WS
 G.getconnections = nil
 
-local ScriptPath = (arg and arg[1]) or "OpenSeaForAnimals.lua"
+local ScriptPath = (arg and arg[1]) or "SwordRNGX.lua"
 local ScriptSrc = ""
 do
     local f = io.open(ScriptPath, "r")
@@ -834,7 +874,7 @@ do
 end
 
 pump(0.2)
-local fn = G.loadstring(ScriptSrc, "=(OpenSeaForAnimals)")
+local fn = G.loadstring(ScriptSrc, "=(SwordRNGX)")
 local okRun, errRun
 G.task.spawn(function()
     okRun, errRun = pcall(fn)
@@ -849,43 +889,57 @@ for _, n in ipairs(MockState.Notifies) do
     if string.find(n, "ERROR", 1, true) then errNotified = true end
 end
 check("no ERROR notify at load", not errNotified)
-check("all 6 toggles registered via TB_Tabs.Autofarm.T1", Library.Toggles.AutoCollect ~= nil and Library.Toggles.AutoSellAll ~= nil and Library.Toggles.AutoCollectCash ~= nil and Library.Toggles.AutoSpinWheel ~= nil and Library.Toggles.AutoClaimDaily ~= nil and Library.Toggles.AutoRebirth ~= nil)
-check("SaveManager folder per game", SaveManager.Folder == "Yuri/OpenSeaForAnimals")
+check("all 6 toggles registered via TB_Tabs.Autofarm.T1", Library.Toggles.AutoAttack ~= nil and Library.Toggles.AutoRoll ~= nil and Library.Toggles.AutoRebirth ~= nil and Library.Toggles.AutoAscend ~= nil and Library.Toggles.AutoEvolve ~= nil and Library.Toggles.AutoRestock ~= nil)
+check("SaveManager folder per game", SaveManager.Folder == "Yuri/SwordRNGX")
 
-Library.Toggles.AutoCollect:SetValue(true)
-pump(1.0)
-local pos = charRoot.CFrame.Position
-check("AutoCollect TPs to nearest pickup + offset", pos.X == 3 and pos.Y == 3 and pos.Z == 2)
-Library.Toggles.AutoCollect:SetValue(false)
+Library.Toggles.AutoAttack:SetValue(true)
+pump(1.6)
+local fires = #CombatEvent.Fires
+check("AutoAttack fires requestHit while on", fires >= 2)
+local tuple = CombatEvent.Fires[1]
+check("requestHit wire: cmd literal", tuple and tuple[1] == "requestHit")
+check("requestHit wire: sword uid from PlayerDataClient equipped", tuple and tuple[2] == "sword-uid-1")
+check("requestHit wire: nearest enemy uid from CombatClient registry", tuple and tuple[3] == "e-42")
+check("requestHit wire: swing center = HRP position", tuple and tuple[4] and tuple[4].X == 0 and tuple[4].Y == 5 and tuple[4].Z == 0)
+local midFires = #CombatEvent.Fires
+Library.Toggles.AutoAttack:SetValue(false)
+pump(2.0)
+check("AutoAttack loop stops after toggle off (Toggles.X.Value guard)", #CombatEvent.Fires == midFires)
+
+EnemyRegistry["e-42"] = nil
+enemyA.Parent = nil
+Library.Toggles.AutoAttack:SetValue(true)
+pump(1.1)
+local tuple2 = CombatEvent.Fires[#CombatEvent.Fires]
+check("requestHit retargets to remaining enemy (or nil target AOE)", tuple2 and (tuple2[3] == "e-77" or tuple2[3] == nil))
+Library.Toggles.AutoAttack:SetValue(false)
 pump(0.3)
-local frozen = charRoot.CFrame.Position
-pump(1.0)
-check("AutoCollect stops TPing after toggle off", charRoot.CFrame.Position.X == frozen.X and charRoot.CFrame.Position.Y == frozen.Y and charRoot.CFrame.Position.Z == frozen.Z)
 
-Library.Toggles.AutoSellAll:SetValue(true)
-pump(31)
-check("AutoSellAll invokes InventoryService SellAll (no args)", #RFs.SellAll.Invokes >= 2 and RFs.SellAll.Invokes[1][1] == nil)
-Library.Toggles.AutoSellAll:SetValue(false)
-
-Library.Toggles.AutoCollectCash:SetValue(true)
-pump(61)
-check("AutoCollectCash invokes AnimalService CollectOfflineCash", #RFs.CollectOfflineCash.Invokes >= 2)
-Library.Toggles.AutoCollectCash:SetValue(false)
-
-Library.Toggles.AutoSpinWheel:SetValue(true)
-pump(61)
-check("AutoSpinWheel invokes SpinWheelService SpinWheel", #RFs.SpinWheel.Invokes >= 2)
-Library.Toggles.AutoSpinWheel:SetValue(false)
-
-Library.Toggles.AutoClaimDaily:SetValue(true)
-pump(61)
-check("AutoClaimDaily invokes DailyRewardService ClaimReward day 1", #RFs.ClaimReward.Invokes >= 2 and RFs.ClaimReward.Invokes[1][1] == 1)
-Library.Toggles.AutoClaimDaily:SetValue(false)
+Library.Toggles.AutoRoll:SetValue(true)
+pump(2.5)
+check("AutoRoll invokes Roll RF 'roll'", #RFs.Roll.Invokes >= 2 and RFs.Roll.Invokes[1][1] == "roll")
+Library.Toggles.AutoRoll:SetValue(false)
+pump(0.3)
 
 Library.Toggles.AutoRebirth:SetValue(true)
-pump(61)
-check("AutoRebirth invokes RebirthService Rebirth", #RFs.Rebirth.Invokes >= 2)
+pump(31)
+check("AutoRebirth invokes Rebirth RF 'requestRebirth' (work-then-wait)", #RFs.Rebirth.Invokes >= 2 and RFs.Rebirth.Invokes[1][1] == "requestRebirth")
 Library.Toggles.AutoRebirth:SetValue(false)
+
+Library.Toggles.AutoAscend:SetValue(true)
+pump(31)
+check("AutoAscend invokes Ascension RF 'ascend'", #RFs.Ascension.Invokes >= 2 and RFs.Ascension.Invokes[1][1] == "ascend")
+Library.Toggles.AutoAscend:SetValue(false)
+
+Library.Toggles.AutoEvolve:SetValue(true)
+pump(31)
+check("AutoEvolve invokes Evolution RF 'evolve'", #RFs.Evolution.Invokes >= 2 and RFs.Evolution.Invokes[1][1] == "evolve")
+Library.Toggles.AutoEvolve:SetValue(false)
+
+Library.Toggles.AutoRestock:SetValue(true)
+pump(61)
+check("AutoRestock invokes Shop RF 'restock'", #RFs.Shop.Invokes >= 2 and RFs.Shop.Invokes[1][1] == "restock")
+Library.Toggles.AutoRestock:SetValue(false)
 
 for _, n in ipairs(MockState.Notifies) do
     if string.find(n, "ERROR", 1, true) then
@@ -893,7 +947,7 @@ for _, n in ipairs(MockState.Notifies) do
     end
 end
 
-print(string.format("OpenSeaForAnimals load harness: %d pass / %d fail", Pass, Fail))
+print(string.format("SwordRNGX load harness: %d pass / %d fail", Pass, Fail))
 if Fail > 0 then
     for _, f in ipairs(Failures) do
         print("  failed: " .. f)

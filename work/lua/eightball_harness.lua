@@ -723,24 +723,150 @@ local function summary()
     end
 end
 
-do
-    local fireCalls = {}
-    local poolRemote = { FireServer = function(self, ...) table.insert(fireCalls, {...}) end }
+local Services = {}
+local RS = Instance.new("Folder", "ReplicatedStorage")
+local WS = Instance.new("Workspace", "Workspace")
+local PLR = Instance.new("Player", "Tester")
+PLR.UserId = 42
+PLR.Idled = Signal.new()
+local charRoot = Instance.new("Part", "HumanoidRootPart")
+charRoot.CFrame = CFrame.new(Vector3.new(0, 5, 0))
+local humanoid = Instance.new("Humanoid", "Humanoid")
+local character = Instance.new("Model", "Char")
+character:AddChild(charRoot)
+character:AddChild(humanoid)
+character.PrimaryPart = charRoot
+PLR.Character = character
 
-    local function Func_AutoQueue()
-        poolRemote:FireServer("Queue", "Brazil")
+local function makeRemote(name, className)
+    local r = Instance.new(className, name)
+    r.Fires = {}
+    r.Invokes = {}
+    function r:FireServer(...)
+        table.insert(self.Fires, { ... })
     end
+    function r:InvokeServer(...)
+        table.insert(self.Invokes, { ... })
+        return { ok = true }
+    end
+    return r
+end
 
-    Func_AutoQueue()
-    check("FireServer called once", #fireCalls == 1)
-    local c = fireCalls[1]
-    check("wire arg1 = 'Queue' (action name)", c[1] == "Queue")
-    check("wire arg2 = 'Brazil' (venue Id)", c[2] == "Brazil")
+local RemotesFolder = Instance.new("Folder", "Remotes")
+RS:AddChild(RemotesFolder)
+local PoolRemote = makeRemote("Pool", "RemoteEvent")
+RemotesFolder:AddChild(PoolRemote)
+local DailyRemote = makeRemote("DailyReward", "RemoteEvent")
+RemotesFolder:AddChild(DailyRemote)
+local SpinRemote = makeRemote("SpinWheel", "RemoteEvent")
+RemotesFolder:AddChild(SpinRemote)
+local EventsRemote = makeRemote("Events", "RemoteEvent")
+RemotesFolder:AddChild(EventsRemote)
 
-    fireCalls = {}
-    for i = 1, 3 do Func_AutoQueue() end
-    check("3 calls = 3 fires (no dedup needed at this layer)", #fireCalls == 3)
-    check("all calls have same wire format", fireCalls[1][1] == "Queue" and fireCalls[3][2] == "Brazil")
+local oldLoadstring = G.loadstring
+G.loadstring = function(src, name)
+    if src == "LIB" then return function() return Library end end
+    if src == "THEME" then return function() return ThemeManager end end
+    if src == "SAVE" then return function() return SaveManager end end
+    return oldLoadstring(src, name)
+end
 
-    summary()
+Services.Players = { LocalPlayer = PLR, GetPlayerFromCharacter = function() return nil end }
+Services.ReplicatedStorage = RS
+Services.RunService = { Stepped = Signal.new(), Heartbeat = Signal.new(), RenderStepped = Signal.new(), IsServer = function() return false end, IsClient = function() return true end, Set3dRenderingEnabled = function() end }
+Services.HttpService = { GenerateGUID = function() return "g1" end, JSONEncode = function() return "{}" end, JSONDecode = function() return {} end }
+Services.GuiService = { SelectedObject = nil, ErrorMessageChanged = Signal.new() }
+Services.TeleportService = { Teleport = function() end, TeleportToPlaceInstance = function() end }
+Services.MarketplaceService = { GetProductInfo = function() return { Name = "8 Ball Duels" } end }
+Services.UserInputService = { TouchEnabled = false, KeyboardEnabled = true }
+Services.VirtualUser = { CaptureController = function() end, ClickButton2 = function() end }
+Services.Lighting = { GlobalShadows = true, FogEnd = 1, Brightness = 1, ClockTime = 14, GetChildren = function() return {} end }
+Services.ProximityPromptService = { PromptButtonHoldBegan = Signal.new() }
+Services.VirtualInputManager = { SendKeyEvent = function() end }
+Services.CollectionService = { GetTagged = function() return {} end }
+Services.TweenService = { Create = function() return { Play = function() end } end, GetValue = function() return 0 end }
+
+G.game = {
+    PlaceId = 123, JobId = "j",
+    GetService = function(self, name) return Services[name] or error("Invalid Service: " .. tostring(name)) end,
+    HttpGet = function(self, url)
+        if string.find(url, "Library.lua", 1, true) then return "LIB" end
+        if string.find(url, "ThemeManager", 1, true) then return "THEME" end
+        if string.find(url, "SaveManager", 1, true) then return "SAVE" end
+        return ""
+    end,
+    IsLoaded = function() return true end,
+}
+G.workspace = WS
+G.getconnections = nil
+
+local ScriptPath = (arg and arg[1]) or "EightBallDuels.lua"
+local ScriptSrc = ""
+do
+    local f = io.open(ScriptPath, "r")
+    if not f then
+        print("FAIL: cannot open script " .. tostring(ScriptPath))
+        os.exit(1)
+    end
+    ScriptSrc = f:read("*a")
+    f:close()
+end
+
+pump(0.2)
+local fn = G.loadstring(ScriptSrc, "=(EightBallDuels)")
+local okRun, errRun
+G.task.spawn(function()
+    okRun, errRun = pcall(fn)
+end)
+pump(0.8)
+check("script loads without runtime error", okRun == true)
+if not okRun then
+    print("SCRIPT RUN ERROR: " .. tostring(errRun))
+end
+local errNotified = false
+for _, n in ipairs(MockState.Notifies) do
+    if string.find(n, "ERROR", 1, true) then errNotified = true end
+end
+check("no ERROR notify at load", not errNotified)
+check("all 4 toggles registered via TB_Tabs.Autofarm.T1", Library.Toggles.AutoQueue ~= nil and Library.Toggles.AutoDailyClaim ~= nil and Library.Toggles.AutoSpinWheel ~= nil and Library.Toggles.AutoEventQuests ~= nil)
+check("SaveManager folder per game", SaveManager.Folder == "Yuri/EightBallDuels")
+
+Library.Toggles.AutoQueue:SetValue(true)
+pump(21)
+check("AutoQueue fires Pool Queue while on", #PoolRemote.Fires >= 2)
+local qtuple = PoolRemote.Fires[1]
+check("Queue wire: cmd literal", qtuple and qtuple[1] == "Queue")
+check("Queue wire: venue Id string", qtuple and qtuple[2] == "Brazil")
+local midFires = #PoolRemote.Fires
+Library.Toggles.AutoQueue:SetValue(false)
+pump(2.0)
+check("AutoQueue loop stops after toggle off", #PoolRemote.Fires == midFires)
+
+Library.Toggles.AutoDailyClaim:SetValue(true)
+pump(61)
+check("AutoDailyClaim fires DailyReward 'DailyClaim'", #DailyRemote.Fires >= 2 and DailyRemote.Fires[1][1] == "DailyClaim")
+Library.Toggles.AutoDailyClaim:SetValue(false)
+
+Library.Toggles.AutoSpinWheel:SetValue(true)
+pump(61)
+check("AutoSpinWheel fires SpinWheel 'SpinWheel'", #SpinRemote.Fires >= 2 and SpinRemote.Fires[1][1] == "SpinWheel")
+Library.Toggles.AutoSpinWheel:SetValue(false)
+
+Library.Toggles.AutoEventQuests:SetValue(true)
+pump(61)
+check("AutoEventQuests fires Events 'EventQuestClaimAll'", #EventsRemote.Fires >= 2 and EventsRemote.Fires[1][1] == "EventQuestClaimAll")
+Library.Toggles.AutoEventQuests:SetValue(false)
+
+for _, n in ipairs(MockState.Notifies) do
+    if string.find(n, "ERROR", 1, true) then
+        print("ERROR NOTIFY: " .. n)
+    end
+end
+
+print(string.format("EightBallDuels load harness: %d pass / %d fail", Pass, Fail))
+if Fail > 0 then
+    for _, f in ipairs(Failures) do
+        print("  failed: " .. f)
+    end
+    os.exit(1)
 end
