@@ -183,7 +183,7 @@ local CFrame
 do
     local cmt = {}
     local function cf(pos)
-        return setmetatable({ Position = pos }, cmt)
+        return setmetatable({ Position = pos, X = pos.X, Y = pos.Y, Z = pos.Z }, cmt)
     end
     cmt.__mul = function(a, b)
         if getmetatable(b) == cmt then
@@ -630,6 +630,26 @@ do
         function tab:AddToggle(idx, info)
             local gb = makeGroupbox(name)
             return gb:AddToggle(idx, info)
+        end
+        function tab:AddDropdown(idx, info)
+            local gb = makeGroupbox(name)
+            return gb:AddDropdown(idx, info)
+        end
+        function tab:AddSlider(idx, info)
+            local gb = makeGroupbox(name)
+            return gb:AddSlider(idx, info)
+        end
+        function tab:AddInput(idx, info)
+            local gb = makeGroupbox(name)
+            return gb:AddInput(idx, info)
+        end
+        function tab:AddButton(a, b)
+            local gb = makeGroupbox(name)
+            return gb:AddButton(a, b)
+        end
+        function tab:AddKeyPicker(idx, info)
+            local gb = makeGroupbox(name)
+            return gb:AddKeyPicker(idx, info)
         end
         function tab:AddDivider() end
         function tab:AddLabel(text, wrap)
