@@ -783,6 +783,9 @@ game:GetService("ProximityPromptService").PromptButtonHoldBegan:Connect(function
 end)
 local NetRemotes = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("leifstout_networker@0.3.1"):WaitForChild("networker"):WaitForChild("_remotes")
 Remotes.CombatEvent = NetRemotes:WaitForChild("Combat"):WaitForChild("RemoteEvent")
+Remotes.AscensionFunc = NetRemotes:WaitForChild("Ascension"):WaitForChild("RemoteFunction")
+Remotes.EvolutionFunc = NetRemotes:WaitForChild("Evolution"):WaitForChild("RemoteFunction")
+Remotes.ShopFunc = NetRemotes:WaitForChild("Shop"):WaitForChild("RemoteFunction")
 local function GetEnemies()
     local list = {}
     for _, m in ipairs(workspace:GetDescendants()) do
@@ -813,6 +816,36 @@ end
 Toggles.AutoAttack = TB.Main.Left.Autofarm.T1:AddToggle("AutoAttack", { Text = "Auto Attack", Default = false })
 Toggles.AutoAttack:OnChanged(function(state)
     Thread("AutoAttack", SafeLoop("Auto Attack", Func_AutoAttack), state)
+end)
+local function Func_AutoAscend()
+    while true do
+        task.wait(30)
+        SafeInvoke(Remotes.AscensionFunc, true, "ascend", nil)
+    end
+end
+local function Func_AutoEvolve()
+    while true do
+        task.wait(30)
+        SafeInvoke(Remotes.EvolutionFunc, true, "evolve", nil)
+    end
+end
+local function Func_AutoRestock()
+    while true do
+        task.wait(60)
+        SafeInvoke(Remotes.ShopFunc, true, "restock")
+    end
+end
+Toggles.AutoAscend = TB.Main.Left.Autofarm.T1:AddToggle("AutoAscend", { Text = "Auto Ascend", Default = false })
+Toggles.AutoAscend:OnChanged(function(state)
+    Thread("AutoAscend", SafeLoop("Auto Ascend", Func_AutoAscend), state)
+end)
+Toggles.AutoEvolve = TB.Main.Left.Autofarm.T1:AddToggle("AutoEvolve", { Text = "Auto Evolve", Default = false })
+Toggles.AutoEvolve:OnChanged(function(state)
+    Thread("AutoEvolve", SafeLoop("Auto Evolve", Func_AutoEvolve), state)
+end)
+Toggles.AutoRestock = TB.Main.Left.Autofarm.T1:AddToggle("AutoRestock", { Text = "Auto Restock", Default = false })
+Toggles.AutoRestock:OnChanged(function(state)
+    Thread("AutoRestock", SafeLoop("Auto Restock", Func_AutoRestock), state)
 end)
 local antiAFKConn = nil
 local function RunAntiAFK()

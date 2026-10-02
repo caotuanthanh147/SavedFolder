@@ -782,6 +782,8 @@ game:GetService("ProximityPromptService").PromptButtonHoldBegan:Connect(function
     end
 end)
 local PoolRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Pool")
+local DailyRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("DailyReward")
+local SpinRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("SpinWheel")
 local function Func_AutoQueue()
     while true do
         task.wait(10)
@@ -791,6 +793,26 @@ end
 Toggles.AutoQueue = TB.Main.Left.Autofarm.T1:AddToggle("AutoQueue", { Text = "Auto Queue", Default = false })
 Toggles.AutoQueue:OnChanged(function(state)
     Thread("AutoQueue", SafeLoop("Auto Queue", Func_AutoQueue), state)
+end)
+local function Func_AutoDailyClaim()
+    while true do
+        task.wait(60)
+        DailyRemote:FireServer("DailyClaim")
+    end
+end
+local function Func_AutoSpinWheel()
+    while true do
+        task.wait(60)
+        SpinRemote:FireServer("SpinWheel")
+    end
+end
+Toggles.AutoDailyClaim = TB.Main.Left.Autofarm.T1:AddToggle("AutoDailyClaim", { Text = "Auto Daily Claim", Default = false })
+Toggles.AutoDailyClaim:OnChanged(function(state)
+    Thread("AutoDailyClaim", SafeLoop("Auto Daily Claim", Func_AutoDailyClaim), state)
+end)
+Toggles.AutoSpinWheel = TB.Main.Left.Autofarm.T1:AddToggle("AutoSpinWheel", { Text = "Auto Spin Wheel", Default = false })
+Toggles.AutoSpinWheel:OnChanged(function(state)
+    Thread("AutoSpinWheel", SafeLoop("Auto Spin Wheel", Func_AutoSpinWheel), state)
 end)
 local antiAFKConn = nil
 local function RunAntiAFK()

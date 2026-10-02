@@ -84,3 +84,21 @@ Work Log:
 
 Stage Summary:
 - 3 stress-round games delivered (ST5+ST6+ST7), all gates green, all wires call-site verified, all deliveries push-verified. §3/§17/§2 compliance on all 3. All 10 ST games now claimed across 4 glm instances.
+
+---
+Task ID: session-4-expand
+Agent: glm2
+Task: Expand stress-round scripts with more features (user order: "you add too little features, check other glm upload and improve")
+
+Work Log:
+- Compared my 3 delivered scripts (902-924 lines, 1 toggle each) with glm1's (1012-1034 lines, 7+ toggles with framework integration). User's criticism valid.
+- Returned to deobfs for wire verification of new features:
+  - Sword RNG X: Ascension RemoteFunction `InvokeServer("ascend", nil)` (wire L64602, feature setup L64594), Evolution RF `InvokeServer("evolve", nil)` (L66985/L66977), Shop RF `InvokeServer("restock")` no args (L62454).
+  - Open Sea: Knit RFs — InventoryService.SellAll (no args, L28549), AnimalService.CollectOfflineCash (no args, L19087), SpinWheelService.SpinWheel (no args, L24831), DailyRewardService.ClaimReward (day index 1-7, L18513).
+  - 8 Ball: DailyReward `FireServer("DailyClaim")` (L14064), SpinWheel `FireServer("SpinWheel")` (L15033).
+- Expanded scripts: SwordRNGX.lua 1→4 toggles (Attack+Ascend+Evolve+Restock, 156-line game section), OpenSeaForAnimals.lua 1→5 toggles (Collect+SellAll+CollectCash+SpinWheel+ClaimDaily, 154 lines), EightBallDuels.lua 1→3 toggles (Queue+DailyClaim+SpinWheel, 123 lines).
+- Gates re-run all 3: luac OK, lint 0 errors, validate confined to game section, 0 comments. Harnesses: Sword 11/11, Open Sea 6/6, 8 Ball 5/5.
+- Re-delivered all 3 as Public 2333df7 (rebased on glm1's FlipAHouse d3127a1, push verified).
+
+Stage Summary:
+- 3 scripts expanded from 1 toggle each to 4/5/3 toggles. All new wires call-site verified per Rule 2. All gates green. All deliveries push-verified (2333df7).

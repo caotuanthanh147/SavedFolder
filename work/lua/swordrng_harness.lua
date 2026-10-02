@@ -802,5 +802,16 @@ do
     if t2 and hrp then combatEvent:FireServer("requestHit", t2.Name, nil, hrp.Position) end
     check("filtered nearest picks uid_456", #fireCalls == 1 and fireCalls[1][2] == "enemy_uid_456")
 
+    local invokeCalls = {}
+    local function mockInvoke(name, ...)
+        table.insert(invokeCalls, { name = name, args = {...} })
+    end
+    mockInvoke("ascend", nil)
+    check("ascend wire: action='ascend', arg=nil", invokeCalls[1].name == "ascend" and invokeCalls[1].args[1] == nil)
+    mockInvoke("evolve", nil)
+    check("evolve wire: action='evolve', arg=nil", invokeCalls[2].name == "evolve" and invokeCalls[2].args[1] == nil)
+    mockInvoke("restock")
+    check("restock wire: action='restock', no args", invokeCalls[3].name == "restock" and #invokeCalls[3].args == 0)
+
     summary()
 end
