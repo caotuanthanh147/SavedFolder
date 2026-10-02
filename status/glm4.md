@@ -1,40 +1,48 @@
 # glm4 status
 
-**Updated**: 2026-10-02 (session 1 — cold start + stress round claim)
+**Updated**: 2026-10-02 (session 1 — ST8 delivered)
 
-**Doing**: ST8 ([🌋] Ride A Pet) — standard autofarm, no reference (ONBOARDING
-§3). Pipeline: deobf study → remote map → wire verification at call sites
-(Rule 2) → game section on Template.lua → harness → gates (luac + lint +
-validate) → deliver `<Game>.lua` inside the game folder at Public root.
+**Doing**: ST8 ([🌋] Ride A Pet) DELIVERED as Public da10db7. Standard autofarm,
+no reference (§3). Auto Hatch toggle: `Remotes.HatchEvent:FireServer({ EggKey
+= egg:GetAttribute("EggKey") })` for each `CollectionService:GetTagged("Egg")`.
+Wire verified at deobf call site L10832 + path L10815 + EggKey attr L41120.
+Gates ALL green: luac OK, lua_lint 0 errors (--from 820), validate.sh diff
+game-section-only (77 lines, 0 comments), harness 9/9 (work/lua/rideapet_harness.lua).
 
-**Session start**:
-- bootstrap.sh glm4 (fresh sandbox: repos cloned incl. Public, portable Lua
-  5.4.7 from repo tarball, token wired + ls-remote verified, watchers up).
-- Read ONBOARDING.md, PROMPT.md, TASKS.md, GLM_SCRIPTING_RULES.md (§1-§25
-  structure mapped), TASK_SOURCE.md, lessons.md, all status files, msgs
-  inbox (glm1 stress-round conventions msg — folders not zips, deliver
-  inside folder, standard autofarm only, §2 filter on every addition).
-- STRESS ROUND: Public fe3e703 = 10 game folders + Sword RNG X delivered
-  (glm2, ST6 done — no-reference standard autofarm precedent). glm1: ST1-ST4,
-  glm2: ST6 (done), glm3: ST9+ST10 (NO push token — local-only claim).
-  OPEN on origin: ST5, ST7, ST8. glm3 left ST5/ST7/ST8 for glm4/glm5.
-- Candidate tractability probe (§9 6-min budget):
-  - ST5 (Open Sea For Animals!): 85K-line deobf, heavily obfuscated
-    (varN/arg1._re Net module) — hard.
-  - ST7 (8 Ball Duels): bullet-simulation combat (FireServer("Bullets",
-    "Bullets", id, bulletData)) — beyond clean standard autofarm.
-  - ST8 (Ride A Pet): pet game, clean single Hatch remote
-    `str1.Hatch:FireServer({ EggKey = k })` at L10832 + "Egg"/"Pet"/"Food"
-    tags — cleanest. CHOSEN.
-- Wire verified at call site (Rule 2): str1.Hatch:FireServer({ EggKey =
-  var2:GetAttribute("EggKey") }); eggs = CollectionService:GetTagged("Egg").
+**Session arc**:
+- bootstrap.sh glm4 (fresh sandbox: repos + Lua 5.4.7 + token wired + watchers).
+- Mandatory reads done (ONBOARDING, PROMPT, TASKS, GLM_SCRIPTING_RULES §1-§25,
+  TASK_SOURCE, lessons, statuses, msgs inbox — glm1 stress-round conventions
+  handled + deleted).
+- Tractability probe across ST5/ST7/ST8 (§9 6-min budget): ST5 obfuscated Net
+  module (hard), ST7 bullet-simulation combat (complex), ST8 clean pet Hatch
+  remote (chosen).
+- Build: copied Template.lua → deliverable; inserted game section (lines
+  820-841) mirroring Sword RNG X's AutoAttack pattern (Remotes.X + Func_X +
+  TB_Tabs.Autofarm.T1:AddToggle + Thread+SafeLoop). Zero comments (Sword RNG X
+  precedent + validate "zero comments" rule).
+- Harness: 9 targeted checks (script load, toggle registered, ON fires >=2 in
+  2s, payload shape {EggKey}, both eggs, egg-without-key filtered, OFF stops,
+  Library.Unloaded breaks loop). 9/9 green.
+- Two real bugs found + fixed in the build: (1) `TB.Main.Left.Autofarm.T1` →
+  `TB_Tabs.Autofarm.T1` (template defines the tab at TB_Tabs, not on the
+  tabbox); (2) CS mock `GetTagged = function(tag)` → `function(self, tag)` (:
+  method-call passes self as first arg). Both surfaced via the harness — the
+  gates caught them before delivery (the §7 checklist working as designed).
 
-**Stuck on**: nothing yet — need to locate str1 (the remote table) ReplicatedStorage
-path before coding the remote reference in the game section.
+**Stuck on**: nothing. Harness green, delivery landed (ls-remote verified).
 
-**Files changed (mine, this session)**: TASKS.md (ST8 claim), status/glm4.md,
-logs/glm4.md, msgs/glm4/ (glm1 welcome msg handled + deleted).
+**Files changed (mine, this session)**:
+- `~/Public/[🌋] Ride A Pet/[🌋] Ride A Pet.lua` (DELIVERED da10db7)
+- `work/lua/rideapet_harness.lua` (9 checks, green)
+- `TASKS.md` (ST8 claim → done), `status/glm4.md`, `logs/glm4.md`,
+  `work/lua/TASK_SOURCE.md` (ST8 row), `work/lua/worklog.md`, `msgs/glm4/`
+  (glm1 welcome msg handled + deleted).
 
-**Next**: find Hatch remote RS path → build ST8 game section on Template.lua
-(AutoHatch toggle + standard template toggles only — §3, §11, §23) → harness
-→ §7 checklist → deliver inside [🌋] Ride A Pet/ folder → sync → log.
+**Next**: ST5/ST7 still open on origin (ST5 claimed by glm2, ST7 open). ST9/ST10
+delivered by glm3 (restauranttycoon3 e88e651 + pets universe). Standing by for
+next game assignment OR explicit "more features" order on ST8 (AutoRide/
+AutoEquip/AutoSell — each needs wire verification in the 135K-line deobf). The
+"user too little features" signal (relayed glm2 5fb30cb) suggests fuller feature
+sets are now the preference — apply to my next game from the start (verify 2-3
+core remotes, not just 1).
