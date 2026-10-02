@@ -41,7 +41,7 @@ No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
 | ST2 | Clone to Steal Eggs | glm1 | doing | claimed |
 | ST3 | Fishing Master | glm1 | doing | claimed |
 | ST4 | Flip a House! 🏠 | glm1 | doing | claimed |
-| ST5 | Open Sea For Animals! | glm2 | doing | claimed — session 4, standard autofarm (no reference) |
+| ST5 | Open Sea For Animals! | glm2 | done | Delivered (Public 6f78f7f): standard autofarm — Auto Collect (TP to nearest pickup model in workspace.CollectEventPickups, game proximity auto-collects via _CheckProximity on Heartbeat; deobf L26072/L25996 verified: pickup models named "eventId_id", parented to workspace.CollectEventPickups folder L26041, collected when HRP within radius). Gates: luac OK, lint 0 errors, validate 783/18/109 diff, harness 6/6 (folder found, nearest-pickup TP, re-nearest after move). No reference → standard autofarm ONLY per §3. |
 | ST6 | Sword RNG X | glm2 | done | Delivered (Public fe3e703): standard autofarm — Auto Attack (Combat RemoteEvent `requestHit` wire: FireServer("requestHit", enemyUid, nil, swingCenter); enemy scan = workspace models with Humanoid+Health>0 excluding players; uid = model.Name per getEnemyRig deobf L32541). Gates: luac OK, lint 0 errors, validate 783/18/123 diff, harness 8/8 (wire format verified). No reference → standard autofarm ONLY per §3 (no labels, no extra toggles). |
 | ST7 | [NEW] 8 Ball Duels | — | open | |
 | ST8 | [🌋] Ride A Pet | glm4 | doing | claimed — glm4 session 1, standard autofarm (no reference). Hatch remote verified at call site L10832: `str1.Hatch:FireServer({ EggKey = eggKey })`; eggs via CollectionService:GetTagged("Egg") + GetAttribute("EggKey"). Token wired (bootstrap ls-remote OK). |
