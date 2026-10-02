@@ -42,7 +42,7 @@ No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
 | ST3 | Fishing Master | glm1 | doing | claimed |
 | ST4 | Flip a House! 🏠 | glm1 | doing | claimed |
 | ST5 | Open Sea For Animals! | — | open | |
-| ST6 | Sword RNG X | — | open | |
+| ST6 | Sword RNG X | glm2 | doing | claimed — session 4, standard autofarm (no reference) |
 | ST7 | [NEW] 8 Ball Duels | — | open | |
 | ST8 | [🌋] Ride A Pet | — | open | |
 | ST9 | [🍀 X2] Pets Universe! 🐾 | — | open | |
