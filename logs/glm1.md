@@ -124,3 +124,37 @@ teach the other glms."
   built, not what should have been.
 - Sandbox was reset again (/tmp wiped, ~ clones gone) — bootstrap.sh
   re-ran clean (~10s), selftest 10/10. Environment resilience held.
+
+## Session 6 — 2026-10-02 (STRESS ROUND: 10 game folders, glm1 batch ST1-ST4)
+
+User order: "I updated the public git, check it, the stress test begin, I'll
+run you in parallel with other glm" — 10 games as FOLDERS at Public root
+(6aaefd6; MATI closed; remote history diverged — reset local to origin/main).
+
+- New arrival mode documented + msged glm2-glm5: folders not zips; delivery =
+  <Game>.lua INSIDE the folder; claimed ST1-ST4 in TASKS.md (ST5-ST10 left
+  for parallel instances).
+- ST1 Anime Breaker (~35 min): BridgeNet2 via the game's own NetworkService
+  (lib.Remote:Fire(system, cmd, args)); game's own AutoSystem toggles +
+  SettingSystem AutoClick + CastSkill with the game-maintained Lib.Target
+  (in-range enemy names). State-synced from PlayerData (no redundant flips,
+  nil-PD deferred retry). Harness 18/18 (caught the `false or nil` Lua trap
+  in CurrentValue — fixed). Delivered 75ecaf4.
+- ST2 Clone to Steal Eggs (~11 min): Knit DOT-call convention; game's own
+  SetAutoHatch + Rebirth/EquipBest/Upgrade loops gated by UpgradeConfig
+  GetPrice + ReplicaClient Data. Harness 14/14 after fixing TWO mock-signature
+  bugs (GetService dot-call, GetPrice dot-call, OnNew task-ref) — the class:
+  mock signature must match the game's exact call syntax. Delivered 5cf7ed2.
+- ST3 Fishing Master (~7 min analysis → BLOCKED): fishing = stateful minigame
+  with prediction-pointer telemetry (EmitPredictedAtPointer + Track); game's
+  own auto-fish is server-entitlement-gated. Flagged for user decision
+  instead of shipping risky wires.
+- ST4 Flip a House (~7 min + ST3): Remo containers (:fire()/:request());
+  Auto Claim Daily/Group + Auto Buy Eggs (buyEggs(1, nil) — id 1, no pos).
+  Cleaning minigame = prediction-acked → scoped out, flagged. Harness 10/10
+  (fixed colon-call mock self). Delivered d3127a1.
+- Board at session end: 7/10 delivered (glm2 did ST5/6/7 with all gates
+  green and §3 discipline — the onboarding worked); ST8 glm4 doing; ST9/ST10
+  glm3 doing but tokenless (msged options; can proxy-push if needed).
+- Pace evidence (user asked for before/after times): ST1 35 min → ST2 11 →
+  ST4 7 — the harness prelude + framework-convention lessons compound.

@@ -1,19 +1,18 @@
 # glm1 status
 
-**Updated**: 2026-10-02 (session 5 — T10+T11 done, user-flagged label incident handled)
+**Updated**: 2026-10-02 05:35 UTC (session 6 — stress round, my batch done)
 
-**Doing**: idle. T10: MATI invented "Status" label REMOVED (user order — "who
-ask you to add the label") and re-delivered as Public c2cf4a8 (gates re-run:
-harness 27/27 Level + 14/14 Lobby, lint 0 errors, template diff game-section
-only, repack [VERIFIED]). T11: ONBOARDING.md rebuilt for glmN + stress test
-(~290 lines: agent identity §1, decision filter + incident case studies §2,
-scope spec §3, stress budget table §9); PROMPT.md behavioral core added;
-guide Rule 11 UI-element bullet + checklist updated; lessons +2 (Scope &
-discipline). Kit selftest 10/10 on the fresh sandbox (bootstrap re-run after
-reset — clones live in ~, /tmp was wiped again).
+**Doing**: idle/standby. Stress round ST1-ST4 complete:
+- ST1 AnimeBreaker DELIVERED (Public 75ecaf4, harness 18/18) ~35 min
+- ST2 CloneToStealEggs DELIVERED (5cf7ed2, 14/14) ~11 min
+- ST3 FishingMaster BLOCKED — needs user decision (entitled auto-fish +
+  prediction-pointer minigame; deep build or skip)
+- ST4 FlipAHouse DELIVERED (d3127a1, 10/10) ~7 min + ST3 analysis
+Board: 7/10 delivered (glm2: ST5/6/7), ST8 glm4 doing, ST9/10 glm3 doing
+(no push token — msged options). Pace accelerated 35→11→7 min/game via
+reused harness patterns + per-framework wire conventions (lessons +3).
 
-**Stuck on**: nothing.
+**Stuck on**: nothing. Awaiting user: Fishing Master decision + stress verdict.
 
-**Next**: STRESS TEST expected (10 games/hour/instance — ONBOARDING §9 is the
-plan). Watch msgs/glm1/ + Public repo. Teach new glmN instances as they spawn
-(they read ONBOARDING.md; msg me judgment calls).
+**Next**: watch msgs/glm1/ + Public; assist ST9/ST10 push if glm3 stays
+tokenless; next user order.
