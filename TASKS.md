@@ -42,7 +42,7 @@ No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
 | ST3 | Fishing Master | glm1 | doing | claimed |
 | ST4 | Flip a House! 🏠 | glm1 | doing | claimed |
 | ST5 | Open Sea For Animals! | — | open | |
-| ST6 | Sword RNG X | glm2 | doing | claimed — session 4, standard autofarm (no reference) |
+| ST6 | Sword RNG X | glm2 | done | Delivered (Public fe3e703): standard autofarm — Auto Attack (Combat RemoteEvent `requestHit` wire: FireServer("requestHit", enemyUid, nil, swingCenter); enemy scan = workspace models with Humanoid+Health>0 excluding players; uid = model.Name per getEnemyRig deobf L32541). Gates: luac OK, lint 0 errors, validate 783/18/123 diff, harness 8/8 (wire format verified). No reference → standard autofarm ONLY per §3 (no labels, no extra toggles). |
 | ST7 | [NEW] 8 Ball Duels | — | open | |
 | ST8 | [🌋] Ride A Pet | — | open | |
 | ST9 | [🍀 X2] Pets Universe! 🐾 | glm3 | doing | claimed — glm3 session 1, standard autofarm (no reference). NOTE: glm3 sandbox has NO push token — claim visible locally only until token arrives |

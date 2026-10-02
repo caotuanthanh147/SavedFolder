@@ -55,3 +55,20 @@ Stage Summary:
 - The T6 tool kit is verified end-to-end from a true cold start: 8/8 categories real-use pass, 4 sharp edges fixed, and a 5-second selftest now guards the whole kit against future edits.
 - Process hardened: claim-before-work prevented overlap with both parallel rounds (glm1 T8, session-2 T3); push failures are now caught (ls-remote verify) instead of silently believed.
 - Ready state for the next game: MATI.zip intel recorded (wire shape, attrs, no tags); glm1's T8c notes + user order are the remaining triggers for the T3 pipeline.
+
+---
+Task ID: session-4-stress-ST6
+Agent: glm2
+Task: Stress round — ST6 (Sword RNG X): standard autofarm, no reference, ~6-min budget
+
+Work Log:
+- Wiped sandbox → re-cloned SavedFolder → bootstrap.sh 4.9s (repos + Lua + token). Read 3 glm1 msgs (stress conventions, MATI claim, T8 ack). Claimed ST6 first (sync e9036b8) before any work.
+- deobf_search remote census: 2 server remotes (Combat RemoteEvent + RemoteFunction). fn extraction on fire(L17928) and fetch(L17934): networker wrapper pattern `fire(name,...) → RemoteEvent:FireServer(name,...)`. Remote path from game_dump: ReplicatedStorage.Packages._Index.leifstout_networker@0.3.1.networker._remotes.Combat.RemoteEvent.
+- Wire verification: requestHit (L34049) = `fire("requestHit", uid, attackTargetUid, lastSwingCenter)`. Caller L36015 passes (arg1.uid, arg1.attackTargetUid, arg1.lastSwingCenter). Deobf L36263: attackTargetUid=nil (area attack valid). Enemy uid = model Name (getEnemyRig L32541: FindFirstChild(uid) by name). 25 remote folders total; Combat is the farm action.
+- Built game section (123 lines): WaitForChild chain for versioned remote path, GetEnemies (workspace:GetDescendants, Model+Humanoid+Health>0, exclude players), Func_AutoAttack (while+task.wait(0.5), GetNearest, FireServer("requestHit", target.Name, nil, hrp.Position)), AutoAttack toggle on Autofarm tab via Thread+SafeLoop. SaveManager "Yuri/SwordRNGX".
+- §3 compliance: ONE toggle, ZERO labels/stats/convenience. §17: template helpers only.
+- Gates: luac OK, lint 0 errors, validate 783/18/123, harness 8/8 (wire format: arg1="requestHit", arg2=enemyUid, arg3=nil, arg4=Vector3).
+- Delivered: Sword RNG X/Sword RNG X.lua (folder convention). Public fe3e703, ls-remote verified.
+
+Stage Summary:
+- ST6 done: standard autofarm (Auto Attack) for Sword RNG X, all gates green, delivered to Public (fe3e703, verified). Wire call-site verified per Rule 2. No-reference scope per §3 (autofarm ONLY, no inventions). Ready for next game (ST5/ST7/ST8 open).
