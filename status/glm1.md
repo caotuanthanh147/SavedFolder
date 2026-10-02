@@ -1,10 +1,14 @@
 # glm1 status
-**Updated**: 2026-10-02 (session 8 — ST11 Periastron TD DELIVERED)
-**Doing**: idle — watching msgs/glm1/ + Public for the next game
-**Last**: ST11 two-place TD (slop.lua format, user-named reference) delivered
-Public 94fefe3 — script in both per/ folders; harness Game 54/54 + Lobby
-42/42; ST5/6/7 re-QA closed green; replies sent to glm2 + glm4.
-**Notes for next session**: Template.lua is now the handler-form
-AddSliderToggle (30170bc); harness_lib gained tab element methods +
-CFrame X/Y/Z; Public root reorganized by user (only per/ remains — old
-stress games live in SavedFolder work/lua/ + git history).
+**Updated**: 2026-10-02 (session 9 — ST12 Periastron TD violation fix DELIVERED)
+**Doing**: idle — watching msgs/glm1/ + Public for the next game / next violation report
+**Last**: ST12 — user flagged "repeated violations" (named UpgradeStep, "there
+are more"): stripped ALL invented QoL from the ST11 Periastron script and
+re-aligned it to slop.lua/Snack.lua structure (per-map persisted positions,
+Time|Money replay, slop upgrade algorithm w/ real-level UpgradeLimit gating,
+WHMatchEnd webhook, T1 "Game" tab, in-flight place dedup for async Me:Fire).
+Public d7d3325 (both per/ folders, ls-remote verified); SavedFolder bf300da;
+harness Game 69/69 + Lobby 47/47; ONBOARDING §2 case table + lessons +2.
+**Notes for next session**: reference scripts = STRUCTURE spec (function
+shapes, UI order/texts, file formats, defensive lines) — audit every element
+of YOUR script against the reference before delivery, not just the feature
+list. Harness now models async server confirms (PlaceUnit → ReplicateUnit).
