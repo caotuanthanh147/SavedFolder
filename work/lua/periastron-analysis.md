@@ -107,3 +107,49 @@ Lobby events: `PortalGroupChanged` `ContractClaimResult` `RoundCardStock`
   still works via RoundRestarted event. DefeatMode offers Replay/ReturnLobby.
 - Robux/gamepass products: excluded (SetGameSpeed kept as-is because the
   game's own UI fires it identically; server enforces entitlement).
+
+## ST12 violation-fix round (2026-10-02, user-flagged "repeated violations")
+
+User named `UpgradeStep` and said "there are more I don't want to name them
+all". Full audit vs slop.lua (the named format) + Yuri/Snack/Snack.lua (the
+blessed canonical implementation):
+
+### Removed (invented — absent from slop/Snack AND from the mapping table above)
+- Stats SafeLabel + 0.5s stats polling loop — same class as the MATI label.
+- "Cash Reserve" (UpgradeReserve) slider — slop only READS the option
+  defensively (always 0); no reference creates the slider.
+- "Place Delay (s)" (PlaceDelay) slider — no reference has it.
+- UpgradesGiven counter + UpgradeLimitAllows — references gate by the
+  tower's REAL level vs UpgradeLimit (GetUpgradableTowers).
+- MState.PendingLabel — the template SafeLabel registry already updates
+  labels; references use `SafeLabel("Macro", txt)`.
+- Custom UpgradeStep/PickUpgradeTarget — replaced by slop's
+  GetUpgradableTowers + UpgradeCand + Func_AutoUpgrade (exact method
+  strings + sort semantics).
+- "Test Webhook" button — references gate match-end webhooks behind the
+  WHMatchEnd toggle (ported) with yuri avatar (ported).
+
+### Ported (slop/Snack structure that the v1 delivery lacked)
+- Per-map, per-slot position LISTS + position.json persistence
+  (HandleSlotPos set/massset/reset, PosText, PickSavedSpot random pick).
+- Map identity: PlayMapMusic payload (string; deobf L4914 listener,
+  getMusic returns Music field or the MAPS key) → MapConfig.resolveMap
+  (deobf L54863) → fallback raw string. Stable per-map bucket key.
+- ReplayMode {"Time","Money"} default Time (Snack semantics: wave wait +
+  skip if wave > tWave+10; Money waits the entry's computed cost).
+- Func_MacroRecord match-gated flow, auto-save with timestamp fallback,
+  SortMacroEntries; Func_MacroReplay full-pass + cross-round persistence
+  (replaces the separate AutoReplay-resume hack; AutoReplay kept as the
+  analysis-sanctioned Game-tab mapping for guaranteeing resumption).
+- Func_AutoAtWave (sell-all ≥ threshold, leave once per wave),
+  Func_AutoSpeed 2s loop, canonical tab block (T1 "Game"), Thread+SafeLoop.
+
+### Added (invisible transport plumbing, defensible)
+- Per-name in-flight place dedup (fire → skip name until ReplicateUnit or
+  1s): Me:Fire is fire-and-forget; slop/Snack's sync invokes never face the
+  confirm window. Without it: duplicate fires at frame rate → overshoot.
+
+### Kept (sanctioned by the mapping table above)
+AutoReexec (Snack AutoRejoin mapping), DefeatMode (Snack-canonical),
+AutoQueue/AutoCrate/AutoClaimContracts, AutoReady/AutoVoteSkip/AutoSpeed/
+AutoLeave, RequestLobbyTeleport defeat path.

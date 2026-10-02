@@ -500,7 +500,7 @@ do
         function el:SetValue(v)
             self.Value = v
             for _, fn in ipairs(self._handlers) do
-                fn(v)
+                G.task.spawn(fn, v)
             end
         end
         function el:SetValues(list)
@@ -786,6 +786,7 @@ g.__SmokeResult = { dist = d, parts = #s, folder = sm.Folder }
     local tgl = Library.Toggles.SmokeToggle
     check("toggle registered", tgl ~= nil)
     tgl:SetValue(true)
+    pump(0.05)
     check("OnChanged fired + immediate first loop pass", G.__GetHits() >= 11)
     pump(1.2)
     check("loop ticked while toggle on (>=20 extra hits)", G.__GetHits() >= 21)
@@ -1133,6 +1134,25 @@ local function wireCount(name, pred)
     return n
 end
 
+local AutoConfirmId = 9000
+local AutoConfirmedIds = {}
+local origFireLog = MeMT.Fire
+MeMT.Fire = function(self, name, ...)
+    origFireLog(self, name, ...)
+    if name == "PlaceUnit" then
+        local a, b = ...
+        if type(a) == "string" and b and b.Position then
+            AutoConfirmId = AutoConfirmId + 1
+            local id = AutoConfirmId
+            table.insert(AutoConfirmedIds, id)
+            local px, py, pz = b.Position.X, b.Position.Y, b.Position.Z
+            G.task.delay(0.05, function()
+                serverEvent("ReplicateUnit", a, CFrame.new(Vector3.new(px, py, pz)), PLR.UserId, id, 0)
+            end)
+        end
+    end
+end
+
 local UnitStats = {
     Archer = { Cost = 125, Range = 14, Damage = 16, Cooldown = 3.5 },
     Sword = { Cost = 100, Range = 8, Damage = 30, Cooldown = 5 },
@@ -1286,6 +1306,25 @@ check("PlaceOrder1-6 sliders registered", Library.Options.PlaceOrder1 ~= nil and
 check("UpgradeLimit1-6 sliders registered", Library.Options.UpgradeLimit1 ~= nil and Library.Options.UpgradeLimit6 ~= nil)
 check("SpeedTarget dropdown registered", Library.Options.SpeedTarget ~= nil)
 check("DefeatMode dropdown registered", Library.Options.DefeatMode ~= nil)
+check("WHMatchEnd registered", Library.Toggles.WHMatchEnd ~= nil)
+check("tab layout: Game/Macro/Lobby + AutoPlay/Webhook tabs", (function()
+    local seen = {}
+    for _, n in ipairs(MockState.Tabs) do seen[n] = true end
+    return seen["Game"] and seen["Macro"] and seen["Lobby"] and seen["Auto Play"] and seen["Webhook"] and seen["LobbyConfig"]
+end)())
+check("UpgradeMethod values match slop format", (function()
+    local dd = Library.Options.UpgradeMethod
+    if not dd or not dd.Values or #dd.Values ~= 4 then return false end
+    return dd.Values[1] == "Lowest Level (Spread Upgrade)"
+        and dd.Values[2] == "Hotbar left to right (until Max)"
+        and dd.Values[3] == "Randomize"
+        and dd.Values[4] == "Customize upgrade order (Set below)"
+end)())
+check("ReplayMode Time|Money default Time", (function()
+    local dd = Library.Options.ReplayMode
+    return dd and dd.Values and dd.Values[1] == "Time" and dd.Values[2] == "Money" and dd.Value == "Time"
+end)())
+check("no invented controls (UpgradeReserve/PlaceDelay/Stats absent)", Library.Options.UpgradeReserve == nil and Library.Options.PlaceDelay == nil)
 
 if PLACE ~= "Lobby" then
     check("game place detected", (function()
@@ -1298,7 +1337,7 @@ if PLACE ~= "Lobby" then
         local dd = Library.Options.SetSlotSelect
         if not dd or not dd.Values then return false end
         for _, v in ipairs(dd.Values) do
-            if v == "Slot 1: Archer" then return true end
+            if v == "Slot 1 (Archer)" then return true end
         end
         return false
     end)())
@@ -1312,8 +1351,19 @@ if PLACE ~= "Lobby" then
     Library.Toggles.AutoUpgrade:SetValue(true)
     pump(1.5)
     check("AutoUpgrade fires UpgradeUnit(1)", wireCount("UpgradeUnit", function(c) return c[1] == 1 end) >= 1)
-
     Library.Toggles.AutoUpgrade:SetValue(false)
+    pump(0.2)
+
+    Library.Options.UpgradeLimit1:SetValue(1)
+    Library.Toggles.AutoUpgrade:SetValue(true)
+    pump(1.5)
+    local upgAtZero = wireCount("UpgradeUnit", function(c) return c[1] == 1 end)
+    check("UpgradeLimit1=1 allows upgrading level-0 unit", upgAtZero >= 1)
+    serverEvent("UnitUpgraded", 1, 1)
+    pump(1.5)
+    check("UpgradeLimit1=1 blocks past level 1 (real level gating)", wireCount("UpgradeUnit", function(c) return c[1] == 1 end) == upgAtZero)
+    Library.Toggles.AutoUpgrade:SetValue(false)
+    Library.Options.UpgradeLimit1:SetValue(0)
     pump(0.2)
     Library.Toggles.AutoPlace:SetValue(true)
     pump(2.5)
@@ -1327,6 +1377,11 @@ if PLACE ~= "Lobby" then
     Library.Toggles.AutoPlace:SetValue(false)
     pump(0.2)
 
+    for _, id in ipairs(AutoConfirmedIds) do
+        serverEvent("RemoveUnit", id)
+    end
+    AutoConfirmedIds = {}
+    pump(0.3)
     local archerBefore = wireCount("PlaceUnit", function(c) return c[1] == "Archer" end)
     Library.Options.PlaceLimit1:SetValue(2)
     Library.Toggles.AutoPlace:SetValue(true)
@@ -1338,6 +1393,69 @@ if PLACE ~= "Lobby" then
     Library.Toggles.AutoPlace:SetValue(false)
     Library.Options.PlaceLimit1:SetValue(0)
     pump(0.2)
+
+    Library.Toggles.PlaceAndUpgrade:SetValue(true)
+    Library.Toggles.AutoPlace:SetValue(true)
+    local placedCf, placedName = nil, nil
+    for _ = 1, 40 do
+        pump(0.25)
+        local calls = wireCalls("PlaceUnit")
+        if #calls > 0 then
+            local c = calls[#calls]
+            placedName = c[1]
+            placedCf = c[2]
+            break
+        end
+    end
+    check("AutoPlace fired for PlaceAndUpgrade test", placedName ~= nil and placedCf ~= nil)
+    if placedName and placedCf then
+        pump(3.5)
+        check("PlaceAndUpgrade upgrades the placed unit", wireCount("UpgradeUnit", function(c) return type(c[1]) == "number" and c[1] >= 9000 end) >= 1)
+    end
+    Library.Toggles.AutoPlace:SetValue(false)
+    Library.Toggles.PlaceAndUpgrade:SetValue(false)
+    pump(0.2)
+
+    serverEvent("PlayMapMusic", "Farm")
+    pump(0.3)
+    local function findButton(text)
+        for _, b in ipairs(MockState.Buttons) do
+            if b.Text == text then return b end
+        end
+        return nil
+    end
+    Library.Options.SetSlotSelect:SetValue("Slot 1 (Archer)")
+    local setBtn = findButton("Set Slot Position")
+    check("Set Slot Position button present", setBtn ~= nil)
+    if setBtn then
+        setBtn.Func()
+        pump(0.5)
+    end
+    check("position.json written with per-map bucket", (function()
+        local raw = MockFS["Yuri/PeriastronTD/position.json"]
+        return raw ~= nil and string.find(raw, "Farm", 1, true) ~= nil and string.find(raw, '"1"', 1, true) ~= nil
+    end)())
+    Library.Toggles.AutoPlace:SetValue(true)
+    pump(1.5)
+    check("AutoPlace uses saved slot position", (function()
+        for _, c in ipairs(wireCalls("PlaceUnit")) do
+            local p = c[2].Position
+            if math.abs(p.X) < 0.6 and math.abs(p.Y - 5) < 0.6 and math.abs(p.Z) < 0.6 then return true end
+        end
+        return false
+    end)())
+    Library.Toggles.AutoPlace:SetValue(false)
+    pump(0.2)
+    local resetBtn = findButton("Reset Position")
+    check("Reset Position button present", resetBtn ~= nil)
+    if resetBtn then
+        resetBtn.Func()
+        pump(0.5)
+    end
+    check("reset clears the map bucket", (function()
+        local raw = MockFS["Yuri/PeriastronTD/position.json"]
+        return raw ~= nil and string.find(raw, "Farm", 1, true) == nil
+    end)())
 
     Library.Toggles.AutoReady:SetValue(true)
     serverEvent("WaveIntermission", { timeLeft = 10 })
@@ -1358,11 +1476,14 @@ if PLACE ~= "Lobby" then
     Library.Toggles.AutoSell:SetValue(true)
     Library.Options.AutoSellValue:SetValue(10)
     serverEvent("SetWave", 10)
-    pump(0.5)
+    pump(1.5)
     check("AutoSell at wave 10 fires SellUnit", wireCount("SellUnit", function(c) return c[1] == 1 end) >= 1)
+    serverEvent("RemoveUnit", 1)
+    pump(0.3)
+    local soldAfterRemove = wireCount("SellUnit", function(c) return c[1] == 1 end)
     serverEvent("SetWave", 11)
-    pump(0.2)
-    check("AutoSell fires once per wave", wireCount("SellUnit", function(c) return c[1] == 1 end) == 1)
+    pump(1.5)
+    check("no re-sell after unit removed (slop semantics)", wireCount("SellUnit", function(c) return c[1] == 1 end) == soldAfterRemove)
 
     Library.Toggles.MacroRecord:SetValue(true)
     pump(0.2)
@@ -1393,9 +1514,12 @@ if PLACE ~= "Lobby" then
     pump(0.2)
 
     Library.Options.WebhookURL:SetValue("https://discord.com/api/webhooks/test")
+    Library.Toggles.WHMatchEnd:SetValue(true)
+    pump(0.1)
     serverEvent("Win", {})
     pump(1.0)
-    check("Win sends webhook", #WebhookLog >= 1 and string.find(WebhookLog[#WebhookLog].Body, "Victory", 1, true) ~= nil)
+    check("Win sends webhook when WHMatchEnd on", #WebhookLog >= 1 and string.find(WebhookLog[#WebhookLog].Body, "Victory", 1, true) ~= nil)
+    check("webhook carries yuri avatar", string.find(WebhookLog[#WebhookLog].Body, "avatar_url", 1, true) ~= nil)
 
     Library.Options.DefeatMode:SetValue("Return to Lobby")
     serverEvent("GameOver", {})

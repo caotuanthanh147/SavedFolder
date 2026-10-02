@@ -655,6 +655,8 @@ AddInfo(Window)
 local Tabs = {
         Main = Window:AddTab("Main"),
     Player = Window:AddTab("Player"),
+    AutoPlay = Window:AddTab("Auto Play"),
+    Webhook = Window:AddTab("Webhook"),
     Config = Window:AddTab("Config"),
 }
 local TB = {
@@ -669,10 +671,13 @@ local TB = {
 }
 local TB_Tabs = {
     Autofarm = {
-        T1 = TB.Main.Left.Autofarm:AddTab("Autofarm"),
+        T1 = TB.Main.Left.Autofarm:AddTab("Game"),
+        T2 = TB.Main.Left.Autofarm:AddTab("Macro"),
+        T3 = TB.Main.Left.Autofarm:AddTab("Lobby"),
     },
     Autofarm2 = {
         T1 = TB.Main.Right.Autofarm:AddTab("Config"),
+        T2 = TB.Main.Right.Autofarm:AddTab("LobbyConfig"),
     },
 }
 local GB = {
@@ -834,8 +839,10 @@ Toggles.AntiAFK:OnChanged(function(state)
     end
 end)
 if Toggles.AntiAFK.Value then RunAntiAFK() end
-local CS = Services.CollectionService
 Shared.Labels = Shared.Labels or {}
+
+local CS = Services.CollectionService
+
 local Periastron = {
     Me = nil,
     MeMT = nil,
@@ -849,79 +856,84 @@ local Periastron = {
     CrateConfig = nil,
     Replica = nil,
     DataController = nil,
-    Place = "None",
+    PlaceName = "None",
     Cash = 0,
     Wave = 0,
+    WaveStartedAt = 0,
     Speed = 1,
     Intermission = false,
     ReadyFiredWave = -1,
-    SoldWave = -1,
-    SoldDone = false,
-    LeaveWave = -1,
-    LeaveDone = false,
+    MapKey = nil,
     Units = {},
     Deck = {},
     DeckLoaded = false,
-    SlotPos = {},
-    FailPos = {},
-    UpgradesGiven = {},
-    Match = {Over = false, Won = false, Started = false},
-    Group = {JoinedAt = 0, LastChange = nil},
+    Place = {
+        SlotPositions = {},
+        TypeFails = {},
+        PauseUntil = {},
+        FailPos = {},
+        InFlight = {},
+    },
+    Match = { Over = false, Won = false, Started = false, WebhookSent = false },
+    Group = { JoinedAt = 0, LastChange = nil },
     QueueTicks = 0,
-    Weather = nil,
 }
 local MState = {
     Rec = false,
     Rep = false,
     Cur = nil,
     Load = nil,
-    Index = 1,
     Step = 0,
     Total = 0,
-    LabelRef = nil,
     SelfFire = false,
     Hooked = false,
-    PendingLabel = nil,
-    Pending = {},
     Saved = false,
 }
 local MDir = "Yuri/PeriastronTD/Macros"
-local StatsLabel = nil
-local PosLabel = nil
-local UpdatePosLabel = nil
+local PosDir = "Yuri/PeriastronTD"
+local PosPath = PosDir .. "/position.json"
 local GAME_PLACE_ID = 109030368179494
 local LOBBY_PLACE_ID = 132304466547289
 local SLOT_COUNT = 6
 local PlaceValid = false
 local LobbyValid = false
 
+local function RoundLive()
+    return PlaceValid and not Periastron.Match.Over
+end
+
+local function WaveElapsed()
+    if Periastron.WaveStartedAt <= 0 then return 0 end
+    return math.max(0, os.clock() - Periastron.WaveStartedAt)
+end
+
 local function DetectPlace()
     if game.PlaceId == GAME_PLACE_ID then
-        Periastron.Place = "Game"
+        Periastron.PlaceName = "Game"
     elseif game.PlaceId == LOBBY_PLACE_ID then
-        Periastron.Place = "Lobby"
+        Periastron.PlaceName = "Lobby"
     elseif workspace:FindFirstChild("PathScriptable") then
-        Periastron.Place = "Game"
+        Periastron.PlaceName = "Game"
     elseif workspace:FindFirstChild("UnboxingCrates") or workspace:FindFirstChild("ContractsBoard") then
-        Periastron.Place = "Lobby"
+        Periastron.PlaceName = "Lobby"
     else
         local deadline = os.clock() + 10
         while os.clock() < deadline and not Library.Unloaded do
             task.wait(0.5)
             if workspace:FindFirstChild("PathScriptable") then
-                Periastron.Place = "Game"
+                Periastron.PlaceName = "Game"
                 break
             end
             if workspace:FindFirstChild("UnboxingCrates") or workspace:FindFirstChild("ContractsBoard") then
-                Periastron.Place = "Lobby"
+                Periastron.PlaceName = "Lobby"
                 break
             end
         end
     end
-    PlaceValid = Periastron.Place == "Game"
-    LobbyValid = Periastron.Place == "Lobby"
-    Library:Notify("Periastron: " .. Periastron.Place .. " place detected", 4)
-    notyuri("[Periastron] place =", Periastron.Place, "PlaceId =", tostring(game.PlaceId))
+    PlaceValid = Periastron.PlaceName == "Game"
+    LobbyValid = Periastron.PlaceName == "Lobby"
+    Library:Notify("Periastron: " .. Periastron.PlaceName .. " place detected", 4)
+    notyuri("[Periastron] place =", Periastron.PlaceName, "PlaceId =", tostring(game.PlaceId))
 end
 
 local function BindMe()
@@ -1050,6 +1062,7 @@ local function FetchDataController()
     end)
 end
 
+
 local function SanitizeDeck(equipped, limit)
     local out = {}
     local n = 0
@@ -1087,15 +1100,15 @@ local function RefreshDeck()
     return changed
 end
 
+local function LoadoutSlotName(slot)
+    return Periastron.Deck[slot]
+end
+
 local function GetSlotDisplayNames()
     local names = {}
     for i = 1, SLOT_COUNT do
         local name = Periastron.Deck[i]
-        if name then
-            table.insert(names, string.format("Slot %d: %s", i, name))
-        else
-            table.insert(names, string.format("Slot %d: (empty)", i))
-        end
+        table.insert(names, "Slot " .. i .. " (" .. (name or "empty") .. ")")
     end
     return names
 end
@@ -1104,6 +1117,38 @@ local function SlotDisplayToNumber(display)
     local n = tonumber(tostring(display):match("^Slot (%d+)"))
     return n
 end
+
+local function GetSlotOption(prefix, slot, fallback)
+    local opt = Options[prefix .. slot]
+    return (opt and tonumber(opt.Value)) or fallback
+end
+
+local function SlotByTowerName()
+    local map = {}
+    for slot, name in ipairs(Periastron.Deck) do
+        if name ~= nil and map[name] == nil then
+            map[name] = slot
+        end
+    end
+    return map
+end
+
+local function GetSelectedTowerSlots()
+    local list = {}
+    local slotByName = SlotByTowerName()
+    for name, slot in pairs(slotByName) do
+        table.insert(list, { name = name, slot = slot })
+    end
+    table.sort(list, function(a, b)
+        local sa = GetSlotOption("PlaceOrder", a.slot, a.slot)
+        local sb = GetSlotOption("PlaceOrder", b.slot, b.slot)
+        if sa ~= sb then
+            return sa < sb end
+        return a.name < b.name
+    end)
+    return list
+end
+
 
 local function GetPlaceCost(name)
     local cfg = Periastron.UnitUpgradeConfig
@@ -1184,36 +1229,254 @@ local function CountOwnedByName(name)
     return n
 end
 
-local function HotbarIndexOf(name)
-    for i, dn in ipairs(Periastron.Deck) do
-        if dn == name then
-            return i
+local function GetOwnUnits()
+    local list = {}
+    for _, u in pairs(Periastron.Units) do
+        if u.own then
+            table.insert(list, u)
         end
     end
-    return nil
+    return list
 end
 
-local function SlotForName(name)
-    return HotbarIndexOf(name)
+local function MatchTowerAt(name, pos, radius)
+    local best, bestDist = nil, radius or 7
+    for _, u in pairs(Periastron.Units) do
+        if u.own and u.name == name and u.pos then
+            local dist = (u.pos - pos).Magnitude
+            if dist < bestDist then
+                best, bestDist = u, dist
+            end
+        end
+    end
+    return best
 end
+
+
+local function GetCurrentMapName()
+    local key = Periastron.MapKey
+    if not key or key == "" then return nil end
+    local cfg = Periastron.MapConfig
+    if cfg and type(cfg.resolveMap) == "function" then
+        local ok, resolved = pcall(cfg.resolveMap, cfg, key)
+        if ok and type(resolved) == "string" and resolved ~= "" then
+            return resolved
+        end
+    end
+    return key
+end
+
+
+local function EnsureFolderPath(path)
+    if not (makefolder and isfolder) then return end
+    pcall(function()
+        local built = ""
+        for _, part in ipairs(path:split("/")) do
+            built = (built == "") and part or (built .. "/" .. part)
+            if not isfolder(built) then
+                makefolder(built)
+            end
+        end
+    end)
+end
+
+local function SaveJSON(path, data)
+    if not writefile then return false end
+    return pcall(function()
+        writefile(path, HttpService:JSONEncode(data))
+    end)
+end
+
+local function LoadJSON(path)
+    if not (readfile and isfile) then return nil end
+    local ok, raw = pcall(function()
+        if isfile(path) then
+            return readfile(path)
+        end
+        return nil
+    end)
+    if not ok or type(raw) ~= "string" or raw == "" then return nil end
+    local data = nil
+    pcall(function()
+        data = HttpService:JSONDecode(raw)
+    end)
+    if type(data) ~= "table" then return nil end
+    return data
+end
+
+local function LoadMDir()
+    if not writefile then return end
+    EnsureFolderPath(MDir)
+end
+
+local function ListMacros()
+    local names = {}
+    local listf = listfiles or listfolder
+    if not listf then return names end
+    local ok, files = pcall(listf, MDir)
+    if not ok or type(files) ~= "table" then return names end
+    for _, path in ipairs(files) do
+        if type(path) == "string" and path:sub(-5):lower() == ".json" then
+            local fname = path:match("([^/\\]+)%.json$")
+            if fname and fname ~= "" then
+                table.insert(names, fname)
+            end
+        end
+    end
+    table.sort(names)
+    return names
+end
+
+local function LoadMacro(name)
+    if not name or name == "" or not readfile then return nil end
+    local data = LoadJSON(MDir .. "/" .. name .. ".json")
+    if not data then return nil end
+    local entries = {}
+    local i = 1
+    while data[tostring(i)] do
+        entries[i] = data[tostring(i)]
+        i = i + 1
+    end
+    return { entries = entries }
+end
+
+local function SaveMacro(name, macro)
+    if not name or name == "" or not writefile then return false end
+    LoadMDir()
+    local out = {}
+    for i, entry in ipairs(macro.entries) do
+        out[tostring(i)] = entry
+    end
+    return SaveJSON(MDir .. "/" .. name .. ".json", out)
+end
+
+local function EnsurePosDir()
+    if not (makefolder and isfolder) then return end
+    EnsureFolderPath(PosDir)
+end
+
+local function SavePositions()
+    if not writefile then return false end
+    EnsurePosDir()
+    local out = {}
+    for mapName, slots in pairs(Periastron.Place.SlotPositions) do
+        local slotOut = {}
+        for slot, spots in pairs(slots) do
+            local spotOut = {}
+            for i, spot in ipairs(spots) do
+                spotOut[i] = { x = spot.x, y = spot.y, z = spot.z }
+            end
+            slotOut[tostring(slot)] = spotOut
+        end
+        out[mapName] = slotOut
+    end
+    return SaveJSON(PosPath, out)
+end
+
+local function LoadPositions()
+    if not (readfile and isfile) then return end
+    local data = LoadJSON(PosPath)
+    if not data then return end
+    local loaded = {}
+    for mapName, slots in pairs(data) do
+        if type(slots) == "table" then
+            loaded[mapName] = {}
+            for slotStr, spots in pairs(slots) do
+                local slot = tonumber(slotStr)
+                if slot and type(spots) == "table" then
+                    local list = {}
+                    for i, spot in ipairs(spots) do
+                        if type(spot) == "table" and tonumber(spot.x) and tonumber(spot.y) and tonumber(spot.z) then
+                            list[i] = { x = tonumber(spot.x), y = tonumber(spot.y), z = tonumber(spot.z) }
+                        end
+                    end
+                    loaded[mapName][slot] = list
+                end
+            end
+        end
+    end
+    Periastron.Place.SlotPositions = loaded
+end
+
+
+local function PosText(mapName)
+    if not mapName or not Periastron.Place.SlotPositions[mapName] then return "No positions set" end
+    local lines = {}
+    for slot, spots in pairs(Periastron.Place.SlotPositions[mapName]) do
+        local unitName = LoadoutSlotName(slot)
+        table.insert(lines, "Slot " .. slot .. (unitName and (" (" .. unitName .. ")") or "") .. ": " .. #spots .. " pos")
+    end
+    if #lines == 0 then return "No positions set" end
+    table.sort(lines)
+    return table.concat(lines, "\n")
+end
+
+local function UpdatePosLabels()
+    local mapName = GetCurrentMapName()
+    SafeLabel("Positions", PosText(mapName))
+end
+
+local function HandleSlotPos(act, slot)
+    local mapName = GetCurrentMapName()
+    if not mapName then
+        Library:Notify("Map not detected yet", 3)
+        return
+    end
+    if act == "reset" then
+        if slot then
+            if Periastron.Place.SlotPositions[mapName] then Periastron.Place.SlotPositions[mapName][slot] = nil end
+            notyuri("ResetPos slot=" .. slot .. " map=" .. mapName)
+        else
+            Periastron.Place.SlotPositions[mapName] = nil
+            notyuri("ResetPos all map=" .. mapName)
+        end
+        SavePositions()
+        UpdatePosLabels()
+        return
+    end
+    local char = Plr.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        Library:Notify("Character not found", 3)
+        return
+    end
+    local pos = hrp.Position
+    if not Periastron.Place.SlotPositions[mapName] then Periastron.Place.SlotPositions[mapName] = {} end
+    if act == "set" then
+        if not Periastron.Place.SlotPositions[mapName][slot] then Periastron.Place.SlotPositions[mapName][slot] = {} end
+        table.insert(Periastron.Place.SlotPositions[mapName][slot], { x = pos.X, y = pos.Y, z = pos.Z })
+        local count = #Periastron.Place.SlotPositions[mapName][slot]
+        notyuri("SetPos slot=" .. slot .. " count=" .. count .. " map=" .. mapName)
+    elseif act == "massset" then
+        for i = 1, SLOT_COUNT do
+            if not Periastron.Place.SlotPositions[mapName][i] then Periastron.Place.SlotPositions[mapName][i] = {} end
+            table.insert(Periastron.Place.SlotPositions[mapName][i], { x = pos.X, y = pos.Y, z = pos.Z })
+        end
+        notyuri("MassSetPos map=" .. mapName)
+    end
+    SavePositions()
+    UpdatePosLabels()
+end
+
 
 local function PosKey(pos)
     return string.format("%.1f_%.1f_%.1f", pos.X, pos.Y, pos.Z)
 end
 
 local function FailPosBlocked(pos)
-    return Periastron.FailPos[PosKey(pos)] ~= nil
+    local deadline = Periastron.Place.FailPos[PosKey(pos)]
+    return type(deadline) == "number" and tick() < deadline
 end
 
 local function MarkFailPos(pos)
-    Periastron.FailPos[PosKey(pos)] = tick()
+    Periastron.Place.FailPos[PosKey(pos)] = tick() + 30
 end
 
 local function ClearExpiredFailPos()
     local now = tick()
-    for k, t in pairs(Periastron.FailPos) do
-        if type(t) == "number" and now - t > 120 then
-            Periastron.FailPos[k] = nil
+    for k, deadline in pairs(Periastron.Place.FailPos) do
+        if type(deadline) ~= "number" or now > deadline then
+            Periastron.Place.FailPos[k] = nil
         end
     end
 end
@@ -1280,12 +1543,12 @@ local function GetPathNodePositions()
 end
 
 local function FindSpotNear(center)
-    if IsSpotValid(center) and not FailPosBlocked(center) then
+    if not FailPosBlocked(center) and IsSpotValid(center) then
         return center
     end
     local offsets = {
         Vector3.new(6, 0, 0), Vector3.new(-6, 0, 0), Vector3.new(0, 0, 6), Vector3.new(0, 0, -6),
-        Vector3.new(6, 0, 6), Vector3.new(-6, 0, 6), Vector3.new(6, 0, -6), Vector3.new(-6, 0, -6),
+        Vector3.new(6, 0, 6), Vector3.new(-6, 0, 6), Vector3.new(6, 0, -6), Vector3.new(-6, 0, -8),
         Vector3.new(12, 0, 0), Vector3.new(-12, 0, 0), Vector3.new(0, 0, 12), Vector3.new(0, 0, -12),
         Vector3.new(9, 0, 9), Vector3.new(-9, 0, -9), Vector3.new(9, 0, -9), Vector3.new(-9, 0, 9),
         Vector3.new(16, 0, 0), Vector3.new(-16, 0, 0), Vector3.new(0, 0, 16), Vector3.new(0, 0, -16),
@@ -1335,115 +1598,242 @@ local function AutoSpotForSlot(slot, name)
     return nil
 end
 
-local function GetPlacePos(slot, name)
-    local saved = Periastron.SlotPos[slot]
-    if saved and saved.X and saved.Y and saved.Z then
-        return FindSpotNear(saved)
+local function PickSavedSpot(slot)
+    local mapName = GetCurrentMapName()
+    local saved = mapName and Periastron.Place.SlotPositions[mapName] and Periastron.Place.SlotPositions[mapName][slot]
+    if not (saved and #saved > 0) then
+        return nil
     end
-    return AutoSpotForSlot(slot, name)
-end
-
-local function LoadMDir()
-    if not writefile then return end
-    pcall(function()
-        local built = ""
-        for _, part in ipairs(MDir:split("/")) do
-            built = (built == "") and part or (built .. "/" .. part)
-            if not isfolder(built) then
-                makefolder(built)
-            end
-        end
-    end)
-end
-
-local function ListMacros()
-    local names = {}
-    local listf = listfiles or listfolder
-    if not listf then return names end
-    local ok, files = pcall(listf, MDir)
-    if not ok or type(files) ~= "table" then return names end
-    for _, path in ipairs(files) do
-        if type(path) == "string" and path:sub(-5):lower() == ".json" then
-            local fname = path:match("([^/\\]+)%.json$")
-            if fname and fname ~= "" then
-                table.insert(names, fname)
-            end
+    for _ = 1, #saved do
+        local pick = saved[math.random(1, #saved)]
+        local pos = Vector3.new(pick.x, pick.y, pick.z)
+        if not FailPosBlocked(pos) then
+            return pos
         end
     end
-    table.sort(names)
-    return names
+    return nil
 end
 
-local function LoadMacro(name)
-    if not name or name == "" or not readfile then return nil end
-    local path = MDir .. "/" .. name .. ".json"
-    local exists = false
-    pcall(function()
-        exists = isfile(path)
-    end)
-    if not exists then return nil end
-    local ok, raw = pcall(readfile, path)
-    if not ok or type(raw) ~= "string" or raw == "" then return nil end
-    local data = nil
-    pcall(function()
-        data = HttpService:JSONDecode(raw)
-    end)
-    if type(data) ~= "table" then return nil end
-    local entries = {}
-    local i = 1
-    while data[tostring(i)] do
-        entries[i] = data[tostring(i)]
-        i = i + 1
+
+local function TryPlaceTower(name, slot)
+    if not RoundLive() then return false, nil end
+    local price = GetPlaceCost(name)
+    if price > 0 and Periastron.Cash < price then return false, nil end
+    local pause = Periastron.Place.PauseUntil[name] or 0
+    if tick() < pause then return false, nil end
+    local inflight = Periastron.Place.InFlight[name]
+    if type(inflight) == "number" and tick() < inflight then return false, nil end
+    if slot then
+        local placeWave = GetSlotOption("PlaceWave", slot, 0)
+        if placeWave > 0 and Periastron.Wave < placeWave then return false, nil end
+        local slotLimit = GetSlotOption("PlaceLimit", slot, 0)
+        if slotLimit > 0 and CountOwnedByName(name) >= slotLimit then return false, nil end
     end
-    return {entries = entries}
+    local spot = PickSavedSpot(slot)
+    if not spot then
+        spot = AutoSpotForSlot(slot, name)
+    end
+    if not spot then return false, nil end
+    if FireGame("PlaceUnit", name, CFrame.new(spot)) then
+        Periastron.Place.TypeFails[name] = 0
+        Periastron.Place.InFlight[name] = tick() + 1
+        return true, spot
+    end
+    MarkFailPos(spot)
+    Periastron.Place.TypeFails[name] = (Periastron.Place.TypeFails[name] or 0) + 1
+    if Periastron.Place.TypeFails[name] >= 3 then
+        Periastron.Place.PauseUntil[name] = tick() + 10
+        Periastron.Place.TypeFails[name] = 0
+        notyuri("3 rejects for", name, "- pausing 10s")
+    end
+    return false, nil
 end
 
-local function SaveMacro(name, macro)
-    if not name or name == "" or not writefile then return false end
-    LoadMDir()
-    local path = MDir .. "/" .. name .. ".json"
-    local out = {}
-    for i, entry in ipairs(macro.entries) do
-        out[tostring(i)] = entry
-    end
-    local ok = pcall(function()
-        writefile(path, HttpService:JSONEncode(out))
-    end)
-    return ok
+local function TryUpgradeOnce(unit)
+    if not (unit and unit.own) then return false end
+    if IsMaxedLevel(unit.name, unit.upgrades) then return false end
+    local price = GetUpgradeCost(unit.name, unit.upgrades)
+    if not (Periastron.Cash >= price) then return false end
+    return FireGame("UpgradeUnit", unit.unitId)
 end
+
+local function Func_AutoPlace()
+    while Toggles.AutoPlace.Value do
+        if RoundLive() then
+            RefreshDeck()
+            ClearExpiredFailPos()
+            for _, entry in ipairs(GetSelectedTowerSlots()) do
+                if not (Toggles.AutoPlace.Value and RoundLive()) then break end
+                local placed, spot = TryPlaceTower(entry.name, entry.slot)
+                if placed then
+                    notyuri("Placed", entry.name, "slot", tostring(entry.slot))
+                    if Toggles.PlaceAndUpgrade and Toggles.PlaceAndUpgrade.Value then
+                        local unit = nil
+                        local deadline = os.clock() + 1.5
+                        while os.clock() < deadline and not unit do
+                            unit = MatchTowerAt(entry.name, spot, 9)
+                            if not unit then
+                                task.wait(0.125)
+                            end
+                        end
+                        if unit then
+                            local upgLimit = entry.slot and GetSlotOption("UpgradeLimit", entry.slot, 0) or 0
+                            for _ = 1, 20 do
+                                if not Toggles.PlaceAndUpgrade.Value then break end
+                                if upgLimit > 0 and unit.upgrades >= upgLimit then break end
+                                if not TryUpgradeOnce(unit) then break end
+                                task.wait()
+                            end
+                        end
+                    end
+                end
+                task.wait()
+            end
+        end
+        task.wait()
+    end
+end
+
+
+local function GetUpgradableTowers()
+    local slotByName = SlotByTowerName()
+    local result = {}
+    for _, unit in ipairs(GetOwnUnits()) do
+        local slot = slotByName[unit.name]
+        local upgLimit = slot and GetSlotOption("UpgradeLimit", slot, 0) or 0
+        local level = unit.upgrades or 0
+        if upgLimit <= 0 or level < upgLimit then
+            if not IsMaxedLevel(unit.name, level) then
+                local price = GetUpgradeCost(unit.name, level)
+                table.insert(result, {
+                    unit = unit,
+                    slot = slot,
+                    level = level,
+                    towerName = unit.name,
+                    price = price,
+                })
+            end
+        end
+    end
+    return result
+end
+
+local function UpgradeCand(units)
+    local method = Options.UpgradeMethod and Options.UpgradeMethod.Value or "Lowest Level (Spread Upgrade)"
+    if #units == 0 then return nil end
+    if method == "Randomize" then
+        return units[math.random(1, #units)]
+    elseif method == "Hotbar left to right (until Max)" or method == "Customize upgrade order (Set below)" then
+        table.sort(units, function(a, b)
+            local sa = a.slot and GetSlotOption("PlaceOrder", a.slot, a.slot) or 99
+            local sb = b.slot and GetSlotOption("PlaceOrder", b.slot, b.slot) or 99
+            if sa ~= sb then return sa < sb end
+            return a.level < b.level
+        end)
+        return units[1]
+    end
+    table.sort(units, function(a, b) return a.level < b.level end)
+    return units[1]
+end
+
+local function Func_AutoUpgrade()
+    while Toggles.AutoUpgrade.Value do
+        local reserve = (Options.UpgradeReserve and Options.UpgradeReserve.Value) or 0
+        local units = GetUpgradableTowers()
+        local target = UpgradeCand(units)
+        if target and RoundLive() and (Periastron.Cash - reserve) >= target.price then
+            if FireGame("UpgradeUnit", target.unit.unitId) then
+                notyuri("Upgraded", target.towerName, "slot", tostring(target.slot))
+            end
+        end
+        task.wait()
+    end
+end
+
+
+local function Func_AutoAtWave(toggle, thresholdOption, action)
+    local firedForWave = nil
+    while toggle.Value do
+        local threshold = tonumber(thresholdOption and thresholdOption.Value) or 0
+        local wave = Periastron.Wave
+        if wave >= threshold and RoundLive() then
+            if action == "sell" then
+                for _, unit in ipairs(GetOwnUnits()) do
+                    FireGame("SellUnit", unit.unitId)
+                end
+            elseif action == "leave" then
+                if firedForWave ~= wave then
+                    firedForWave = wave
+                    FireGame("RequestLobbyTeleport")
+                    notyuri("AutoLeave", "leave sent", "wave", tostring(wave))
+                end
+            end
+        end
+        task.wait(1)
+    end
+end
+
+local function ApplyGameSpeed()
+    if not (Toggles.AutoSpeed and Toggles.AutoSpeed.Value and PlaceValid) then return end
+    local n = tonumber(Options.SpeedTarget and Options.SpeedTarget.Value) or 2
+    if Periastron.Speed >= n then return end
+    FireGame("SetGameSpeed", n)
+end
+
+local function Func_AutoSpeed()
+    while Toggles.AutoSpeed.Value do
+        local ok, err = pcall(ApplyGameSpeed)
+        if not ok then
+            notyuri("AutoSpeed error:", tostring(err))
+        end
+        task.wait(2)
+    end
+end
+
 
 local function UpdateMacroLabel(suffix)
-    if not (MState.LabelRef and MState.LabelRef.SetText) then return end
     local txt
     if MState.Rec then
-        txt = string.format("Recording [%d]%s", MState.Step, suffix and (" " .. suffix) or "")
+        if suffix then
+            txt = string.format("Recording [%d] %s", MState.Step, suffix)
+        else
+            txt = string.format("Recording [%d]", MState.Step)
+        end
     elseif MState.Rep then
-        txt = string.format("Replaying [%d / %d]%s", MState.Index - 1, MState.Total, suffix and (" " .. suffix) or "")
+        txt = string.format("Replaying [%d / %d]", MState.Step, MState.Total)
+        if suffix then
+            txt = txt .. " | " .. suffix
+        end
     else
         txt = "Idle" .. (suffix and (" | " .. suffix) or "")
     end
-    if MState.Rec then
-        MState.PendingLabel = txt
-    else
-        local ok = pcall(function()
-            MState.LabelRef:SetText(txt)
-        end)
-        if not ok then
-            MState.PendingLabel = txt
-        end
-    end
+    notyuri("MacroLabel", txt)
+    SafeLabel("Macro", txt)
 end
 
-local function RecordAct(kind, data)
+local function RecordAct(kind, data, wave, elapsed)
     if not MState.Cur then return end
     MState.Step = MState.Step + 1
-    local entry = {Type = kind, W = Periastron.Wave, M = Periastron.Cash, Seq = MState.Step}
-    for k, val in pairs(data or {}) do
-        entry[k] = val
+    local entry = { Type = kind, Time = tostring(wave or 0) .. " " .. tostring(math.floor((elapsed or 0) * 1000)) }
+    for k, v in pairs(data or {}) do
+        entry[k] = v
     end
     table.insert(MState.Cur.entries, entry)
     UpdateMacroLabel(kind)
-    notyuri("[Macro Rec]", kind, "wave", tostring(Periastron.Wave), "cash", tostring(Periastron.Cash))
+end
+
+local function ParseMacroTime(entry)
+    local wStr, eStr = (entry.Time or ""):match("^(%d+)%s+(.+)$")
+    return tonumber(wStr) or 0, (tonumber(eStr) or 0) / 1000
+end
+
+local function SortMacroEntries(entries)
+    table.sort(entries, function(a, b)
+        local wa = ParseMacroTime(a)
+        local wb = ParseMacroTime(b)
+        if wa ~= wb then return wa < wb end
+        return ParseMacroTime(a) < ParseMacroTime(b)
+    end)
 end
 
 local function InstallMacroHook()
@@ -1459,19 +1849,19 @@ local function InstallMacroHook()
         if rec and name == "PlaceUnit" then
             local a, b = ...
             if type(a) == "string" and b and b.Position and b.X then
-                RecordAct("Place", {N = a, P = {b.X, b.Y, b.Z}})
+                RecordAct("Place", { Name = a, Pos = { b.X, b.Y, b.Z } }, Periastron.Wave, WaveElapsed())
             end
         elseif rec and name == "UpgradeUnit" then
             local a = ...
             if type(a) == "number" then
                 local u = Periastron.Units[a]
-                RecordAct("Upgrade", {N = u and u.name or "?"})
+                RecordAct("Upgrade", { Name = u and u.name or "?", LVL = u and u.upgrades or 0, Key = a }, Periastron.Wave, WaveElapsed())
             end
         elseif rec and name == "SellUnit" then
             local a = ...
             if type(a) == "number" then
                 local u = Periastron.Units[a]
-                RecordAct("Sell", {N = u and u.name or "?"})
+                RecordAct("Sell", { Name = u and u.name or "?", Key = a }, Periastron.Wave, WaveElapsed())
             end
         end
         return orig(self, name, ...)
@@ -1480,28 +1870,372 @@ local function InstallMacroHook()
     notyuri("[Periastron] macro hook installed on Me.Fire")
 end
 
-local function SendWebhook(title, description)
-    if not Support.Webhook then return end
-    local url = Options.WebhookURL and Options.WebhookURL.Value or ""
-    if url == "" then return end
-    pcall(function()
-        local req = request or http_request
-        req({
-            Url = url,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({
-                username = "Yuri",
-                embeds = {
-                    {
-                        title = title,
-                        description = description,
-                        color = 0xFFB6C1,
-                    },
-                },
-            }),
-        })
-    end)
+local function Func_MacroRecord(state)
+    if not state then return end
+    if Toggles.LoadMacro and Toggles.LoadMacro.Value then
+        Toggles.LoadMacro:SetValue(false)
+    end
+    InstallMacroHook()
+    MState.Cur = { entries = {} }
+    MState.Step = 0
+    MState.Saved = false
+    UpdateMacroLabel("Waiting")
+    while Toggles.MacroRecord.Value and not RoundLive() do
+        task.wait()
+    end
+    if not Toggles.MacroRecord.Value then
+        MState.Cur = nil
+        MState.Step = 0
+        UpdateMacroLabel()
+        return
+    end
+    MState.Rec = true
+    UpdateMacroLabel()
+    notyuri("recording started")
+    while Toggles.MacroRecord.Value and RoundLive() do
+        task.wait()
+    end
+    MState.Rec = false
+    task.wait(0.1)
+    local entries = MState.Cur and #MState.Cur.entries or 0
+    notyuri("recording stopped,", tostring(entries), "actions")
+    if entries > 0 and not MState.Saved then
+        MState.Saved = true
+        SortMacroEntries(MState.Cur.entries)
+        local recorded = MState.Cur
+        local fname = (Options.FileName and Options.FileName.Value) or ""
+        if fname == "" then
+            fname = "Macro_" .. os.date("%Y%m%d_%H%M%S")
+        end
+        task.spawn(function()
+            if SaveMacro(fname, recorded) then
+                Library:Notify("Macro saved: " .. fname, 4)
+                if Options.MacroSelected then
+                    Options.MacroSelected:SetValues(ListMacros())
+                    Options.MacroSelected:SetValue(fname)
+                end
+            else
+                Library:Notify("Failed to save macro (writefile unsupported?)", 4)
+            end
+        end)
+    end
+    MState.Cur = nil
+    MState.Step = 0
+    UpdateMacroLabel("Stopped (" .. tostring(entries) .. ")")
+end
+
+local function MacroEntryCost(entry)
+    if entry.Type == "Place" then
+        return GetPlaceCost(entry.Name)
+    elseif entry.Type == "Upgrade" then
+        return GetUpgradeCost(entry.Name, entry.LVL or 0)
+    end
+    return nil
+end
+
+local function WaitForCash(amount, timeout)
+    if not amount or amount <= 0 then return true end
+    if Periastron.Cash >= amount then return true end
+    local limit = timeout or 60
+    local start = os.clock()
+    while Toggles.LoadMacro.Value and Periastron.Cash < amount and (os.clock() - start) < limit do
+        if Library.Unloaded then return false end
+        task.wait()
+    end
+    return Toggles.LoadMacro.Value and Periastron.Cash >= amount
+end
+
+local function FindTowerForEntry(entry)
+    if entry.Key and Periastron.Units[entry.Key] and Periastron.Units[entry.Key].own then
+        return Periastron.Units[entry.Key]
+    end
+    if type(entry.Pos) ~= "table" or #entry.Pos ~= 3 then return nil end
+    local pos = Vector3.new(entry.Pos[1], entry.Pos[2], entry.Pos[3])
+    local best = MatchTowerAt(entry.Name, pos, 7)
+    if best and entry.Key then
+        entry.Key = best.unitId
+    end
+    return best
+end
+
+local function ResolveTowerRetry(entry)
+    local unit = FindTowerForEntry(entry)
+    if unit and unit.own then return unit end
+    local start = os.clock()
+    while Toggles.LoadMacro.Value and (os.clock() - start) < 1 do
+        task.wait()
+        unit = FindTowerForEntry(entry)
+        if unit and unit.own then return unit end
+    end
+    return nil
+end
+
+local function DoMacroAction(entry)
+    if entry.Type == "Place" then
+        local pos = entry.Pos
+        if type(pos) ~= "table" or #pos ~= 3 then return end
+        local slot = SlotByTowerName()[entry.Name]
+        if not slot then
+            notyuri("Place SKIP: not equipped:", tostring(entry.Name))
+            return
+        end
+        local placed = false
+        for attempt = 1, 3 do
+            if not Toggles.LoadMacro.Value then return end
+            local spot = Vector3.new(pos[1], pos[2], pos[3])
+            if attempt > 1 then
+                local alt = FindSpotNear(spot)
+                if alt then
+                    spot = alt
+                end
+            end
+            if FireGame("PlaceUnit", entry.Name, CFrame.new(spot)) then
+                placed = true
+                break
+            end
+            local cost = MacroEntryCost(entry)
+            if not WaitForCash(cost, 5) then break end
+        end
+        if placed then
+            local start = os.clock()
+            local target = Vector3.new(pos[1], pos[2], pos[3])
+            while os.clock() - start < 1.5 do
+                local inst = MatchTowerAt(entry.Name, target, 7)
+                if inst then
+                    entry.Key = inst.unitId
+                    break
+                end
+                task.wait()
+            end
+        end
+    elseif entry.Type == "Upgrade" then
+        local unit = ResolveTowerRetry(entry)
+        if not (unit and unit.own) then
+            notyuri("Upgrade SKIP: no unit for key", tostring(entry.Key))
+            return
+        end
+        if type(entry.LVL) == "number" and unit.upgrades >= entry.LVL then
+            return
+        end
+        for _ = 1, 3 do
+            if not Toggles.LoadMacro.Value then return end
+            if FireGame("UpgradeUnit", unit.unitId) then return end
+            local cost = MacroEntryCost(entry)
+            if not WaitForCash(cost, 5) then return end
+        end
+    elseif entry.Type == "Sell" then
+        local unit = ResolveTowerRetry(entry)
+        if not (unit and unit.own) then
+            notyuri("Sell SKIP: no unit for key", tostring(entry.Key))
+            return
+        end
+        FireGame("SellUnit", unit.unitId)
+    end
+end
+
+local function Func_MacroReplay()
+    while Toggles.LoadMacro.Value do
+        local macro = MState.Load
+        if not (macro and macro.entries and #macro.entries > 0) then
+            Toggles.LoadMacro:SetValue(false)
+            Library:Notify("No macro loaded", 3)
+            return
+        end
+        InstallMacroHook()
+        MState.Rep = true
+        MState.Total = #macro.entries
+        MState.Step = 0
+        SortMacroEntries(macro.entries)
+        UpdateMacroLabel()
+        while Toggles.LoadMacro.Value and not RoundLive() do
+            task.wait()
+        end
+        if not Toggles.LoadMacro.Value then break end
+        for i, entry in ipairs(macro.entries) do
+            if not Toggles.LoadMacro.Value then break end
+            if not RoundLive() then
+                notyuri("match ended mid-pass")
+                break
+            end
+            MState.Step = i
+            UpdateMacroLabel(entry.Type)
+            local replayMode = Options.ReplayMode and Options.ReplayMode.Value or "Time"
+            local skipStep = false
+            if replayMode == "Money" then
+                local cost = MacroEntryCost(entry)
+                if cost and cost > 0 and not WaitForCash(cost) then
+                    notyuri("money wait aborted (toggle off)")
+                end
+            else
+                local tWave = ParseMacroTime(entry)
+                while Toggles.LoadMacro.Value and Periastron.Wave < tWave do
+                    if not RoundLive() then break end
+                    task.wait()
+                end
+                if Periastron.Wave > tWave + 10 then
+                    skipStep = true
+                end
+            end
+            if not Toggles.LoadMacro.Value then break end
+            if not skipStep then
+                local ok, err = pcall(DoMacroAction, entry)
+                if not ok then
+                    notyuri("action failed:", tostring(err))
+                end
+                task.wait(0)
+            else
+                UpdateMacroLabel("skipped")
+                notyuri("skipped stale entry", entry.Type, tostring(entry.Time))
+            end
+        end
+        MState.Rep = false
+        MState.Step = 0
+        UpdateMacroLabel("Finished")
+        if Toggles.LoadMacro.Value then
+            UpdateMacroLabel("Waiting")
+            while Toggles.LoadMacro.Value and RoundLive() do
+                task.wait()
+            end
+            while Toggles.LoadMacro.Value and not RoundLive() do
+                task.wait()
+            end
+        end
+    end
+    MState.Rep = false
+    UpdateMacroLabel()
+end
+
+
+local function GetPortal()
+    local map = workspace:FindFirstChild("Map")
+    local portals = map and map:FindFirstChild("Portals")
+    if not portals then return nil end
+    for _, p in ipairs(portals:GetChildren()) do
+        local id = p:GetAttribute("PortalId")
+        if type(id) == "number" then
+            return p
+        end
+    end
+    return nil
+end
+
+local function GetPortalEnterCFrame(portal)
+    local enter = portal:FindFirstChild("PortalEnterCFrame", true)
+    if enter then
+        if enter:IsA("BasePart") then
+            return enter.CFrame
+        elseif enter:IsA("Attachment") then
+            return enter.WorldCFrame
+        elseif enter:IsA("Model") then
+            return enter:GetPivot()
+        end
+    end
+    return portal:GetPivot()
+end
+
+local function Func_AutoQueue()
+    while Toggles.AutoQueue.Value do
+        if LobbyValid then
+            local portal = GetPortal()
+            if portal then
+                local portalId = portal:GetAttribute("PortalId")
+                if type(portalId) == "number" then
+                    if not (Periastron.Group.JoinedAt > 0 and tick() - Periastron.Group.JoinedAt < 45) then
+                        local enterCF = GetPortalEnterCFrame(portal)
+                        local char = GetCharacter()
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if hrp and (hrp.Position - enterCF.Position).Magnitude > 7 then
+                            TPTo(enterCF * CFrame.new(0, 0, 3))
+                        end
+                        Periastron.QueueTicks = Periastron.QueueTicks + 1
+                        local map = (Options.QueueMap and Options.QueueMap.Value) or "Join Existing"
+                        if map ~= "Join Existing" and Periastron.QueueTicks % 5 == 0 then
+                            local players = tonumber((Options.QueuePlayers and Options.QueuePlayers.Value) or "1") or 1
+                            Library:Notify("AutoQueue: creating group on " .. map, 3)
+                            FireGame("RequestCreateGroup", portalId, map, players)
+                        else
+                            FireGame("RequestJoinGroup", portalId)
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(6)
+    end
+end
+
+local function GetCrateCount(rarity)
+    local data = GetReplicaData()
+    if not data then return 0 end
+    local inv = data.Inventory
+    local crates = inv and inv.Crates
+    if type(crates) == "table" then
+        local c = crates[rarity]
+        if type(c) == "number" then
+            return c
+        end
+        if type(c) == "table" and type(c.Count) == "number" then
+            return c.Count
+        end
+    end
+    return 0
+end
+
+local function Func_AutoCrate()
+    while Toggles.AutoCrate.Value do
+        if LobbyValid then
+            local rarity = (Options.CrateRarity and Options.CrateRarity.Value) or "Common"
+            local amount = tonumber((Options.CrateAmount and Options.CrateAmount.Value) or "1") or 1
+            local have = GetCrateCount(rarity)
+            local opened = 0
+            while opened < amount and have - opened > 0 do
+                if FireGame("RequestOpenCrate", rarity) then
+                    opened = opened + 1
+                end
+                task.wait(0.6)
+            end
+            if opened > 0 then
+                notyuri("[AutoCrate] opened", tostring(opened), rarity)
+            end
+        end
+        task.wait(2)
+    end
+end
+
+local function Func_AutoClaimContracts()
+    while Toggles.AutoClaimContracts.Value do
+        if LobbyValid then
+            local data = GetReplicaData()
+            if data then
+                local contracts = data.Contracts
+                if type(contracts) == "table" then
+                    local cfg = Periastron.ContractConfig
+                    if cfg and type(cfg.get) == "function" and type(cfg.isComplete) == "function" then
+                        for _, kind in ipairs({"Hourly", "Daily", "Weekly"}) do
+                            local section = contracts[kind]
+                            if type(section) == "table" and type(section.Slots) == "table" then
+                                for idx, slot in ipairs(section.Slots) do
+                                    if type(slot) == "table" and not slot.Claimed then
+                                        local ok, c = pcall(cfg.get, cfg, slot.Id)
+                                        if ok and c then
+                                            local okC, done = pcall(cfg.isComplete, cfg, c, slot)
+                                            if okC and done then
+                                                if FireGame("ClaimContract", kind, idx) then
+                                                    notyuri("[Contracts] claimed", kind, tostring(idx))
+                                                end
+                                                task.wait(0.4)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(5)
+    end
 end
 
 local function QueueOnTeleportExec(code)
@@ -1533,446 +2267,61 @@ local function QueueReexec()
     notyuri("[Lobby] re-exec queued")
 end
 
-local function ApplyGameSpeed()
-    if not (Toggles.AutoSpeed and Toggles.AutoSpeed.Value and PlaceValid) then return end
-    local target = tonumber((Options.SpeedTarget and Options.SpeedTarget.Value) or "2") or 2
-    FireGame("SetGameSpeed", target)
-end
 
-local function DoSellAll()
-    local sold = 0
-    for unitId, u in pairs(Periastron.Units) do
-        if u.own then
-            if FireGame("SellUnit", unitId) then
-                sold = sold + 1
-            end
-        end
-    end
-    if sold > 0 then
-        Library:Notify("Auto Sell: sold " .. sold .. " units", 3)
-        notyuri("[AutoSell] sold", tostring(sold))
-    end
-end
+local yuri = {
+    "https://mangadex.org/covers/5311ac6f-3651-43a8-bb9c-b40dea7ab72d/062845cb-4498-4499-a23a-89ecac694ea9.jpg",
+    "https://mangadex.org/covers/df01a222-faeb-4952-84ac-d6040815e2dd/ec777628-a5d7-4d5f-92f5-11a8a746427e.jpg",
+    "https://cdn.donmai.us/original/dc/0e/__hayafuji_kasane_and_aoyama_meguru_keiyaku_shimai_drawn_by_hijiki_hijikini__dc0e2235f2ca00dcb06aa3db2999bd1f.jpg",
+    "https://db.yurigarden.com/storage/v1/object/public/yuri-garden-store/comics/233/thumbnail.jpg",
+    "https://db.yurigarden.com/storage/v1/object/public/yuri-garden-store/comics/328/thumbnail.jpg",
+    "https://db.yurigarden.com/storage/v1/object/public/yuri-garden-store/comics/1339/thumbnail.jpeg",
+    "https://db.yurigarden.com/storage/v1/object/public/yuri-garden-store/comics/1268/thumbnail.jpeg",
+    "https://dynasty-scans.com/system/releases/000/040/979/001.webp",
+    "https://dynasty-scans.com/system/images_images/000/031/460/full/GErfQqXagAA4mk7-orig.webp",
+    "https://i.pximg.net/c/1200x1200_80_webp/img-master/img/2026/02/01/15/33/44/140636490_p0_master1200.jpg",
+    "https://i.pximg.net/c/1200x1200_80_webp/img-master/img/2022/08/15/23/52/23/100515820_p0_master1200.jpg",
+    "https://i.pximg.net/c/1200x1200_80_webp/img-master/img/2025/07/22/17/09/45/132989170_p0_master1200.jpg",
+    "https://i.pximg.net/c/1200x1200_80_webp/img-master/img/2019/12/01/21/59/30/78092730_p0_master1200.jpg",
+}
 
-local function CheckWaveGates()
-    local w = Periastron.Wave
-    if Toggles.AutoSell and Toggles.AutoSell.Value and Options.AutoSellValue then
-        local target = Options.AutoSellValue.Value or 0
-        if target > 0 and not Periastron.SoldDone and w >= target then
-            Periastron.SoldDone = true
-            Periastron.SoldWave = w
-            DoSellAll()
-        end
-    end
-    if Toggles.AutoLeave and Toggles.AutoLeave.Value and Options.AutoLeaveValue then
-        local target = Options.AutoLeaveValue.Value or 0
-        if target > 0 and not Periastron.LeaveDone and w >= target then
-            Periastron.LeaveDone = true
-            Periastron.LeaveWave = w
-            Library:Notify("Auto Leave: returning to lobby", 3)
-            FireGame("RequestLobbyTeleport")
-        end
-    end
-end
-
-local function PlaceStep()
-    if not (PlaceValid and not Periastron.Match.Over) then return false end
-    RefreshDeck()
-    local slots = {}
-    for s = 1, SLOT_COUNT do
-        if Periastron.Deck[s] then
-            table.insert(slots, s)
-        end
-    end
-    if #slots == 0 then return false end
-    table.sort(slots, function(a, b)
-        local oa = (Options["PlaceOrder" .. a] and Options["PlaceOrder" .. a].Value) or a
-        local ob = (Options["PlaceOrder" .. b] and Options["PlaceOrder" .. b].Value) or b
-        if oa ~= ob then
-            return oa < ob
-        end
-        return a < b
+local function SendWebhook(title, description)
+    if not Support.Webhook then return end
+    local url = Options.WebhookURL and Options.WebhookURL.Value or ""
+    if url == "" then return end
+    local img = yuri[math.random(1, #yuri)]
+    pcall(function()
+        local req = request or http_request
+        req({
+            Url = url,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode({
+                username = "Yuri",
+                avatar_url = img,
+                embeds = {
+                    {
+                        title = title,
+                        description = description,
+                        color = 0xFFB6C1,
+                    },
+                },
+            }),
+        })
     end)
-    for _, slot in ipairs(slots) do
-        local name = Periastron.Deck[slot]
-        local waveGate = (Options["PlaceWave" .. slot] and Options["PlaceWave" .. slot].Value) or 0
-        if Periastron.Wave >= waveGate then
-            local limit = (Options["PlaceLimit" .. slot] and Options["PlaceLimit" .. slot].Value) or 0
-            local have = CountOwnedByName(name)
-            if limit <= 0 or have < limit then
-                local pos = GetPlacePos(slot, name)
-                if pos then
-                    local cost = GetPlaceCost(name)
-                    if Periastron.Cash >= cost then
-                        if FireGame("PlaceUnit", name, CFrame.new(pos)) then
-                            notyuri("[AutoPlace]", name, "at", PosKey(pos), "cost", tostring(cost))
-                            return true
-                        end
-                    end
-                else
-                    MarkFailPos(Periastron.SlotPos[slot] or Vector3.new(0, 0, 0))
-                end
-            end
-        end
-    end
-    return false
 end
 
-local function PickUpgradeTarget()
-    local candidates = {}
-    for _, u in pairs(Periastron.Units) do
-        if u.own and not IsMaxedLevel(u.name, u.upgrades) then
-            table.insert(candidates, u)
-        end
-    end
-    if #candidates == 0 then return nil end
-    local method = (Options.UpgradeMethod and Options.UpgradeMethod.Value) or "Lowest Level (Spread Upgrade)"
-    if method:find("Lowest") then
-        table.sort(candidates, function(a, b)
-            if a.upgrades ~= b.upgrades then
-                return a.upgrades < b.upgrades
-            end
-            local ia = HotbarIndexOf(a.name) or 99
-            local ib = HotbarIndexOf(b.name) or 99
-            return ia < ib
-        end)
-        return candidates[1]
-    elseif method:find("Hotbar") then
-        table.sort(candidates, function(a, b)
-            local ia = HotbarIndexOf(a.name) or 99
-            local ib = HotbarIndexOf(b.name) or 99
-            if ia ~= ib then
-                return ia < ib
-            end
-            return a.upgrades < b.upgrades
-        end)
-        return candidates[1]
-    elseif method:find("Random") then
-        return candidates[math.random(1, #candidates)]
-    end
-    table.sort(candidates, function(a, b)
-        local sa = SlotForName(a.name) or 99
-        local sb = SlotForName(b.name) or 99
-        local oa = (Options["PlaceOrder" .. sa] and Options["PlaceOrder" .. sa].Value) or sa
-        local ob = (Options["PlaceOrder" .. sb] and Options["PlaceOrder" .. sb].Value) or sb
-        if oa ~= ob then
-            return oa < ob
-        end
-        return a.upgrades < b.upgrades
-    end)
-    return candidates[1]
-end
-
-local function UpgradeLimitAllows(name)
-    local slot = SlotForName(name)
-    if not slot then return true end
-    local limit = (Options["UpgradeLimit" .. slot] and Options["UpgradeLimit" .. slot].Value) or 0
-    if limit <= 0 then return true end
-    local given = Periastron.UpgradesGiven[name] or 0
-    return given < limit
-end
-
-local function UpgradeStep()
-    if not (PlaceValid and not Periastron.Match.Over) then return false end
-    local target = PickUpgradeTarget()
-    if not target then return false end
-    if not UpgradeLimitAllows(target.name) then return false end
-    local cost = GetUpgradeCost(target.name, target.upgrades)
-    local reserve = (Options.UpgradeReserve and Options.UpgradeReserve.Value) or 0
-    if Periastron.Cash - cost < reserve then return false end
-    if Periastron.Cash < cost then return false end
-    if FireGame("UpgradeUnit", target.unitId) then
-        Periastron.UpgradesGiven[target.name] = (Periastron.UpgradesGiven[target.name] or 0) + 1
-        notyuri("[AutoUpgrade]", target.name, "lvl", tostring(target.upgrades), "->", tostring(target.upgrades + 1), "cost", tostring(cost))
-        return true
-    end
-    return false
-end
-
-local function FindTowerForEntry(entry)
-    local best = nil
-    for _, u in pairs(Periastron.Units) do
-        if u.own and u.name == entry.N then
-            if not best or u.upgrades < best.upgrades then
-                best = u
-            end
-        end
-    end
-    return best
-end
-
-local function ProcessPendingSweep()
-    local now = tick()
-    for i = #MState.Pending, 1, -1 do
-        local p = MState.Pending[i]
-        if p.deadline and now > p.deadline then
-            notyuri("[Macro] pending timeout:", p.kind, tostring(p.name))
-            table.remove(MState.Pending, i)
-        end
-    end
-end
-
-local function ReplayEntryReady(entry)
-    local mode = (Options.ReplayMode and Options.ReplayMode.Value) or "Wave"
-    if mode == "Money" then
-        return Periastron.Cash >= (entry.M or 0)
-    end
-    return Periastron.Wave >= (entry.W or 0)
-end
-
-local function DoMacroEntry(entry)
-    if entry.Type == "Place" then
-        local pos = Vector3.new(entry.P[1] or 0, entry.P[2] or 0, entry.P[3] or 0)
-        local spot = FindSpotNear(pos)
-        if spot then
-            if FireGame("PlaceUnit", entry.N, CFrame.new(spot)) then
-                table.insert(MState.Pending, {kind = "Place", name = entry.N, deadline = tick() + 6})
-                return true
-            end
-        else
-            MarkFailPos(pos)
-        end
-    elseif entry.Type == "Upgrade" then
-        local u = FindTowerForEntry(entry)
-        if u and not IsMaxedLevel(u.name, u.upgrades) then
-            local cost = GetUpgradeCost(u.name, u.upgrades)
-            if Periastron.Cash >= cost then
-                if FireGame("UpgradeUnit", u.unitId) then
-                    table.insert(MState.Pending, {kind = "Upgrade", name = entry.N, deadline = tick() + 6})
-                    return true
-                end
-            end
-        end
-    elseif entry.Type == "Sell" then
-        local u = FindTowerForEntry(entry)
-        if u then
-            if FireGame("SellUnit", u.unitId) then
-                table.insert(MState.Pending, {kind = "Sell", name = entry.N, deadline = tick() + 6})
-                return true
-            end
-        end
-    end
-    return false
-end
-
-local function ReplayStep()
-    if not MState.Load or not MState.Load.entries then return false end
-    local entries = MState.Load.entries
-    if MState.Index > #entries then
-        return false
-    end
-    ProcessPendingSweep()
-    if #MState.Pending > 3 then
-        return false
-    end
-    local entry = entries[MState.Index]
-    if entry and ReplayEntryReady(entry) then
-        if DoMacroEntry(entry) then
-            MState.Index = MState.Index + 1
-            UpdateMacroLabel()
-            return true
-        end
-        MState.Index = MState.Index + 1
-        return false
-    end
-    return false
-end
-
-local function ResetReplay()
-    MState.Index = 1
-    MState.Pending = {}
-    UpdateMacroLabel()
-end
-
-local function GetPortal()
-    local map = workspace:FindFirstChild("Map")
-    local portals = map and map:FindFirstChild("Portals")
-    if not portals then return nil end
-    for _, p in ipairs(portals:GetChildren()) do
-        local id = p:GetAttribute("PortalId")
-        if type(id) == "number" then
-            return p
-        end
-    end
-    return nil
-end
-
-local function GetPortalEnterCFrame(portal)
-    local enter = portal:FindFirstChild("PortalEnterCFrame", true)
-    if enter then
-        if enter:IsA("BasePart") then
-            return enter.CFrame
-        elseif enter:IsA("Attachment") then
-            return enter.WorldCFrame
-        elseif enter:IsA("Model") then
-            return enter:GetPivot()
-        end
-    end
-    return portal:GetPivot()
-end
-
-local function QueueStep()
-    if not LobbyValid then return end
-    local portal = GetPortal()
-    if not portal then return end
-    local portalId = portal:GetAttribute("PortalId")
-    if type(portalId) ~= "number" then return end
-    if Periastron.Group.JoinedAt > 0 and tick() - Periastron.Group.JoinedAt < 45 then return end
-    local enterCF = GetPortalEnterCFrame(portal)
-    local char = GetCharacter()
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp and (hrp.Position - enterCF.Position).Magnitude > 7 then
-        TPTo(enterCF * CFrame.new(0, 0, 3))
-    end
-    Periastron.QueueTicks = Periastron.QueueTicks + 1
-    local map = (Options.QueueMap and Options.QueueMap.Value) or "Join Existing"
-    if map ~= "Join Existing" and Periastron.QueueTicks % 5 == 0 then
-        local players = tonumber((Options.QueuePlayers and Options.QueuePlayers.Value) or "1") or 1
-        Library:Notify("AutoQueue: creating group on " .. map, 3)
-        FireGame("RequestCreateGroup", portalId, map, players)
-    else
-        FireGame("RequestJoinGroup", portalId)
-    end
-end
-
-local function GetCrateCount(rarity)
-    local data = GetReplicaData()
-    if not data then return 0 end
-    local inv = data.Inventory
-    local crates = inv and inv.Crates
-    if type(crates) == "table" then
-        local c = crates[rarity]
-        if type(c) == "number" then
-            return c
-        end
-        if type(c) == "table" and type(c.Count) == "number" then
-            return c.Count
-        end
-    end
-    return 0
-end
-
-local function CrateStep()
-    if not LobbyValid then return end
-    local rarity = (Options.CrateRarity and Options.CrateRarity.Value) or "Common"
-    local amount = tonumber((Options.CrateAmount and Options.CrateAmount.Value) or "1") or 1
-    local have = GetCrateCount(rarity)
-    if have <= 0 then return end
-    local opened = 0
-    while opened < amount and have - opened > 0 do
-        if FireGame("RequestOpenCrate", rarity) then
-            opened = opened + 1
-        end
-        task.wait(0.6)
-    end
-    if opened > 0 then
-        notyuri("[AutoCrate] opened", tostring(opened), rarity)
-    end
-end
-
-local function ContractStep()
-    if not LobbyValid then return end
-    local data = GetReplicaData()
-    if not data then return end
-    local contracts = data.Contracts
-    if type(contracts) ~= "table" then return end
-    local cfg = Periastron.ContractConfig
-    if not (cfg and type(cfg.get) == "function" and type(cfg.isComplete) == "function") then return end
-    for _, kind in ipairs({"Hourly", "Daily", "Weekly"}) do
-        local section = contracts[kind]
-        if type(section) == "table" and type(section.Slots) == "table" then
-            for idx, slot in ipairs(section.Slots) do
-                if type(slot) == "table" and not slot.Claimed then
-                    local ok, c = pcall(cfg.get, cfg, slot.Id)
-                    if ok and c then
-                        local okC, done = pcall(cfg.isComplete, cfg, c, slot)
-                        if okC and done then
-                            if FireGame("ClaimContract", kind, idx) then
-                                notyuri("[Contracts] claimed", kind, tostring(idx))
-                            end
-                            task.wait(0.4)
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
-local function PlaceLoop()
-    while Toggles.AutoPlace.Value do
-        local ok, err = pcall(PlaceStep)
-        if not ok then
-            notyuri("[AutoPlace] step error:", tostring(err))
-        end
-        if Toggles.PlaceAndUpgrade and Toggles.PlaceAndUpgrade.Value then
-            local okU, errU = pcall(UpgradeStep)
-            if not okU then
-                notyuri("[AutoUpgrade] step error:", tostring(errU))
-            end
-        end
-        local delay = (Options.PlaceDelay and Options.PlaceDelay.Value) or 1
-        ClearExpiredFailPos()
-        task.wait(math.max(0.4, delay))
-    end
-end
-
-local function UpgradeLoop()
-    while Toggles.AutoUpgrade.Value do
-        local ok, err = pcall(UpgradeStep)
-        if not ok then
-            notyuri("[AutoUpgrade] step error:", tostring(err))
-        end
-        task.wait(0.8)
-    end
-end
-
-local function ReplayLoop()
-    while Toggles.LoadMacro.Value do
-        local ok, err = pcall(ReplayStep)
-        if not ok then
-            notyuri("[Macro] replay step error:", tostring(err))
-        end
-        task.wait(0.3)
-    end
-end
-
-local function QueueLoop()
-    while Toggles.AutoQueue.Value do
-        local ok, err = pcall(QueueStep)
-        if not ok then
-            notyuri("[AutoQueue] step error:", tostring(err))
-        end
-        task.wait(6)
-    end
-end
-
-local function CrateLoop()
-    while Toggles.AutoCrate.Value do
-        local ok, err = pcall(CrateStep)
-        if not ok then
-            notyuri("[AutoCrate] step error:", tostring(err))
-        end
-        task.wait(2)
-    end
-end
-
-local function ContractLoop()
-    while Toggles.AutoClaimContracts.Value do
-        local ok, err = pcall(ContractStep)
-        if not ok then
-            notyuri("[Contracts] step error:", tostring(err))
-        end
-        task.wait(5)
-    end
-end
 
 local function OnMatchEnd(won)
     Periastron.Match.Over = true
     Periastron.Match.Won = won
     local label = won and "Victory" or "Defeat"
-    local desc = string.format("Place: %s | Wave: %d | Cash: %s", Periastron.Place, Periastron.Wave, CommaFormat(Periastron.Cash))
-    SendWebhook("Periastron TD: " .. label, desc)
+    if not Periastron.Match.WebhookSent then
+        Periastron.Match.WebhookSent = true
+        if Toggles.WHMatchEnd and Toggles.WHMatchEnd.Value then
+            local desc = string.format("Place: %s | Wave: %d | Cash: %s", Periastron.PlaceName, Periastron.Wave, CommaFormat(Periastron.Cash))
+            SendWebhook("Periastron TD: " .. label, desc)
+        end
+    end
     Library:Notify("Match " .. label .. " (wave " .. Periastron.Wave .. ")", 5)
     if not won then
         local mode = (Options.DefeatMode and Options.DefeatMode.Value) or "Replay Round"
@@ -1986,18 +2335,17 @@ end
 
 local function OnRoundRestarted()
     Periastron.Units = {}
-    Periastron.UpgradesGiven = {}
-    Periastron.SoldWave = -1
-    Periastron.SoldDone = false
-    Periastron.LeaveWave = -1
-    Periastron.LeaveDone = false
+    Periastron.Place.TypeFails = {}
+    Periastron.Place.PauseUntil = {}
+    Periastron.Place.FailPos = {}
+    Periastron.Place.InFlight = {}
     Periastron.Match.Over = false
     Periastron.Match.Started = true
+    Periastron.Match.WebhookSent = false
     Periastron.ReadyFiredWave = -1
-    ResetReplay()
-    if Toggles.AutoReplay and Toggles.AutoReplay.Value and Toggles.LoadMacro and Toggles.LoadMacro.Value then
-        MState.Rep = true
-        UpdateMacroLabel()
+    Periastron.WaveStartedAt = os.clock()
+    if Toggles.AutoReplay and Toggles.AutoReplay.Value and Toggles.LoadMacro and Toggles.LoadMacro.Value and not MState.Rep then
+        Thread("LoadMacro", SafeLoop("Macro Replay", Func_MacroReplay), true)
     end
     ApplyGameSpeed()
 end
@@ -2012,8 +2360,8 @@ local function InstallGameStateListeners()
         local w = tonumber(wave)
         if w then
             Periastron.Wave = w
+            Periastron.WaveStartedAt = os.clock()
             Periastron.Intermission = false
-            CheckWaveGates()
         end
     end)
     ListenGame("WaveIntermission", function(data)
@@ -2040,32 +2388,25 @@ local function InstallGameStateListeners()
             Periastron.Speed = s
         end
     end)
+    ListenGame("PlayMapMusic", function(music)
+        if type(music) == "string" and music ~= "" then
+            Periastron.MapKey = music
+            notyuri("[Periastron] map key =", music)
+        end
+    end)
     ListenGame("ReplicateUnit", function(name, cframe, ownerUserId, unitId, upgrades)
         RegisterUnit(name, cframe, ownerUserId, unitId, upgrades)
-        for i = #MState.Pending, 1, -1 do
-            local p = MState.Pending[i]
-            if p.kind == "Place" and p.name == name then
-                table.remove(MState.Pending, i)
-            end
+        if ownerUserId == Plr.UserId then
+            Periastron.Place.InFlight[name] = nil
         end
     end)
     ListenGame("RemoveUnit", function(unitId)
         Periastron.Units[unitId] = nil
-        for i = #MState.Pending, 1, -1 do
-            if MState.Pending[i].kind == "Sell" then
-                table.remove(MState.Pending, i)
-            end
-        end
     end)
     ListenGame("UnitUpgraded", function(unitId, level)
         local u = Periastron.Units[unitId]
         if u then
             u.upgrades = tonumber(level) or u.upgrades
-        end
-        for i = #MState.Pending, 1, -1 do
-            if MState.Pending[i].kind == "Upgrade" then
-                table.remove(MState.Pending, i)
-            end
         end
     end)
     ListenGame("RoundRestarted", function()
@@ -2090,134 +2431,34 @@ local function InstallLobbyStateListeners()
     end)
 end
 
-Tabs.AutoPlay = Window:AddTab("Auto Play")
-Tabs.Webhook = Window:AddTab("Webhook")
-TB_Tabs.Autofarm.T2 = TB.Main.Left.Autofarm:AddTab("Macro")
-TB_Tabs.Autofarm.T3 = TB.Main.Left.Autofarm:AddTab("Lobby")
-TB_Tabs.Autofarm2.T2 = TB.Main.Right.Autofarm:AddTab("LobbyConfig")
-local APLeft = Tabs.AutoPlay:AddLeftGroupbox("Auto Play")
-local APRight = Tabs.AutoPlay:AddRightGroupbox("Limits")
-local GB_Webhook = Tabs.Webhook:AddLeftGroupbox("Webhook")
 
+LoadMDir()
+LoadPositions()
+
+local GB_Webhook = {
+    Left = {
+        Webhook = Tabs.Webhook:AddLeftGroupbox("Webhook"),
+    },
+}
+
+local APLeft = Tabs.AutoPlay:AddLeftGroupbox("Auto Play")
 APLeft:AddToggle("AutoPlace", { Text = "Auto Place" })
 APLeft:AddToggle("AutoUpgrade", { Text = "Auto Upgrade" })
 APLeft:AddDropdown("UpgradeMethod", {
     Text = "Upgrade Method",
     Values = {
         "Lowest Level (Spread Upgrade)",
-        "Hotbar Left to Right (until Max)",
+        "Hotbar left to right (until Max)",
         "Randomize",
-        "Customize (Slot Order)",
+        "Customize upgrade order (Set below)",
     },
     Default = "Lowest Level (Spread Upgrade)",
 })
 APLeft:AddToggle("PlaceAndUpgrade", { Text = "Place and Upgrade" })
-AddSliderToggle({ Group = APLeft, Id = "AutoSell", Text = "Auto Sell at Wave", Default = 10, Min = 0, Max = 100, Rounding = 0 })
-APLeft:AddSlider("UpgradeReserve", {
-    Text = "Cash Reserve",
-    Default = 0,
-    Min = 0,
-    Max = 100000,
-    Rounding = 0,
-    Compact = true,
-})
-APLeft:AddSlider("PlaceDelay", {
-    Text = "Place Delay (s)",
-    Default = 1,
-    Min = 0.5,
-    Max = 10,
-    Rounding = 1,
-    Compact = true,
-})
+local AutoSell_T, AutoSell_S = AddSliderToggle({ Group = APLeft, Id = "AutoSell", Text = "Auto Sell at Wave", Default = 10, Min = 0, Max = 100, Rounding = 0 })
 APLeft:AddDivider()
-APLeft:AddDropdown("SetSlotSelect", {
-    Text = "Set Slot Position",
-    Values = GetSlotDisplayNames(),
-    Default = GetSlotDisplayNames()[1] or "",
-})
-APLeft:AddButton({
-    Text = "Set Slot Position",
-    Func = function()
-        local val = (Options.SetSlotSelect and Options.SetSlotSelect.Value) or ""
-        local slot = SlotDisplayToNumber(val)
-        if slot then
-            local char = GetCharacter()
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                Periastron.SlotPos[slot] = hrp.Position
-                Library:Notify("Slot " .. slot .. " position set", 3)
-                UpdatePosLabel()
-                return
-            end
-        end
-        Library:Notify("Select a slot (and spawn in) first", 3)
-    end,
-})
-APLeft:AddButton({
-    Text = "Save Position for All Slots",
-    Func = function()
-        local char = GetCharacter()
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            Library:Notify("No character", 3)
-            return
-        end
-        for s = 1, SLOT_COUNT do
-            Periastron.SlotPos[s] = hrp.Position
-        end
-        Library:Notify("All slot positions set", 3)
-        UpdatePosLabel()
-    end,
-})
-APLeft:AddDivider()
-do
-    local function GetResetSlotValues()
-        local names = GetSlotDisplayNames()
-        table.insert(names, "All Slots")
-        return names
-    end
-    APLeft:AddDropdown("ResetSlotSelect", {
-        Text = "Reset Slot Position",
-        Values = GetResetSlotValues(),
-        Default = "All Slots",
-    })
-end
-APLeft:AddButton({
-    Text = "Reset Position",
-    Func = function()
-        local val = (Options.ResetSlotSelect and Options.ResetSlotSelect.Value) or "All Slots"
-        if val == "All Slots" then
-            Periastron.SlotPos = {}
-        else
-            local slot = SlotDisplayToNumber(val)
-            if slot then
-                Periastron.SlotPos[slot] = nil
-            end
-        end
-        Periastron.FailPos = {}
-        Library:Notify("Positions reset", 3)
-        UpdatePosLabel()
-    end,
-})
-PosLabel = SafeLabel(APLeft, "Positions", "No positions set")
-StatsLabel = SafeLabel(APLeft, "Stats", "Detecting place...")
-UpdatePosLabel = function()
-    if not (PosLabel and PosLabel.SetText) then return end
-    local n = 0
-    for _ in pairs(Periastron.SlotPos) do
-        n = n + 1
-    end
-    local txt
-    if n == 0 then
-        txt = "No positions set"
-    else
-        txt = string.format("%d position(s) set", n)
-    end
-    pcall(function()
-        PosLabel.SetText(txt)
-    end)
-end
 
+local APRight = Tabs.AutoPlay:AddRightGroupbox("Limits")
 APRight:AddLabel("Place Order per Slot", true)
 for i = 1, SLOT_COUNT do
     APRight:AddSlider("PlaceOrder" .. i, {
@@ -2266,11 +2507,56 @@ for i = 1, SLOT_COUNT do
     })
 end
 
-TB_Tabs.Autofarm.T1:AddToggle("AutoVoteSkip", { Text = "Auto Vote Skip" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoReady", { Text = "Auto Ready Wave" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoSpeed", { Text = "Auto Game Speed" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoReplay", { Text = "Auto Replay Macro" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoLeave", { Text = "Auto Leave" })
+SafeLabel(APLeft, "Positions", "No positions set")
+APLeft:AddDropdown("SetSlotSelect", {
+    Text = "Set Slot Position",
+    Values = GetSlotDisplayNames(),
+    Default = GetSlotDisplayNames()[1] or "",
+})
+APLeft:AddButton({
+    Text = "Set Slot Position",
+    Func = function()
+        local val = (Options.SetSlotSelect and Options.SetSlotSelect.Value) or ""
+        local slot = SlotDisplayToNumber(val)
+        if slot then
+            HandleSlotPos("set", slot)
+        else
+            Library:Notify("Select a slot first", 3)
+        end
+    end,
+})
+APLeft:AddButton({ Text = "Save Position for All Slots", Func = function() HandleSlotPos("massset") end })
+APLeft:AddDivider()
+do
+    local function GetResetSlotValues()
+        local names = GetSlotDisplayNames()
+        table.insert(names, "All Slots")
+        return names
+    end
+    APLeft:AddDropdown("ResetSlotSelect", {
+        Text = "Reset Slot Position",
+        Values = GetResetSlotValues(),
+        Default = "All Slots",
+    })
+end
+APLeft:AddButton({
+    Text = "Reset Position",
+    Func = function()
+        local val = (Options.ResetSlotSelect and Options.ResetSlotSelect.Value) or "All Slots"
+        if val == "All Slots" then
+            HandleSlotPos("reset", nil)
+        else
+            HandleSlotPos("reset", SlotDisplayToNumber(val))
+        end
+    end,
+})
+UpdatePosLabels()
+
+TB_Tabs.Autofarm.T1:AddToggle("AutoVoteSkip", { Text = "Auto Skip", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoReady", { Text = "Auto Ready", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoSpeed", { Text = "Auto Game Speed", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoReplay", { Text = "Auto Replay", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoLeave", { Text = "Auto Leave", Default = false })
 
 TB_Tabs.Autofarm.T2:AddDropdown("MacroSelected", {
     Text = "Select File",
@@ -2284,8 +2570,8 @@ TB_Tabs.Autofarm.T2:AddInput("FileName", {
 })
 TB_Tabs.Autofarm.T2:AddDropdown("ReplayMode", {
     Text = "Replay Mode",
-    Values = {"Wave", "Money"},
-    Default = "Wave",
+    Values = {"Time", "Money"},
+    Default = "Time",
 })
 TB_Tabs.Autofarm.T2:AddToggle("MacroRecord", {
     Text = "Record Macro",
@@ -2295,9 +2581,9 @@ TB_Tabs.Autofarm.T2:AddToggle("LoadMacro", {
     Text = "Play Macro",
     Default = false,
 })
-MState.LabelRef = SafeLabel(TB_Tabs.Autofarm.T2, "Macro", "Idle")
+SafeLabel(TB_Tabs.Autofarm.T2, "Macro", "Idle")
 
-TB_Tabs.Autofarm.T3:AddToggle("AutoQueue", { Text = "Auto Queue (Portal)" })
+TB_Tabs.Autofarm.T3:AddToggle("AutoQueue", { Text = "Auto Queue" })
 TB_Tabs.Autofarm.T3:AddToggle("AutoCrate", { Text = "Auto Open Crates" })
 TB_Tabs.Autofarm.T3:AddToggle("AutoClaimContracts", { Text = "Auto Claim Contracts" })
 TB_Tabs.Autofarm.T3:AddToggle("AutoReexec", { Text = "Auto Re-Exec After Teleport" })
@@ -2341,6 +2627,7 @@ TB_Tabs.Autofarm2.T2:AddDropdown("QueueMap", {
     Text = "Map",
     Values = mapValues,
     Default = "Join Existing",
+    Searchable = true,
 })
 TB_Tabs.Autofarm2.T2:AddDropdown("QueuePlayers", {
     Text = "Players",
@@ -2359,18 +2646,19 @@ TB_Tabs.Autofarm2.T2:AddDropdown("CrateAmount", {
     Default = "1",
 })
 
-GB_Webhook:AddInput("WebhookURL", {
+GB_Webhook.Left.Webhook:AddInput("WebhookURL", {
     Text = "Webhook URL",
     Default = "",
     Placeholder = "https://discord.com/api/webhooks/...",
 })
-GB_Webhook:AddButton({
-    Text = "Test Webhook",
-    Func = function()
-        SendWebhook("Periastron TD", "Webhook test from " .. tostring(Plr.Name))
-        Library:Notify("Webhook test sent", 3)
-    end,
+GB_Webhook.Left.Webhook:AddToggle("WHMatchEnd", {
+    Text = "Match Finished",
+    Default = false,
 })
+if not Support.Webhook then
+    GB_Webhook.Left.Webhook:AddLabel("<font color='#FFA500'>Executor does not support HTTP requests.</font>", true)
+end
+
 
 local function RefreshQueueMapDropdown()
     if not (Options.QueueMap and Periastron.MapConfig) then return end
@@ -2408,6 +2696,7 @@ task.spawn(function()
         local changed = RefreshDeck()
         if changed ~= false and Periastron.Deck[1] ~= nil then
             RefreshSlotDropdowns()
+            UpdatePosLabels()
             break
         end
         task.wait(1)
@@ -2424,117 +2713,66 @@ task.spawn(function()
     end
 end)
 
+
 Toggles.AutoPlace:OnChanged(function(state)
-    Thread("Game.AutoPlace", PlaceLoop, state)
+    Thread("AutoPlace", SafeLoop("AutoPlace", Func_AutoPlace), state)
 end)
 Toggles.AutoUpgrade:OnChanged(function(state)
-    Thread("Game.AutoUpgrade", UpgradeLoop, state)
+    Thread("AutoUpgrade", SafeLoop("AutoUpgrade", Func_AutoUpgrade), state)
+end)
+Toggles.AutoSell:OnChanged(function(state)
+    Thread("AutoSell", SafeLoop("AutoSell", function() Func_AutoAtWave(AutoSell_T, Options.AutoSellValue, "sell") end), state)
+end)
+Toggles.AutoLeave:OnChanged(function(state)
+    Thread("AutoLeave", SafeLoop("AutoLeave", function() Func_AutoAtWave(Toggles.AutoLeave, Options.AutoLeaveValue, "leave") end), state)
+end)
+Toggles.AutoSpeed:OnChanged(function(state)
+    Thread("AutoSpeed", SafeLoop("AutoSpeed", Func_AutoSpeed), state)
+end)
+Toggles.MacroRecord:OnChanged(function(state)
+    Func_MacroRecord(state)
 end)
 Toggles.LoadMacro:OnChanged(function(state)
     if state then
-        local name = (Options.MacroSelected and Options.MacroSelected.Value) or ""
-        MState.Load = LoadMacro(name)
-        MState.Index = 1
-        MState.Total = MState.Load and #MState.Load.entries or 0
-        MState.Rep = true
-        MState.Pending = {}
-        if not MState.Load then
-            Library:Notify("Macro not found: " .. tostring(name), 4)
+        if not MState.Load and Options.MacroSelected and Options.MacroSelected.Value and Options.MacroSelected.Value ~= "" then
+            MState.Load = LoadMacro(Options.MacroSelected.Value)
+            if not MState.Load then
+                Library:Notify("Failed to load macro: " .. tostring(Options.MacroSelected.Value), 4)
+            end
         end
-        UpdateMacroLabel()
-    else
-        MState.Rep = false
-        UpdateMacroLabel()
+        if Toggles.MacroRecord and Toggles.MacroRecord.Value then
+            Toggles.MacroRecord:SetValue(false)
+        end
     end
+    Thread("LoadMacro", SafeLoop("Macro Replay", Func_MacroReplay), state)
 end)
-Toggles.MacroRecord:OnChanged(function(state)
-    if state then
-        MState.Cur = {entries = {}}
-        MState.Step = 0
-        MState.Rec = true
-        Library:Notify("Recording macro actions", 3)
-    else
-        MState.Rec = false
-        if MState.Cur and #MState.Cur.entries > 0 then
-            local name = (Options.FileName and Options.FileName.Value) or ""
-            if name == "" then
-                name = (Options.MacroSelected and Options.MacroSelected.Value) or ""
-            end
-            if name ~= "" then
-                if SaveMacro(name, MState.Cur) then
-                    Library:Notify("Macro saved: " .. name .. " (" .. #MState.Cur.entries .. " actions)", 4)
-                    if Options.MacroSelected then
-                        Options.MacroSelected:SetValues(ListMacros())
-                        Options.MacroSelected:SetValue(name)
-                    end
-                else
-                    Library:Notify("Macro save failed (file IO?)", 4)
-                end
-            else
-                Library:Notify("Macro not saved: no file name", 4)
-            end
+Options.MacroSelected:OnChanged(function(v)
+    if v and v ~= "" then
+        MState.Load = LoadMacro(v)
+        if not MState.Load then
+            Library:Notify("Failed to load macro: " .. tostring(v), 4)
         end
-        MState.Cur = nil
-        UpdateMacroLabel()
     end
 end)
 Toggles.AutoQueue:OnChanged(function(state)
     Periastron.QueueTicks = 0
-    Thread("Lobby.AutoQueue", QueueLoop, state)
+    Thread("AutoQueue", SafeLoop("AutoQueue", Func_AutoQueue), state)
 end)
 Toggles.AutoCrate:OnChanged(function(state)
-    Thread("Lobby.AutoCrate", CrateLoop, state)
+    Thread("AutoCrate", SafeLoop("AutoCrate", Func_AutoCrate), state)
 end)
 Toggles.AutoClaimContracts:OnChanged(function(state)
-    Thread("Lobby.AutoClaimContracts", ContractLoop, state)
-end)
-Toggles.AutoSpeed:OnChanged(function(state)
-    if state then
-        ApplyGameSpeed()
-    end
+    Thread("AutoClaimContracts", SafeLoop("AutoClaimContracts", Func_AutoClaimContracts), state)
 end)
 Toggles.AutoReexec:OnChanged(function(state)
     if state then
         QueueReexec()
     end
 end)
+if Options.MacroSelected.Value and Options.MacroSelected.Value ~= "" then
+    MState.Load = LoadMacro(Options.MacroSelected.Value)
+end
 
-task.spawn(function()
-    while not Library.Unloaded do
-        if StatsLabel and StatsLabel.SetText then
-            local units = 0
-            for _, u in pairs(Periastron.Units) do
-                if u.own then
-                    units = units + 1
-                end
-            end
-            local posCount = 0
-            for _ in pairs(Periastron.SlotPos) do
-                posCount = posCount + 1
-            end
-            local txt = string.format(
-                "%s | Wave %d | Cash %s | Units %d | Pos %d/6 | Speed %dx",
-                Periastron.Place,
-                Periastron.Wave,
-                Abbreviate(Periastron.Cash),
-                units,
-                posCount,
-                Periastron.Speed
-            )
-            pcall(function()
-                StatsLabel:SetText(txt)
-            end)
-        end
-        if MState.Rec and MState.PendingLabel and MState.LabelRef and MState.LabelRef.SetText then
-            local txt = MState.PendingLabel
-            MState.PendingLabel = nil
-            pcall(function()
-                MState.LabelRef.SetText(txt)
-            end)
-        end
-        task.wait(0.5)
-    end
-end)
 
 task.spawn(function()
     if not BindMe() then
@@ -2553,6 +2791,7 @@ task.spawn(function()
     if PlaceValid then
         RefreshDeck()
         RefreshSlotDropdowns()
+        UpdatePosLabels()
     end
 end)
 local MenuGroup = Tabs.Config:AddLeftGroupbox("Menu")
