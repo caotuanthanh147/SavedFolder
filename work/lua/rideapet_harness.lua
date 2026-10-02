@@ -838,7 +838,7 @@ G.task.spawn = function(fn, ...)
     return co
 end
 
-local f = io.open("/home/z/Public/[🌋] Ride A Pet/[🌋] Ride A Pet.lua", "r")
+local f = io.open("/home/z/SavedFolder/work/lua/RideAPet.lua", "r")
 local src = f:read("*a"); f:close()
 print("[debug] src len=" .. #src .. " first40=" .. src:sub(1, 40))
 local fn = G.loadstring(src, "=(rideapet)")
@@ -880,12 +880,14 @@ T.AutoHatch:SetValue(false)
 pump(1.5)
 check("AutoHatch OFF stops firing", #HatchRemote.Fires == firesOff)
 
-T.AutoHatch:SetValue(true)
-pump(0.6)
-Library.Unloaded = true
+-- §22-7 loop exits on toggle-off + Thread respawns on re-enable
+local firesMid = #HatchRemote.Fires
+T.AutoHatch:SetValue(false)
 pump(1.0)
-local firesUnloaded = #HatchRemote.Fires
+local firesAfterOff = #HatchRemote.Fires
+T.AutoHatch:SetValue(true)
 pump(1.5)
-check("Library.Unloaded breaks the loop (no further fires)", #HatchRemote.Fires == firesUnloaded)
+local firesAfterOn = #HatchRemote.Fires
+check("toggle OFF->ON respawns the loop (new fires after re-enable)", (firesAfterOn - firesAfterOff) > 0)
 
 summary()

@@ -51,3 +51,25 @@
   in ~10s), sync.sh (commit→rebase→push→ls-remote verify), deobf_search.py
   (remote/fn/find/tags/attrs), validate.sh (luac+diff+style), harness_lib.lua
   (scheduler + Instance + Linoria mocks).
+
+## ST8 v2 — 2026-10-02 (§22-7 loop refactor + glm1 ST-QA1 guidance applied)
+
+- glm1's ST-QA1 audit found glm2's ST5/ST6/ST7 ALL broken at load
+  (`TB.Main.Left.Autofarm.T1` nil — T1 is a TB_Tabs key, not a tabbox field).
+  My ST8 avoided this from the start (used `TB_Tabs.Autofarm.T1`) — the
+  harness caught the alt form during build (the §7 checklist working).
+- glm1's 4-point message to me: (1) TB_Tabs ref ✓ already, (2) real-script
+  harness ✓ already, (3) §22-7 loop shape — REFACTORED v2:
+  `while Toggles.AutoHatch.Value do pcall(step) task.wait(0.5) end` (was
+  `while true ... if Library.Unloaded break`), (4) sync script to work/lua/
+  — DONE (work/lua/RideAPet.lua).
+- Gates v2: luac OK, lint 0 err, validate 0 comments / 78-line game section,
+  harness 9/9 (new respawn check: OFF→ON respawns via Thread dead-coroutine
+  detection; the old Library.Unloaded-breaks check was redundant with the
+  §22-7 toggle-off exit).
+- §3 two-halves codified (glm1): "standard autofarm = wire every remote that
+  passes Rule 11's KEEP filter AND invent nothing beyond it. Under-shipping
+  = over-shipping = violation." For ST8 I judged AutoHatch = the real
+  continuous automation surface; EggPickup/ClaimEventReward look one-off
+  (asked glm1 for judgment). Flagged for explicit user order rather than
+  auto-expanding (§2: not explicitly ordered for ST8).
