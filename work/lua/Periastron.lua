@@ -889,6 +889,7 @@ local MState = {
     Hooked = false,
     Saved = false,
 }
+local CheckCaller = (type(checkcaller) == "function" and checkcaller) or (type(iscaller) == "function" and iscaller) or nil
 local MDir = "Yuri/PeriastronTD/Macros"
 local PosDir = "Yuri/PeriastronTD"
 local PosPath = PosDir .. "/position.json"
@@ -981,12 +982,7 @@ local function FireGame(name, ...)
     local me = Periastron.Me
     if not me then return false end
     MState.SelfFire = true
-    local ok, err
-    if Periastron.OrigFire then
-        ok, err = pcall(Periastron.OrigFire, me, name, ...)
-    else
-        ok, err = pcall(me.Fire, me, name, ...)
-    end
+    local ok, err = pcall(me.Fire, me, name, ...)
     MState.SelfFire = false
     if not ok then
         notyuri("[Periastron] Fire", tostring(name), "FAILED:", tostring(err))
@@ -1791,11 +1787,17 @@ local function Func_AutoSpeed()
 end
 
 
-local function UpdateMacroLabel(suffix)
+local function UpdateMacroLabel(suffix, elapsed, nextEntry)
     local txt
+    local timeStr = ""
+    if type(elapsed) == "number" then
+        timeStr = " " .. tostring(elapsed)
+    elseif type(elapsed) == "string" then
+        timeStr = " " .. elapsed
+    end
     if MState.Rec then
         if suffix then
-            txt = string.format("Recording [%d] %s", MState.Step, suffix)
+            txt = string.format("Recording [%d] %s%s", MState.Step, suffix, timeStr)
         else
             txt = string.format("Recording [%d]", MState.Step)
         end
@@ -1803,49 +1805,59 @@ local function UpdateMacroLabel(suffix)
         txt = string.format("Replaying [%d / %d]", MState.Step, MState.Total)
         if suffix then
             txt = txt .. " | " .. suffix
+            if timeStr ~= "" then txt = txt .. " [" .. timeStr:sub(2) .. "]" end
+            if nextEntry then
+                txt = txt .. " => " .. tostring(nextEntry.Type) .. " [" .. tostring(nextEntry.Time or "") .. "]"
+            end
         end
     else
         txt = "Idle" .. (suffix and (" | " .. suffix) or "")
     end
-    notyuri("MacroLabel", txt)
+    notyuri("UpdateLabel", txt)
     SafeLabel("Macro", txt)
 end
 
 local function RecordAct(kind, data, wave, elapsed)
     if not MState.Cur then return end
     MState.Step = MState.Step + 1
-    local entry = { Type = kind, Time = tostring(wave or 0) .. " " .. tostring(math.floor((elapsed or 0) * 1000)) }
+    local entry = { Type = kind, Time = tostring(wave or 0) .. " " .. tostring(elapsed or 0) }
     for k, v in pairs(data or {}) do
         entry[k] = v
     end
     table.insert(MState.Cur.entries, entry)
-    UpdateMacroLabel(kind)
+    UpdateMacroLabel(kind, entry.Time)
+    notyuri("", kind, "confirmed", "wave", tostring(wave), string.format("%.2fs", elapsed))
 end
 
 local function ParseMacroTime(entry)
     local wStr, eStr = (entry.Time or ""):match("^(%d+)%s+(.+)$")
-    return tonumber(wStr) or 0, (tonumber(eStr) or 0) / 1000
+    return tonumber(wStr) or 0, tonumber(eStr) or 0
 end
 
 local function SortMacroEntries(entries)
     table.sort(entries, function(a, b)
-        local wa = ParseMacroTime(a)
-        local wb = ParseMacroTime(b)
+        local wa, ea = ParseMacroTime(a)
+        local wb, eb = ParseMacroTime(b)
         if wa ~= wb then return wa < wb end
-        return ParseMacroTime(a) < ParseMacroTime(b)
+        return ea > eb
     end)
 end
 
 local function InstallMacroHook()
     if MState.Hooked then return end
+    if not CheckCaller then
+        Library:Notify("Macro record requires checkcaller support", 4)
+        return
+    end
     local mt = Periastron.MeMT
     if type(mt) ~= "table" or type(mt.Fire) ~= "function" then
         notyuri("[Periastron] macro hook unavailable: no Me metatable")
         return
     end
     local orig = Periastron.OrigFire
-    mt.Fire = function(self, name, ...)
-        local rec = MState.Rec and not MState.SelfFire
+    local cc = (type(newcclosure) == "function") and newcclosure or (function(f) return f end)
+    mt.Fire = cc(function(self, name, ...)
+        local rec = MState.Rec and not CheckCaller()
         if rec and name == "PlaceUnit" then
             local a, b = ...
             if type(a) == "string" and b and b.Position and b.X then
@@ -1865,7 +1877,7 @@ local function InstallMacroHook()
             end
         end
         return orig(self, name, ...)
-    end
+    end)
     MState.Hooked = true
     notyuri("[Periastron] macro hook installed on Me.Fire")
 end
@@ -2058,7 +2070,7 @@ local function Func_MacroReplay()
                 break
             end
             MState.Step = i
-            UpdateMacroLabel(entry.Type)
+            UpdateMacroLabel(entry.Type, entry.Time, macro.entries[i + 1])
             local replayMode = Options.ReplayMode and Options.ReplayMode.Value or "Time"
             local skipStep = false
             if replayMode == "Money" then
@@ -2067,13 +2079,21 @@ local function Func_MacroReplay()
                     notyuri("money wait aborted (toggle off)")
                 end
             else
-                local tWave = ParseMacroTime(entry)
+                local tWave, tElapsed = ParseMacroTime(entry)
                 while Toggles.LoadMacro.Value and Periastron.Wave < tWave do
                     if not RoundLive() then break end
                     task.wait()
                 end
+                if not Toggles.LoadMacro.Value then break end
                 if Periastron.Wave > tWave + 10 then
                     skipStep = true
+                else
+                    local diff = WaveElapsed() - tElapsed
+                    if diff < 0 then
+                        while Toggles.LoadMacro.Value and RoundLive() and WaveElapsed() < tElapsed do
+                            task.wait()
+                        end
+                    end
                 end
             end
             if not Toggles.LoadMacro.Value then break end
@@ -2238,36 +2258,6 @@ local function Func_AutoClaimContracts()
     end
 end
 
-local function QueueOnTeleportExec(code)
-    if type(queue_on_teleport) == "function" then
-        queue_on_teleport(code)
-    elseif type(queueonteleport) == "function" then
-        queueonteleport(code)
-    end
-end
-
-local function QueueReexec()
-    if not Support.QueueOnTeleport then
-        notyuri("[Lobby] re-exec skipped: queue_on_teleport unsupported")
-        return
-    end
-    local src = (Options.ExecSource and Options.ExecSource.Value) or ""
-    if src == "" then
-        notyuri("[Lobby] re-exec skipped: Exec Source empty")
-        return
-    end
-    local code
-    if src:sub(1, 7) == "http://" or src:sub(1, 8) == "https://" then
-        code = string.format('local ok, err = pcall(function() loadstring(game:HttpGet("%s"))() end) if not ok then warn("[Yuri reexec] " .. tostring(err)) end', src)
-    else
-        code = string.format('local ok, err = pcall(function() if readfile and isfile and isfile("%s") then loadstring(readfile("%s"))() end end) if not ok then warn("[Yuri reexec] " .. tostring(err)) end', src, src)
-    end
-    QueueOnTeleportExec(code)
-    Library:Notify("Re-exec queued after next teleport", 4)
-    notyuri("[Lobby] re-exec queued")
-end
-
-
 local yuri = {
     "https://mangadex.org/covers/5311ac6f-3651-43a8-bb9c-b40dea7ab72d/062845cb-4498-4499-a23a-89ecac694ea9.jpg",
     "https://mangadex.org/covers/df01a222-faeb-4952-84ac-d6040815e2dd/ec777628-a5d7-4d5f-92f5-11a8a746427e.jpg",
@@ -2323,14 +2313,6 @@ local function OnMatchEnd(won)
         end
     end
     Library:Notify("Match " .. label .. " (wave " .. Periastron.Wave .. ")", 5)
-    if not won then
-        local mode = (Options.DefeatMode and Options.DefeatMode.Value) or "Replay Round"
-        if mode == "Return to Lobby" then
-            task.delay(2, function()
-                FireGame("RequestLobbyTeleport")
-            end)
-        end
-    end
 end
 
 local function OnRoundRestarted()
@@ -2586,12 +2568,6 @@ SafeLabel(TB_Tabs.Autofarm.T2, "Macro", "Idle")
 TB_Tabs.Autofarm.T3:AddToggle("AutoQueue", { Text = "Auto Queue" })
 TB_Tabs.Autofarm.T3:AddToggle("AutoCrate", { Text = "Auto Open Crates" })
 TB_Tabs.Autofarm.T3:AddToggle("AutoClaimContracts", { Text = "Auto Claim Contracts" })
-TB_Tabs.Autofarm.T3:AddToggle("AutoReexec", { Text = "Auto Re-Exec After Teleport" })
-TB_Tabs.Autofarm.T3:AddInput("ExecSource", {
-    Text = "Exec Source (URL or path)",
-    Default = "",
-    Placeholder = "https://... or workspace/file path",
-})
 
 TB_Tabs.Autofarm2.T1:AddSlider("AutoLeaveValue", {
     Text = "Leave at Wave",
@@ -2605,11 +2581,6 @@ TB_Tabs.Autofarm2.T1:AddDropdown("SpeedTarget", {
     Text = "Speed Target",
     Values = {"1", "2", "3", "4"},
     Default = "2",
-})
-TB_Tabs.Autofarm2.T1:AddDropdown("DefeatMode", {
-    Text = "On Defeat",
-    Values = {"Replay Round", "Return to Lobby"},
-    Default = "Replay Round",
 })
 
 local mapValues = {"Join Existing"}
@@ -2763,11 +2734,6 @@ Toggles.AutoCrate:OnChanged(function(state)
 end)
 Toggles.AutoClaimContracts:OnChanged(function(state)
     Thread("AutoClaimContracts", SafeLoop("AutoClaimContracts", Func_AutoClaimContracts), state)
-end)
-Toggles.AutoReexec:OnChanged(function(state)
-    if state then
-        QueueReexec()
-    end
 end)
 if Options.MacroSelected.Value and Options.MacroSelected.Value ~= "" then
     MState.Load = LoadMacro(Options.MacroSelected.Value)

@@ -868,6 +868,13 @@ G.request = function(tbl)
     return { Success = true }
 end
 G.http_request = G.request
+local MockExecContext = false
+G.checkcaller = function()
+    return MockExecContext
+end
+G.newcclosure = function(f)
+    return f
+end
 
 local function jsonEnc(v)
     local t = type(v)
@@ -1299,13 +1306,14 @@ check("AutoReady registered", Library.Toggles.AutoReady ~= nil)
 check("AutoSpeed registered", Library.Toggles.AutoSpeed ~= nil)
 check("AutoReplay registered", Library.Toggles.AutoReplay ~= nil)
 check("AutoLeave registered", Library.Toggles.AutoLeave ~= nil)
-check("AutoReexec registered", Library.Toggles.AutoReexec ~= nil)
+check("AutoReexec removed (invented + template feature deleted upstream)", Library.Toggles.AutoReexec == nil)
 check("AutoSell slider-toggle registered", Library.Toggles.AutoSell ~= nil and Library.Options.AutoSellValue ~= nil)
 check("PlaceAndUpgrade registered", Library.Toggles.PlaceAndUpgrade ~= nil)
 check("PlaceOrder1-6 sliders registered", Library.Options.PlaceOrder1 ~= nil and Library.Options.PlaceOrder6 ~= nil)
 check("UpgradeLimit1-6 sliders registered", Library.Options.UpgradeLimit1 ~= nil and Library.Options.UpgradeLimit6 ~= nil)
 check("SpeedTarget dropdown registered", Library.Options.SpeedTarget ~= nil)
-check("DefeatMode dropdown registered", Library.Options.DefeatMode ~= nil)
+check("DefeatMode removed (analysis-only invention)", Library.Options.DefeatMode == nil)
+check("ExecSource removed with reexec", Library.Options.ExecSource == nil)
 check("WHMatchEnd registered", Library.Toggles.WHMatchEnd ~= nil)
 check("tab layout: Game/Macro/Lobby + AutoPlay/Webhook tabs", (function()
     local seen = {}
@@ -1325,6 +1333,7 @@ check("ReplayMode Time|Money default Time", (function()
     return dd and dd.Values and dd.Values[1] == "Time" and dd.Values[2] == "Money" and dd.Value == "Time"
 end)())
 check("no invented controls (UpgradeReserve/PlaceDelay/Stats absent)", Library.Options.UpgradeReserve == nil and Library.Options.PlaceDelay == nil)
+check("script never queues teleport reexec", #TeleportQueue == 0)
 
 if PLACE ~= "Lobby" then
     check("game place detected", (function()
@@ -1485,12 +1494,28 @@ if PLACE ~= "Lobby" then
     pump(1.5)
     check("no re-sell after unit removed (slop semantics)", wireCount("SellUnit", function(c) return c[1] == 1 end) == soldAfterRemove)
 
+    serverEvent("UpdateCash", 100000)
+    pump(0.2)
+    Library.Options.FileName:SetValue("selfmacro")
+    MockExecContext = true
+    Library.Toggles.MacroRecord:SetValue(true)
+    pump(0.2)
+    local ownFireBase = wireCount("UpgradeUnit")
+    Library.Toggles.AutoUpgrade:SetValue(true)
+    pump(1.5)
+    Library.Toggles.AutoUpgrade:SetValue(false)
+    check("autofire actually fired during own-fire test", wireCount("UpgradeUnit") > ownFireBase)
+    Library.Toggles.MacroRecord:SetValue(false)
+    pump(0.3)
+    check("own autofarm fires NOT captured (checkcaller gate)", MockFS["Yuri/PeriastronTD/Macros/selfmacro.json"] == nil)
+    MockExecContext = false
+
+    Library.Options.FileName:SetValue("testmacro")
     Library.Toggles.MacroRecord:SetValue(true)
     pump(0.2)
     MeMT.Fire(MeSingleton, "PlaceUnit", "Sword", CFrame.new(Vector3.new(5, 1, 25)))
     MeMT.Fire(MeSingleton, "UpgradeUnit", 1)
     pump(0.3)
-    Library.Options.FileName:SetValue("testmacro")
     Library.Toggles.MacroRecord:SetValue(false)
     pump(0.3)
     check("macro file saved", MockFS["Yuri/PeriastronTD/Macros/testmacro.json"] ~= nil)
@@ -1501,6 +1526,11 @@ if PLACE ~= "Lobby" then
     check("macro contains Upgrade entry", (function()
         local raw = MockFS["Yuri/PeriastronTD/Macros/testmacro.json"]
         return raw and string.find(raw, "Upgrade", 1, true) ~= nil
+    end)())
+    check("macro Time is raw seconds (slop format, no ms encoding)", (function()
+        local raw = MockFS["Yuri/PeriastronTD/Macros/testmacro.json"]
+        local t = raw and raw:match('"Time":"11 ([0-9%.]+)"')
+        return t ~= nil and tonumber(t) < 120
     end)())
 
     Library.Options.MacroSelected:SetValue("testmacro")
@@ -1513,6 +1543,28 @@ if PLACE ~= "Lobby" then
     Library.Toggles.LoadMacro:SetValue(false)
     pump(0.2)
 
+    Library.Options.FileName:SetValue("waitmacro")
+    serverEvent("SetWave", 12)
+    pump(0.1)
+    Library.Toggles.MacroRecord:SetValue(true)
+    pump(3.2)
+    MeMT.Fire(MeSingleton, "PlaceUnit", "Sword", CFrame.new(Vector3.new(6, 1, 26)))
+    pump(0.3)
+    Library.Toggles.MacroRecord:SetValue(false)
+    pump(0.3)
+    check("waitmacro saved", MockFS["Yuri/PeriastronTD/Macros/waitmacro.json"] ~= nil)
+    local swordBase = wireCount("PlaceUnit", function(c) return c[1] == "Sword" end)
+    serverEvent("SetWave", 12)
+    pump(0.1)
+    Library.Options.MacroSelected:SetValue("waitmacro")
+    Library.Toggles.LoadMacro:SetValue(true)
+    pump(0.6)
+    check("Time mode waits for recorded elapsed (no early fire)", wireCount("PlaceUnit", function(c) return c[1] == "Sword" end) == swordBase)
+    pump(4.0)
+    check("Time mode fires once elapsed reached", wireCount("PlaceUnit", function(c) return c[1] == "Sword" end) > swordBase)
+    Library.Toggles.LoadMacro:SetValue(false)
+    pump(0.2)
+
     Library.Options.WebhookURL:SetValue("https://discord.com/api/webhooks/test")
     Library.Toggles.WHMatchEnd:SetValue(true)
     pump(0.1)
@@ -1521,14 +1573,17 @@ if PLACE ~= "Lobby" then
     check("Win sends webhook when WHMatchEnd on", #WebhookLog >= 1 and string.find(WebhookLog[#WebhookLog].Body, "Victory", 1, true) ~= nil)
     check("webhook carries yuri avatar", string.find(WebhookLog[#WebhookLog].Body, "avatar_url", 1, true) ~= nil)
 
-    Library.Options.DefeatMode:SetValue("Return to Lobby")
-    serverEvent("GameOver", {})
-    pump(3.0)
-    check("GameOver + Return to Lobby fires RequestLobbyTeleport", wireCount("RequestLobbyTeleport") >= 1)
-
     serverEvent("RoundRestarted")
     pump(1.0)
     check("RoundRestarted re-applies game speed", wireCount("SetGameSpeed", function(c) return c[1] == 2 end) >= 2)
+
+    serverEvent("GameOver", {})
+    pump(3.0)
+    check("defeat webhook sent when WHMatchEnd on", (function()
+        local last = WebhookLog[#WebhookLog]
+        return last ~= nil and string.find(last.Body, "Defeat", 1, true) ~= nil
+    end)())
+    check("GameOver fires NO teleport (DefeatMode removed, slop parity)", wireCount("RequestLobbyTeleport") == 0)
 
     check("RequestCash requested at init", wireCount("RequestCash") >= 1)
 else
@@ -1570,16 +1625,7 @@ else
     Library.Toggles.AutoClaimContracts:SetValue(false)
     pump(0.2)
 
-    Library.Toggles.AutoReexec:SetValue(true)
-    pump(0.5)
-    check("AutoReexec queues teleport exec (needs ExecSource)", (function()
-        Library.Options.ExecSource:SetValue("https://example.com/periastron.lua")
-        Library.Toggles.AutoReexec:SetValue(false)
-        pump(0.2)
-        Library.Toggles.AutoReexec:SetValue(true)
-        pump(0.3)
-        return #TeleportQueue >= 1
-    end)())
+    check("lobby: no reexec elements remain", Library.Toggles.AutoReexec == nil and Library.Options.ExecSource == nil)
 end
 
 print(string.format("Periastron harness (%s): %d pass / %d fail", PLACE, Pass, Fail))

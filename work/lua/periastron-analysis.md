@@ -153,3 +153,66 @@ blessed canonical implementation):
 AutoReexec (Snack AutoRejoin mapping), DefeatMode (Snack-canonical),
 AutoQueue/AutoCrate/AutoClaimContracts, AutoReady/AutoVoteSkip/AutoSpeed/
 AutoLeave, RequestLobbyTeleport defeat path.
+
+## ST13 addendum (2026-10-02, second user violation round — self-certification corrected)
+
+User named: "check caller" (potassium doc / Cobalt), reexecute ("who ask you"),
+*1000//1000 ("what's the fucking point"). All fixed, Public 2146200.
+
+### Corrected — the "Kept (sanctioned by the mapping table)" section above was WRONG for two entries
+This analysis file is a WORK PRODUCT, not a reference. Rule 11 references are:
+slop.lua, Snack.lua, Template.lua, GLM_SCRIPTING_RULES.md, the deobf. Citing
+THIS file as the sanctioning authority for AutoReexec/DefeatMode was
+self-certification — that is how they survived the ST12 audit. Corrected:
+- AutoReexec + QueueOnTeleportExec + ExecSource: REMOVED. slop.lua has no
+  re-exec feature (only manual Rejoin button + AutoServerhop), and the
+  potassium doc §14.2 records the user DELETED QueueOnTeleportExec from the
+  template ("do NOT re-add or re-implement") — my game-section
+  QueueOnTeleportExec was a re-implementation of a banned helper.
+- DefeatMode: REMOVED. slop's match-end handling is webhook-only
+  (SendMatchEndWebhook, L2664-2691). "On Defeat" dropdown + Return to Lobby
+  action had no reference. GameOver now = webhook + notify, nothing else.
+- Still kept (these DO map to real wires + Rule 11 KEEP, not to this file):
+  AutoQueue/AutoCrate/AutoClaimContracts (lobby remotes, repetitive-task
+  automation), AutoReady (ReadyWave wire, slop's AutoSkip mechanism-slot),
+  AutoVoteSkip/AutoSpeed/AutoLeave/AutoReplay (slop elements, L3020-3024).
+
+### Macro hook — checkcaller (potassium doc §12 UNC standard, Cobalt-confirmed)
+- Old gate `MState.Rec and not MState.SelfFire` = the §23.16 stuck-true bug
+  class (Thread-off during a Fire leaves SelfFire true → captures die
+  permanently) AND it only worked because FireGame bypassed the hook via
+  OrigFire — a private path, not slop's shape.
+- New gate: `MState.Rec and not CheckCaller()` where CheckCaller is the
+  feature-detected `checkcaller`/`iscaller` (type()-checked — typeof is
+  Luau-only in the game section). InstallMacroHook refuses with a Notify
+  when absent (slop's Support.HookMeta refusal precedent). Hook wrapped in
+  newcclosure when available (slop's `cc` pattern). FireGame now calls the
+  LIVE `me.Fire` (through the hook, slop's one-path shape); SelfFire stays
+  as Invoke/Fire bookkeeping parity, never read by the hook (§23.16).
+
+### Macro Time format — slop verbatim, no invented encoding
+- slop L1057: `Time = tostring(wave or 0) .. " " .. tostring(elapsed or 0)`.
+  My `math.floor(elapsed * 1000)` encode + `/1000` decode had NO consumer —
+  the Time-mode replay never waited on elapsed at all (the wait itself was
+  missing). Fixed: raw seconds everywhere; ParseMacroTime slop-verbatim;
+  SortMacroEntries slop-verbatim (wa, then ea > eb — my old second branch
+  compared wave again, dead code).
+- Time-mode replay wait ported from slop L1667-1682 with Periastron's
+  count-up clock: `diff = WaveElapsed() - tElapsed; if diff < 0 then wait
+  until WaveElapsed() >= tElapsed` (slop's GetRemainingTime counts down, so
+  its `diff > 0` inverts). Stale-skip `wave > tWave + 10` unchanged.
+- UpdateMacroLabel ported to slop's full signature (suffix, elapsed,
+  nextEntry) with the "=> next entry" preview; RecordAct logs slop's
+  "confirmed wave %.2fs".
+
+### Harness (periastron_harness.lua, now Game 78 / Lobby 49)
+New regression checks: own autofarm fires NOT captured while recording
+(MockExecContext flag models checkcaller), autofire-actually-fired
+non-vacuity guard, macro Time = raw seconds (< 120, ms encoding would be
+thousands), Time-mode wait (no early fire, fires once elapsed reached),
+AutoReexec/ExecSource/DefeatMode absent, #TeleportQueue == 0, GameOver
+sends defeat webhook AFTER RoundRestarted reset (per-match once semantics —
+the Win test consumed the guard; test order matters) + NO
+RequestLobbyTeleport on defeat. checkcaller mock + newcclosure identity
+mock added to the env (before script load). Refusal/alias-fallback gate
+logic unit-verified standalone.
