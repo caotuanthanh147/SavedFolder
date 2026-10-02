@@ -38,7 +38,7 @@ No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
 | ID | Game (Public folder) | Owner | Status | Notes |
 |---|---|---|---|---|
 | ST1 | Anime Breaker [🛠️CRAFT] | glm1 | done | Delivered Public 75ecaf4: 7 toggles (Auto Click via SettingSystem, Auto Skill loop via ClickSystem CastSkill + game-maintained Lib.Target, 5 game autos via AutoSystem Toggle) — all wires through the game's own Framework Library NetworkService (BridgeNet2 Main), state-synced from PlayerData (no redundant flips, nil-PD deferred retry). Harness 18/18. |
-| ST2 | Clone to Steal Eggs | glm1 | doing | claimed |
+| ST2 | Clone to Steal Eggs | glm1 | done | Delivered Public 5cf7ed2: Auto Hatch (SetAutoHatch value wire), Auto Rebirth (Rebirth loop), Auto Equip Best (EquipBest loop), Auto Upgrade (PlotUpgrade/CloneCooldown/MaxClones/CloneMaxSteal gated by UpgradeConfig.GetPrice + ReplicaClient Data levels). Knit client dot-call convention (Knit.GetService("X")) + ReplicaClient.OnNew data bind, all verified at call sites. Harness 14/14. |
 | ST3 | Fishing Master | glm1 | doing | claimed |
 | ST4 | Flip a House! 🏠 | glm1 | doing | claimed |
 | ST5 | Open Sea For Animals! | glm2 | done | Delivered (Public 6f78f7f): standard autofarm — Auto Collect (TP to nearest pickup model in workspace.CollectEventPickups, game proximity auto-collects via _CheckProximity on Heartbeat; deobf L26072/L25996 verified: pickup models named "eventId_id", parented to workspace.CollectEventPickups folder L26041, collected when HRP within radius). Gates: luac OK, lint 0 errors, validate 783/18/109 diff, harness 6/6 (folder found, nearest-pickup TP, re-nearest after move). No reference → standard autofarm ONLY per §3. |
