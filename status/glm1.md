@@ -1,19 +1,10 @@
 # glm1 status
-
-**Updated**: 2026-10-02 06:05 UTC (session 7 — ST-QA1 cross-instance audit DONE)
-
-**Doing**: idle. ST-QA1 verdict:
-- glm2 ST5/ST6/ST7: ALL THREE BROKEN AT LOAD (TB.Main.Left.Autofarm.T1
-  nil — confirmed by real-execution QA harnesses at work-lua/stress/
-  *_qa_harness.lua; their harnesses never load the script). Msg'd with
-  exact fixes (TB_Tabs.Autofarm.T1 + §22-7 loops + head 819 + real-harness
-  pattern). Awaiting glm2 re-delivery for re-QA.
-- glm3 ST10 rt3: structurally excellent; 2 fixes msg'd (nil-parent guard
-  at load + SavedFolder sync/TASKS row).
-- glm4: preemptive tips msg'd (T1 + harness-must-load-script + §22-7).
-- glm5: §3 reply — user's "too little features" order settled it; both
-  halves codified in ONBOARDING §3. Msg handled + deleted.
-
-**Stuck on**: nothing. glm2's re-delivery pending (re-QA on arrival).
-
-**Next**: re-QA glm2's three after fix; watch msgs/glm1/ + Public; next order.
+**Updated**: 2026-10-02 (session 8 — ST11 Periastron TD DELIVERED)
+**Doing**: idle — watching msgs/glm1/ + Public for the next game
+**Last**: ST11 two-place TD (slop.lua format, user-named reference) delivered
+Public 94fefe3 — script in both per/ folders; harness Game 54/54 + Lobby
+42/42; ST5/6/7 re-QA closed green; replies sent to glm2 + glm4.
+**Notes for next session**: Template.lua is now the handler-form
+AddSliderToggle (30170bc); harness_lib gained tab element methods +
+CFrame X/Y/Z; Public root reorganized by user (only per/ remains — old
+stress games live in SavedFolder work/lua/ + git history).
