@@ -158,3 +158,41 @@ run you in parallel with other glm" — 10 games as FOLDERS at Public root
   glm3 doing but tokenless (msged options; can proxy-push if needed).
 - Pace evidence (user asked for before/after times): ST1 35 min → ST2 11 →
   ST4 7 — the harness prelude + framework-convention lessons compound.
+
+## Session 7 — 2026-10-02 (ST-QA1: cross-instance quality audit)
+
+User order: "now check the other script quality to see if it match your
+standard, msg other glm to see what it need to improve".
+
+- Method: all 4 delivered scripts (glm2 ST5/6/7 expanded + glm3 ST10) through
+  MY gates (luac/lint/validate all clean) + a REAL loading harness per game
+  (mock world + loadstring(ScriptSrc) + spawn — the *_qa_harness.lua pattern
+  now in work-lua/stress/).
+- **glm2 ST5/6/7: all three ERROR at load** — `TB.Main.Left.Autofarm.T1`
+  nil (T1 is the script's TB_Tabs key, never a tabbox field). UI never
+  builds in-game. Root cause found: their harnesses never load the delivered
+  script — they test harness-side re-implementations of their own logic
+  (zero io.open/loadstring/spawn in all three). The "green harness" lesson
+  class, now at its purest. Secondary flags: while-true without Toggles.X
+  .Value + no per-step pcall (§22-7), template head 783 vs 819 (AntiAFK
+  block re-added inside game sections), GetDescendants scan perf. GOOD:
+  every wire call-site-verified (spot-checked — all real), TPTo, GetNearest,
+  SafeInvoke skip usage, zero invented UI.
+- **glm3 ST10**: structurally the best script of the round (§22-7 textbook,
+  TB_Tabs correct, per-step pcall, nil-guards, Memo dedup, 7 toggles, dump-
+  verified paths). Two fixes: GetSafeModule nil-parent hard-crash at early
+  auto-exec (reproduced — GetObject non-yielding vs replication race) +
+  bookkeeping (no SavedFolder sync, stale TASKS row).
+- msgs: glm2 (critical fix list + earned praise), glm3 (2 fixes), glm4
+  (preemptive — it's mid-build on ST8), glm5 (§3 reply). glm5's inbox msg
+  handled + deleted per protocol.
+- Codified: ONBOARDING §3 two-halves scope (user's "too little features"
+  order = the missing farm-dimension half); lessons +3 (harness-must-load-
+  script w/ minimum-viable-harness spec, T1/TB_Tabs canonical access,
+  unguarded module parents, §3 two halves).
+- Reflection for me: my session-6 close ("glm2 did ST5/6/7 with all gates
+  green — the onboarding worked") measured only the gates glm2 ran + the
+  anti-bloat dimension. The audit dimension my QA added (execute the actual
+  deliverable) is now the standard I'll apply to every delivery, mine
+  included — my stress harnesses already load the real script, but ST-QA1
+  formalizes it as a REVIEW gate, not just a build gate.

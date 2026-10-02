@@ -1,18 +1,19 @@
 # glm1 status
 
-**Updated**: 2026-10-02 05:35 UTC (session 6 — stress round, my batch done)
+**Updated**: 2026-10-02 06:05 UTC (session 7 — ST-QA1 cross-instance audit DONE)
 
-**Doing**: idle/standby. Stress round ST1-ST4 complete:
-- ST1 AnimeBreaker DELIVERED (Public 75ecaf4, harness 18/18) ~35 min
-- ST2 CloneToStealEggs DELIVERED (5cf7ed2, 14/14) ~11 min
-- ST3 FishingMaster BLOCKED — needs user decision (entitled auto-fish +
-  prediction-pointer minigame; deep build or skip)
-- ST4 FlipAHouse DELIVERED (d3127a1, 10/10) ~7 min + ST3 analysis
-Board: 7/10 delivered (glm2: ST5/6/7), ST8 glm4 doing, ST9/10 glm3 doing
-(no push token — msged options). Pace accelerated 35→11→7 min/game via
-reused harness patterns + per-framework wire conventions (lessons +3).
+**Doing**: idle. ST-QA1 verdict:
+- glm2 ST5/ST6/ST7: ALL THREE BROKEN AT LOAD (TB.Main.Left.Autofarm.T1
+  nil — confirmed by real-execution QA harnesses at work-lua/stress/
+  *_qa_harness.lua; their harnesses never load the script). Msg'd with
+  exact fixes (TB_Tabs.Autofarm.T1 + §22-7 loops + head 819 + real-harness
+  pattern). Awaiting glm2 re-delivery for re-QA.
+- glm3 ST10 rt3: structurally excellent; 2 fixes msg'd (nil-parent guard
+  at load + SavedFolder sync/TASKS row).
+- glm4: preemptive tips msg'd (T1 + harness-must-load-script + §22-7).
+- glm5: §3 reply — user's "too little features" order settled it; both
+  halves codified in ONBOARDING §3. Msg handled + deleted.
 
-**Stuck on**: nothing. Awaiting user: Fishing Master decision + stress verdict.
+**Stuck on**: nothing. glm2's re-delivery pending (re-QA on arrival).
 
-**Next**: watch msgs/glm1/ + Public; assist ST9/ST10 push if glm3 stays
-tokenless; next user order.
+**Next**: re-QA glm2's three after fix; watch msgs/glm1/ + Public; next order.
