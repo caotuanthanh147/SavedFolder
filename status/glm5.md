@@ -1,38 +1,37 @@
 # glm5 status
 
-**Updated**: 2026-10-02 05:39 UTC (session 1 — review + verify pass)
+**Updated**: 2026-10-02 05:41 UTC (session 1 — review/verify/close, all loops closed)
 
-**Identity**: glm5 — next free number after glm1-4; glm1 left an inbox in
-msgs/glm5/ (stress-round conventions, handled). Review/critic instance this
-session, not a build slot.
+**Identity**: glm5 — next free number after glm1-4. Review/critic instance
+this session (user ran me in parallel with the other glm as a stress test).
 
-**Doing**: user ran me in parallel as a stress-test critic. Task: review
-glm2's stress-round deliveries and message it the rule violations.
-- Pass 1 (msg 053421Z): flagged glm2's 1-toggle-per-game (ST5/6/7) as
-  under-scoping §3's "build the standard autofarm" half while honoring the
-  "nothing else" half. Deobf-cited the specific remotes left unwired per
-  game (ST6: Roll L27161 + Rebirth L52082; ST5: Hatch L15828/Upgrade L16272/
-  Rebirth L18235; ST7: DailyClaim L14064/OfflineClaim L17328/SpinWheel
-  L15033/Codes L13796/EventQuestClaim L21155). Cited §3/Rule11 L121/Rule16/
-  PROMPT L4/§9.
-- Heads-up to glm1 (msg 053659Z): my critique cuts against glm1's "§3
-  discipline" praise of glm2 in logs/glm1.md — flagged the tension (glm2
-  cleared the anti-bloat bar, missed the build-the-farm bar) per §8.
-- Verify pass (msg 053847Z): glm2 expanded in parallel (f3a58bf, per user's
-  own "too little features" order) — ST6 1→4, ST5 1→5, ST7 1→3 toggles, all
-  real remotes (verified: Ascension L64594, Evolution, Restock; SellAll/
-  CollectCash/SpinWheel/Daily; DailyClaim+SpinWheel). Expansion cleared the
-  user's count bar. Residual logged (not a re-do, Rule 16): ST6 still has no
-  Auto Roll — the headline cite — because Roll (RollServiceClient L27112) ≠
-  Ascension (L64583); in a "Sword RNG" game the Roll remote IS the core loop.
-  ST5 progression loops (Hatch/Upgrade/Rebirth) + ST7 (OfflineClaim/Codes/
-  EventQuestClaim) still open too. Flagged as next-game feedback.
+**Doing**: DONE for this session. Reviewed glm2's stress-round deliveries,
+messaged it the rule violations, verified the fix, closed the loop.
+- Pass 1 (053421Z): flagged 1-toggle-per-game (ST5/6/7) as under-scoping
+  §3's "build the standard autofarm" half. Deobf-cited specifics per game.
+- Heads-up glm1 (053659Z): flagged tension w/ its "§3 discipline" praise.
+- Verify pass (053847Z): glm2 expanded 1→3-5 toggles w/ real remotes; logged
+  residual (ST6 Auto Roll still missing — Roll≠Ascension per L27112/L64583).
+- Closeout reply (just sent): glm2 wired the headline cites (Auto Roll ST6,
+  Auto Rebirth ST6+ST5, Auto Event Quests ST7 — final 6/6/4 toggles, Public
+  5fb30cb) AND gave Rule-11 reasoning for 3 unwired (Hatch=template FirePP
+  coverage / Codes=needs user strings / OfflineClaim=Replica deep-build).
+  Conceded all 3 (glm2 is right); one mild pushback on ST5 Auto Upgrade
+  (UpgradeConfig types are enumerable, Knit GetService pattern = ST2's
+  shape — reachable, chosen-not-to). Thread closed, inbox cleared (§8).
+
+**Outcome**: the critique was directionally correct (glm2 agreed + fixed
+the headline items + internalized the §3 two-clause lesson); the pushback
+channel surfaced legitimate Rule-11 reasoning that sharpened MY contrapositive
+(redemption-without-input ≠ automation-value yet). Healthy multi-agent loop.
 
 **Stuck on**: nothing.
 
-**Files changed (mine)**: status/glm5.md, logs/glm5.md, msgs/glm2/
-glm5-20261002T053421Z.md (pass 1) + glm5-20261002T053847Z.md (verify),
-msgs/glm1/glm5-20261002T053659Z.md (tension heads-up).
+**Files changed (mine)**: status/glm5.md, logs/glm5.md, msgs/glm2/glm5-
+20261002T053421Z.md (pass1) + 053847Z (verify) + 0541xxZ (closeout),
+msgs/glm1/glm5-20261002T053659Z.md (tension heads-up). Inbound msgs/glm5/
+handled + deleted per §8.
 
-**Next**: standing by. msgs/glm5/ is my inbox. If the user opens a build
-slot for me I'll claim it in TASKS.md before starting.
+**Next**: standing by. A cross-instance ST-QA1 audit was just claimed
+(faed27a). If the user wants me on QA1 or a build slot, I'll claim in
+TASKS.md before starting.
