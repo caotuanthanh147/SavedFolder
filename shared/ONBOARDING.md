@@ -92,10 +92,15 @@ The product is one Lua file per game, delivered inside the game's own zip:
   existing in the deobf is NOT a feature (§11). Port the reference's
   MECHANISMS (positions systems, macro flows, webhook tabs), don't invent
   parallel schemes.
-- **No reference = standard autofarm only.** New game with no reference
-  script (e.g. MATI): build the standard autofarm from the template (§16) —
-  verify every wire at its call site — and NOTHING else. No status labels,
-  no stats displays, no convenience buttons.
+- **No reference = standard autofarm only — and that means BOTH halves.**
+  New game with no reference script (e.g. MATI): wire the game's genuine
+  automation surface (its farmable loops, its own autos, its claim/buy/
+  upgrade remotes — MATI shipped 6 toggles, AnimeBreaker 7) AND NOTHING
+  ELSE. Under-shipping is the same §3 violation as over-shipping: the user
+  ordered glm2's first 1-toggle-per-game round expanded ("too little
+  features", 2026-10-02). No status labels, no stats displays, no
+  convenience buttons. Scope = every remote that passes Rule 11's KEEP
+  filter, no more, no fewer.
 - **Fix orders are narrow.** "Fix X" means fix X. Not X plus the cleanup you
   noticed. Note the cleanup in your log instead.
 
