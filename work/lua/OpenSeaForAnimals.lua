@@ -786,6 +786,7 @@ Remotes.SellAllFunc = KnitServices:WaitForChild("InventoryService"):WaitForChild
 Remotes.CollectCashFunc = KnitServices:WaitForChild("AnimalService"):WaitForChild("RF"):WaitForChild("CollectOfflineCash")
 Remotes.SpinWheelFunc = KnitServices:WaitForChild("SpinWheelService"):WaitForChild("RF"):WaitForChild("SpinWheel")
 Remotes.ClaimDailyFunc = KnitServices:WaitForChild("DailyRewardService"):WaitForChild("RF"):WaitForChild("ClaimReward")
+Remotes.RebirthFunc = KnitServices:WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth")
 local function Func_AutoCollect()
     while true do
         task.wait(0.3)
@@ -844,6 +845,16 @@ end)
 Toggles.AutoClaimDaily = TB.Main.Left.Autofarm.T1:AddToggle("AutoClaimDaily", { Text = "Auto Claim Daily", Default = false })
 Toggles.AutoClaimDaily:OnChanged(function(state)
     Thread("AutoClaimDaily", SafeLoop("Auto Claim Daily", Func_AutoClaimDaily), state)
+end)
+local function Func_AutoRebirth()
+    while true do
+        task.wait(60)
+        SafeInvoke(Remotes.RebirthFunc, true)
+    end
+end
+Toggles.AutoRebirth = TB.Main.Left.Autofarm.T1:AddToggle("AutoRebirth", { Text = "Auto Rebirth", Default = false })
+Toggles.AutoRebirth:OnChanged(function(state)
+    Thread("AutoRebirth", SafeLoop("Auto Rebirth", Func_AutoRebirth), state)
 end)
 local antiAFKConn = nil
 local function RunAntiAFK()

@@ -786,6 +786,8 @@ Remotes.CombatEvent = NetRemotes:WaitForChild("Combat"):WaitForChild("RemoteEven
 Remotes.AscensionFunc = NetRemotes:WaitForChild("Ascension"):WaitForChild("RemoteFunction")
 Remotes.EvolutionFunc = NetRemotes:WaitForChild("Evolution"):WaitForChild("RemoteFunction")
 Remotes.ShopFunc = NetRemotes:WaitForChild("Shop"):WaitForChild("RemoteFunction")
+Remotes.RollFunc = NetRemotes:WaitForChild("Roll"):WaitForChild("RemoteFunction")
+Remotes.RebirthFunc = NetRemotes:WaitForChild("Rebirth"):WaitForChild("RemoteFunction")
 local function GetEnemies()
     local list = {}
     for _, m in ipairs(workspace:GetDescendants()) do
@@ -846,6 +848,26 @@ end)
 Toggles.AutoRestock = TB.Main.Left.Autofarm.T1:AddToggle("AutoRestock", { Text = "Auto Restock", Default = false })
 Toggles.AutoRestock:OnChanged(function(state)
     Thread("AutoRestock", SafeLoop("Auto Restock", Func_AutoRestock), state)
+end)
+local function Func_AutoRoll()
+    while true do
+        task.wait(1)
+        SafeInvoke(Remotes.RollFunc, true, "roll")
+    end
+end
+local function Func_AutoRebirth()
+    while true do
+        task.wait(30)
+        SafeInvoke(Remotes.RebirthFunc, true, "requestRebirth")
+    end
+end
+Toggles.AutoRoll = TB.Main.Left.Autofarm.T1:AddToggle("AutoRoll", { Text = "Auto Roll", Default = false })
+Toggles.AutoRoll:OnChanged(function(state)
+    Thread("AutoRoll", SafeLoop("Auto Roll", Func_AutoRoll), state)
+end)
+Toggles.AutoRebirth = TB.Main.Left.Autofarm.T1:AddToggle("AutoRebirth", { Text = "Auto Rebirth", Default = false })
+Toggles.AutoRebirth:OnChanged(function(state)
+    Thread("AutoRebirth", SafeLoop("Auto Rebirth", Func_AutoRebirth), state)
 end)
 local antiAFKConn = nil
 local function RunAntiAFK()

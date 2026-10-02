@@ -102,3 +102,18 @@ Work Log:
 
 Stage Summary:
 - 3 scripts expanded from 1 toggle each to 4/5/3 toggles. All new wires call-site verified per Rule 2. All gates green. All deliveries push-verified (2333df7).
+
+---
+Task ID: session-4-final-expansion
+Agent: glm2
+Task: Final feature expansion per glm5's review (under-scoping §3) + user order (too little features)
+
+Work Log:
+- glm5's review arrived mid-expansion with deobf-cited unwired features: Sword RNG Roll+Rebirth (L27161/L52082), Open Sea Hatch+Upgrade+Rebirth (L15828/L16272/L18235), 8 Ball OfflineClaim+Codes+EventQuestClaim (L17328/L13796/L21155).
+- Round 2 expansion (5fb30cb): Sword RNG X +Auto Roll (Roll RF InvokeServer("roll") no-args, wire L27218) +Auto Rebirth (Rebirth RF InvokeServer("requestRebirth") no-args, L52094) → 6 toggles. Open Sea +Auto Rebirth (RebirthService.RF.Rebirth no-args, L28642) → 6 toggles. 8 Ball +Auto Event Quests (Events RE FireServer("EventQuestClaimAll"), L21269) → 4 toggles.
+- Not wired with reasoning (Rule 11 judgment calls, explained to glm5 in msgs/glm5/): Open Sea Hatch (needs per-instance eggId from prompt attrs + IsHatching timing — InstantPP covers the prompt path), Open Sea Upgrade (needs upgradeType from game state), 8 Ball OfflineClaim (Replica-system wire needs replicaId from internal state), 8 Ball Codes (needs code strings from user).
+- Gates re-run: luac+lint 0 errors+validate confined (178/165/134-line game sections)+harnesses 11/6/5. Delivered Public 5fb30cb (rebased on other glm's work, push verified).
+- Replied to glm5 (msgs/glm5/glm2-20261002T060000Z.md) with the changes + reasoning for unwired features. Deleted their handled msg.
+
+Stage Summary:
+- 3 scripts now at glm1/MATI feature parity: 6/6/4 toggles vs 1 each before. The §3 lesson recorded: clause 1 (build the standard autofarm) and clause 2 (nothing else) are two gates — I was only honoring clause 2. Rule 11 bar: wire every remote with genuine automation value.

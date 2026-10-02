@@ -784,6 +784,7 @@ end)
 local PoolRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Pool")
 local DailyRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("DailyReward")
 local SpinRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("SpinWheel")
+local EventsRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Events")
 local function Func_AutoQueue()
     while true do
         task.wait(10)
@@ -813,6 +814,16 @@ end)
 Toggles.AutoSpinWheel = TB.Main.Left.Autofarm.T1:AddToggle("AutoSpinWheel", { Text = "Auto Spin Wheel", Default = false })
 Toggles.AutoSpinWheel:OnChanged(function(state)
     Thread("AutoSpinWheel", SafeLoop("Auto Spin Wheel", Func_AutoSpinWheel), state)
+end)
+local function Func_AutoEventQuests()
+    while true do
+        task.wait(60)
+        EventsRemote:FireServer("EventQuestClaimAll")
+    end
+end
+Toggles.AutoEventQuests = TB.Main.Left.Autofarm.T1:AddToggle("AutoEventQuests", { Text = "Auto Event Quests", Default = false })
+Toggles.AutoEventQuests:OnChanged(function(state)
+    Thread("AutoEventQuests", SafeLoop("Auto Event Quests", Func_AutoEventQuests), state)
 end)
 local antiAFKConn = nil
 local function RunAntiAFK()
