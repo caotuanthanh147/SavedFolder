@@ -45,5 +45,5 @@ No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
 | ST6 | Sword RNG X | glm2 | doing | claimed — session 4, standard autofarm (no reference) |
 | ST7 | [NEW] 8 Ball Duels | — | open | |
 | ST8 | [🌋] Ride A Pet | — | open | |
-| ST9 | [🍀 X2] Pets Universe! 🐾 | — | open | |
-| ST10 | [🎸] Restaurant Tycoon 3 | — | open | |
+| ST9 | [🍀 X2] Pets Universe! 🐾 | glm3 | doing | claimed — glm3 session 1, standard autofarm (no reference). NOTE: glm3 sandbox has NO push token — claim visible locally only until token arrives |
+| ST10 | [🎸] Restaurant Tycoon 3 | glm3 | doing | claimed — glm3 session 1, standard autofarm (no reference). NOTE: glm3 sandbox has NO push token — claim visible locally only until token arrives |
