@@ -199,13 +199,24 @@ function SafeLabel(target, id, text)
     end, true)
     return label
 end
-function AddSliderToggle(Config)
-    local Toggle = Config.Group:AddToggle(Config.Id, {
+function AddSliderToggle(Config, ...)
+    if type(Config) == "string" then
+        return Toggles[Config], Options[Config .. "Value"]
+    end
+    local Handlers = {...}
+    local Toggle, Slider
+    Toggle = Config.Group:AddToggle(Config.Id, {
         Text = Config.Text,
         Default = Config.DefaultToggle or false,
         Disabled = Config.Disabled,
+        Callback = function(state)
+            if Slider then Slider:SetVisible(state) end
+            for _, Handler in ipairs(Handlers) do
+                Handler(state, Toggle, Slider)
+            end
+        end,
     })
-    local Slider = Config.Group:AddSlider(Config.Id .. "Value", {
+    Slider = Config.Group:AddSlider(Config.Id .. "Value", {
         Text = Config.Text,
         Default = Config.Default,
         Min = Config.Min,
@@ -214,10 +225,7 @@ function AddSliderToggle(Config)
         Compact = true,
         Visible = false
     })
-    Toggle:OnChanged(function()
-        Slider:SetVisible(Toggle.Value)
-    end)
-    return Toggle, Slider
+    return Toggles[Config.Id], Options[Config.Id .. "Value"]
 end
 local function SafeConnect(key, getSignalFn, handler)
     local ok, signal = pcall(getSignalFn)
@@ -679,7 +687,7 @@ local GB = {
     },
 }
 AddSliderToggle({ Group = GB.Player.Left.General, Id = "WS", Text = "WalkSpeed", Default = 16, Min = 16, Max = 1000 })
-local TPW_T, TPW_S = AddSliderToggle({ Group = GB.Player.Left.General, Id = "TPW", Text = "TPWalk", Default = 1, Min = 1, Max = 30, Rounding = 1 })
+AddSliderToggle({ Group = GB.Player.Left.General, Id = "TPW", Text = "TPWalk", Default = 1, Min = 1, Max = 30, Rounding = 1 })
 AddSliderToggle({ Group = GB.Player.Left.General, Id = "JP", Text = "JumpPower", Default = 50, Min = 0, Max = 500 })
 AddSliderToggle({ Group = GB.Player.Left.General, Id = "HH", Text = "HipHeight", Default = 2, Min = 0, Max = 10, Rounding = 1 })
 GB.Player.Left.General:AddToggle("Noclip", { Text = "Noclip" })
@@ -691,7 +699,7 @@ GB.Player.Left.General:AddToggle("Disable3DRender", { Text = "Disable 3D Renderi
 AddSliderToggle({ Group = GB.Player.Left.General, Id = "Grav", Text = "Gravity", Default = 196, Min = 0, Max = 500, Rounding = 1})
 AddSliderToggle({ Group = GB.Player.Left.General, Id = "Zoom", Text = "Camera Zoom", Default = 128, Min = 128, Max = 10000 })
 AddSliderToggle({ Group = GB.Player.Left.General, Id = "FOV", Text = "Field of View", Default = 70, Min = 30, Max = 120 })
-local FPS_T, FPS_S = AddSliderToggle({ Group = GB.Player.Left.General, Id = "LimitFPS", Text = "Set Max FPS", Disabled = not Support.FPS, Default = 60, Min = 5, Max = 360 })
+AddSliderToggle({ Group = GB.Player.Left.General, Id = "LimitFPS", Text = "Set Max FPS", Disabled = not Support.FPS, Default = 60, Min = 5, Max = 360 })
 GB.Player.Left.General:AddToggle("FPSBoost", { Text = "FPS Boost" })
 GB.Player.Left.Server:AddToggle("AntiAFK", {
     Text = "Anti AFK",
@@ -702,8 +710,32 @@ GB.Player.Left.Server:AddToggle("AutoReconnect", { Text = "Auto Reconnect" })
 GB.Player.Left.Server:AddToggle("NoGameplayPaused", { Text = "No Gameplay Paused"})
 GB.Player.Left.Server:AddButton({ Text = "Serverhop", Func = function() Serverhop() end })
 GB.Player.Left.Server:AddButton({ Text = "Rejoin", Func = function() Services.TeleportService:Teleport(game.PlaceId, Plr) end })
-GB.Player.Left.Server:AddToggle("AutoServerhop", { Text = "Auto Serverhop" })
-GB.Player.Left.Server:AddSlider("AutoHopMins", { Text = "Minutes", Default = 30, Min = 0, Max = 300, Compact = true, Rounding = 0 })
+AddSliderToggle({ Group = GB.Player.Left.Server, Id = "AutoServerhop", Text = "Auto Serverhop (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
+    Thread("AutoServerhop", function()
+        local lastHop = tick()
+        while Toggles.AutoServerhop.Value do
+            task.wait(5)
+            if not Toggles.AutoServerhop.Value then break end
+            if (tick() - lastHop) >= (Options.AutoServerhopValue.Value * 60) then
+                Serverhop()
+                break
+            end
+        end
+    end, state)
+end)
+AddSliderToggle({ Group = GB.Player.Left.Server, Id = "AutoRejoin", Text = "Auto Rejoin (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
+    Thread("AutoRejoin", function()
+        local lastRejoin = tick()
+        while Toggles.AutoRejoin.Value do
+            task.wait(5)
+            if not Toggles.AutoRejoin.Value then break end
+            if (tick() - lastRejoin) >= (Options.AutoRejoinValue.Value * 60) then
+                TeleportService:Teleport(game.PlaceId, Plr)
+                break
+            end
+        end
+    end, state)
+end)
 GB.Player.Right.Game:AddToggle("InstantPP", { Text = "Instant Prompt" })
 GB.Player.Right.Game:AddToggle("Fullbright", { Text = "Fullbright" })
 GB.Player.Right.Game:AddToggle("NoFog", { Text = "No Fog" })
@@ -712,24 +744,10 @@ Toggles.AntiKnockback:OnChanged(function(state)
     Thread("AntiKnockback", Func_AntiKnockback, state)
 end)
 Toggles.TPW:OnChanged(function(v)
-    TPW_S:SetVisible(TPW_T.Value)
     Thread("TPW", FuncTPW, v)
 end)
 Toggles.Noclip:OnChanged(function(v)
     Thread("Noclip", FuncNoclip, v)
-end)
-Toggles.AutoServerhop:OnChanged(function(state)
-    Thread("AutoServerhop", function()
-        local lastHop = tick()
-        while Toggles.AutoServerhop.Value do
-            task.wait(5)
-            if not Toggles.AutoServerhop.Value then break end
-            if (tick() - lastHop) >= (Options.AutoHopMins.Value * 60) then
-                Serverhop()
-                break
-            end
-        end
-    end, state)
 end)
 Connections.Player_General = RunService.Stepped:Connect(function()
     local Hum = Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
@@ -756,12 +774,11 @@ task.spawn(function()
     end
 end)
 Options.LimitFPSValue:OnChanged(function()
-    if FPS_T.Value then
-        setfpscap(FPS_S.Value)
+    if Toggles.LimitFPS.Value then
+        setfpscap(Options.LimitFPSValue.Value)
     end
 end)
 Toggles.LimitFPS:OnChanged(function(v)
-    FPS_S:SetVisible(FPS_T.Value)
     if not v and Support.FPS then
         setfpscap(2000)
     end
