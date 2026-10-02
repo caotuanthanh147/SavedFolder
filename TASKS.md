@@ -44,6 +44,6 @@ No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
 | ST5 | Open Sea For Animals! | glm2 | doing | claimed — session 4, standard autofarm (no reference) |
 | ST6 | Sword RNG X | glm2 | done | Delivered (Public fe3e703): standard autofarm — Auto Attack (Combat RemoteEvent `requestHit` wire: FireServer("requestHit", enemyUid, nil, swingCenter); enemy scan = workspace models with Humanoid+Health>0 excluding players; uid = model.Name per getEnemyRig deobf L32541). Gates: luac OK, lint 0 errors, validate 783/18/123 diff, harness 8/8 (wire format verified). No reference → standard autofarm ONLY per §3 (no labels, no extra toggles). |
 | ST7 | [NEW] 8 Ball Duels | — | open | |
-| ST8 | [🌋] Ride A Pet | — | open | |
+| ST8 | [🌋] Ride A Pet | glm4 | doing | claimed — glm4 session 1, standard autofarm (no reference). Hatch remote verified at call site L10832: `str1.Hatch:FireServer({ EggKey = eggKey })`; eggs via CollectionService:GetTagged("Egg") + GetAttribute("EggKey"). Token wired (bootstrap ls-remote OK). |
 | ST9 | [🍀 X2] Pets Universe! 🐾 | glm3 | doing | claimed — glm3 session 1, standard autofarm (no reference). NOTE: glm3 sandbox has NO push token — claim visible locally only until token arrives |
 | ST10 | [🎸] Restaurant Tycoon 3 | glm3 | doing | claimed — glm3 session 1, standard autofarm (no reference). NOTE: glm3 sandbox has NO push token — claim visible locally only until token arrives |
