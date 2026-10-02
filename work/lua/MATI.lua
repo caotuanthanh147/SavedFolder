@@ -818,7 +818,6 @@ Toggles.AntiAFK:OnChanged(function(state)
 end)
 if Toggles.AntiAFK.Value then RunAntiAFK() end
 local MState = { Melting = false, LastAim = 0, LastState = 0, ThrownAt = 0, CreatedAt = 0, QueuedPad = nil }
-Shared.Labels = {}
 
 local function PopulateRemotes()
     Remotes.MeltState = GetObject(RS, "FrozenHouseNet.MeltState")
@@ -999,13 +998,11 @@ local function Func_AutoMelt()
             if piece then
                 StopMelt()
                 TPTo(piece, Vector3.new(0, 4, 0))
-                SafeLabel("Status", "Key piece")
                 return
             end
             local target = NearestIce()
             if not target then
                 StopMelt()
-                SafeLabel("Status", "No ice")
                 return
             end
             local energy, capacity = BatteryNow()
@@ -1016,7 +1013,6 @@ local function Func_AutoMelt()
                 if Toggles.AutoGrenade.Value then
                     ThrowGrenade(target)
                 end
-                SafeLabel("Status", "Recharging")
                 return
             end
             if not HeldMelter() then
@@ -1045,7 +1041,6 @@ local function Func_AutoMelt()
                 MState.LastAim = now
                 Remotes.MeltAim:FireServer(target.Position)
             end
-            SafeLabel("Status", "Melting")
         end)
         if not ok then
             notyuri("AutoMelt:", err)
@@ -1067,7 +1062,6 @@ local function Func_AutoFreezer()
             TPTo(prompt:FindFirstAncestorWhichIsA("BasePart"), Vector3.new(0, 2, 3))
             task.wait(0.3)
             FirePP(prompt)
-            SafeLabel("Status", "Freezer off")
         end)
         if not ok then
             notyuri("AutoFreezer:", err)
@@ -1104,7 +1098,6 @@ local function Func_AutoBuy()
                 if res and res.ok then
                     ShopInvoke("equip", nextTool.Id)
                     ShopInvoke("hold", nextTool.Id)
-                    SafeLabel("Status", "Bought " .. nextTool.Name)
                 end
             end
         end)
@@ -1188,7 +1181,6 @@ local function Func_AutoRestart()
             })
             MState.CreatedAt = os.clock()
             MState.QueuedPad = pad
-            SafeLabel("Status", "Queued Frozen House")
         end)
         if not ok then
             notyuri("AutoRestart:", err)
@@ -1205,7 +1197,6 @@ TB_Tabs.Autofarm.T1:AddToggle("AutoBuy", { Text = "Auto Buy Tools" })
 TB_Tabs.Autofarm.T1:AddToggle("AutoUpgrade", { Text = "Auto Upgrade" })
 TB_Tabs.Autofarm.T1:AddDivider()
 TB_Tabs.Autofarm.T1:AddToggle("AutoRestart", { Text = "Auto Restart", Tooltip = "Lobby: queues the next Frozen House run" })
-SafeLabel(TB_Tabs.Autofarm.T1, "Status", "Idle")
 
 Toggles.AutoMelt:OnChanged(function(state)
     Thread("AutoMelt", SafeLoop("AutoMelt", Func_AutoMelt), state)

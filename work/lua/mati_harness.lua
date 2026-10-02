@@ -1151,25 +1151,6 @@ local function noErrorNotify()
     return true
 end
 
-local function statusText()
-    local entry = Library.Labels
-    local labels = MockState.AllLabels
-    for _, l in ipairs(labels) do
-        if l.Kind == "Label" and l.Text then
-        end
-    end
-    return nil
-end
-
-local function anyLabelText(expected)
-    for _, l in ipairs(MockState.AllLabels) do
-        if l.Kind == "Label" and l.Text == expected then
-            return true
-        end
-    end
-    return false
-end
-
 pump(0.2)
 
 local fn = G.loadstring(ScriptSrc, "=(MATI)")
@@ -1223,7 +1204,6 @@ if PLACE == "Level" then
         end
         return false
     end)())
-    check("status label shows Recharging", anyLabelText("Recharging"))
 
     PLR:SetAttribute("Grenades", 2)
     Library.Toggles.AutoGrenade:SetValue(true)

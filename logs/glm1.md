@@ -91,3 +91,36 @@ Delivery: repack.sh MATI.zip + MATI/MATI.lua (originals MD5-verified) → Public
 c26a275, ls-remote verified. harness_lib updated (tabbox tabs support direct
 elements; ProximityPrompt/Configuration classmap) — selftest 10/10. TASKS T9 done;
 TASK_SOURCE MATI row; mati-analysis.md wire table; worklog.md summary updated.
+
+## Session 5 — 2026-10-02 (T10 label fix + T11 ONBOARDING rewrite)
+
+User flag (verbatim): "who ask you to add the label, I already fucking told
+you to think before you add something, is the label you add helps with
+anything? also this [ONBOARDING.md] is not enough — the other glm after
+reading it just do random shit, add more stuff, like you're an agent…
+it can be glm3, 4, 5, … inf, after this we will do a stress test
+(10 games/hour/glm) so be prepared, you're the oldest glm so you have to
+teach the other glms."
+
+- T10 (label): found the invention — `SafeLabel(TB_Tabs.Autofarm.T1,
+  "Status", "Idle")` + 8 update call sites + `Shared.Labels = {}` init.
+  Template game section has ZERO label calls; MATI has no reference script;
+  nobody ordered it. Removed all of it + the harness label check + dead
+  harness helpers (statusText/anyLabelText). Gates re-run green (27/27 +
+  14/14, lint 0, diff confined). Repacked [VERIFIED] and re-delivered
+  Public c2cf4a8 (ls-remote checked).
+- T11 (teach): ONBOARDING.md rebuilt — the old version was a reference
+  manual (WHERE things are) with no behavioral core (HOW to decide). New §1
+  agent identity, §2 4-question decision filter + 4 incident case studies
+  (today's label, TweenTo, TowerInc helpers, silent pushes), §3 scope spec,
+  §9 stress mode with a 6-min/game budget table + never-skippable list.
+  PROMPT.md got the 2-line behavioral core. Guide Rule 11 + §23 checklist
+  now cover UI elements explicitly. lessons.md +2 (Scope & discipline).
+- Discipline notes for me: I read the label rule ("functional labels are
+  fine") and pattern-matched my invention onto it instead of checking the
+  REFERENCE — the rule's examples came from Slop, MATI had no Slop. The
+  filter question "WHO ASKED FOR THIS?" exists precisely because in-the-
+  moment rationalization beats memory of rules. Gates measure what was
+  built, not what should have been.
+- Sandbox was reset again (/tmp wiped, ~ clones gone) — bootstrap.sh
+  re-ran clean (~10s), selftest 10/10. Environment resilience held.

@@ -42,6 +42,7 @@ User instruction (recorded 2026-09-28): *"use the template in the zip file as yo
 | `"[UPD 2] SCP Incremental.zip"` (IM upload 2026-10-01, NOT in repo) | [UPD 2] SCP Incremental | SCPINC-1 | `Yuri/SCPIncremental/SCPIncremental.lua` (1,691 lines, 100/100 checks; repacked zip in Yuri/SCPIncremental/; NOT pushed — token redacted) |
 | `"[⭐UPD2] Tower Incremental.zip"` (commit 47d9709) | [⭐UPD2] Tower Incremental (StairClimb) — plain "next game" | TOWERINC-1 | `Yuri/TowerInc/TowerInc.lua` (1,553 lines, 95/95 checks; pushed back as commit 0a89b0d) |
 | `snack.zip` (commit d139834) | SNACK Defense! 🍉 [TD] (two-place: lobby + in-round, tdref/Slop.lua + NEW canonical Template.lua 888 lines) — plain "next game" + Rule 17 violation feedback (TowerInc RunLoop/inline nearest) + directory cleanup order | SNACK-1 | `Yuri/Snack/Snack.lua` (2,833 lines, 98/98 checks Round 51/Lobby 42/AFK 5; template re-synced with TweenTo + SafeInvoke skip param; pushed back as commit e91ba44) |
+| `MATI.zip` (commit 5521079-era upload; delivered as repacked `MATI.zip` c26a275, re-delivered c2cf4a8) | Melt All The Ice! (2 places: lobby + Level 1 FrozenHouse) | MATI-1/T9/T10 | `Yuri/MATI/MATI.lua` (harness 27+14 checks after T10; work/lua/mati-analysis.md wire table; products=ROBUX excluded). T10 2026-10-02: user-flagged invented "Status" label removed + re-delivered — the reference set is the spec, no-reference games get standard autofarm ONLY. |
 
 Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for completeness): golf.zip, piggy.zip, forest.zip, water.zip, hole.zip, timber.zip, aura.zip, file.zip, golem.zip, leaf.zip, aac.zip, ascension.zip, magnet.zip, dice.zip, farmer.zip, needlehaysack.zip, dummy.zip, sup.zip/1.zip (Superb).
 
@@ -57,7 +58,7 @@ Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for com
 
 - SCPINC-1 complete (Yuri/SCPIncremental/SCPIncremental.lua 100/100 checks). NOT pushed to GitHub: the push token in the oldglm.zip worklog is [REDACTED:github_token] — user must take files from Yuri/SCPIncremental/ or re-supply a token / push themselves.
 - Repo also holds error/error.txt (user's Snack macro test: "Recording [0]" — Alliance §20-class hook capture failure) + tdref.zip (reference scripts incl. usethisfileSnack.lua 2026-10-01 18:52). Snack is closed (zip deleted) — do not touch unless the user re-opens it.
-| `MATI.zip` (commit 5521079-era upload; delivered as repacked `MATI.zip` c26a275) | Melt All The Ice! (2 places: lobby + Level 1 FrozenHouse) | MATI-1/T9 | `Yuri/MATI/MATI.lua` (harness 28+14 checks; work/lua/mati-analysis.md wire table; products=ROBUX excluded) |
+- MATI still OPEN (zip at Public root as of 2026-10-02).
 
 - TowerInc Rule 17 violations (RunLoop instead of SafeLoop, 3x inline nearest instead of GetNearest, missing Shared.Labels init) were NOTED by the user but explicitly NOT fixed ("ignore that game, only fix when I told you to fix it"). Do not touch TowerInc unless the user asks.
 
