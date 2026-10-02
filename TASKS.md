@@ -37,7 +37,7 @@ No-reference games = standard autofarm ONLY (ONBOARDING §3). Claim below.
 
 | ID | Game (Public folder) | Owner | Status | Notes |
 |---|---|---|---|---|
-| ST1 | Anime Breaker [🛠️CRAFT] | glm1 | doing | claimed |
+| ST1 | Anime Breaker [🛠️CRAFT] | glm1 | done | Delivered Public 75ecaf4: 7 toggles (Auto Click via SettingSystem, Auto Skill loop via ClickSystem CastSkill + game-maintained Lib.Target, 5 game autos via AutoSystem Toggle) — all wires through the game's own Framework Library NetworkService (BridgeNet2 Main), state-synced from PlayerData (no redundant flips, nil-PD deferred retry). Harness 18/18. |
 | ST2 | Clone to Steal Eggs | glm1 | doing | claimed |
 | ST3 | Fishing Master | glm1 | doing | claimed |
 | ST4 | Flip a House! 🏠 | glm1 | doing | claimed |
