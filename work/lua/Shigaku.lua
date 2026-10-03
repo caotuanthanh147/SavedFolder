@@ -851,6 +851,7 @@ local function ResolveModules()
         M.Input = GetSafeModule(clientScripts, "Input")
         M.Combat = GetSafeModule(clientScripts, "Combat")
         M.Data = GetSafeModule(clientScripts, "Data")
+        M.Posture = GetSafeModule(clientScripts, "Posture")
         local gymScript = clientScripts:FindFirstChild("Gym")
         M.Gym = GetSafeModule(clientScripts, "Gym")
         if gymScript then
@@ -1091,6 +1092,38 @@ local function Func_AutoGym()
     end
 end
 
+local function Func_InfinitePosture()
+    while Toggles.InfinitePosture.Value do
+        local ok, err = pcall(function()
+            local M = Shared.Modules
+            if not (M and M.Posture) then
+                return
+            end
+            M.Posture.Sync(M.Posture.GetMax())
+        end)
+        if not ok then
+            notyuri("InfinitePosture:", err)
+        end
+        task.wait(0.25)
+    end
+end
+
+local function Func_InfinitePosture()
+    while Toggles.InfinitePosture.Value do
+        local ok, err = pcall(function()
+            local M = Shared.Modules
+            if not (M and M.Posture) then
+                return
+            end
+            M.Posture.Sync(M.Posture.GetMax())
+        end)
+        if not ok then
+            notyuri("InfinitePosture:", err)
+        end
+        task.wait(0.25)
+    end
+end
+
 ResolveModules()
 local gymValues = {}
 do
@@ -1109,6 +1142,8 @@ TB_Tabs.Autofarm.T1:AddDropdown("GymKind", {
     Default = gymValues[1],
 })
 TB_Tabs.Autofarm.T1:AddToggle("AutoGym", { Text = "Auto Gym" })
+TB_Tabs.Autofarm.T1:AddDivider()
+TB_Tabs.Autofarm.T1:AddToggle("InfinitePosture", { Text = "Infinite Posture" })
 
 Thread("Resolve", function()
     while not Shared.Modules and not Library.Unloaded do
@@ -1132,6 +1167,132 @@ Toggles.AutoGym:OnChanged(function(state)
             end
         end)
     end
+end)
+Toggles.InfinitePosture:OnChanged(function(state)
+    Thread("InfinitePosture", SafeLoop("InfinitePosture", Func_InfinitePosture), state)
+end)
+local ShigakuRoll = { Ready = false, Pending = nil, GS = nil, Appearance = nil, Data = nil, ActionBridge = nil, RejectConn = nil }
+local RollFields = { "FightStyle", "LastName", "Eyes", "Mouth", "Scar", "Hair", "HairColor", "FacialHair", "Ethnicity", "SkinTone", "Height", "Trait", "Greeting", "Ringtone" }
+local function InitShigakuRoll()
+    local Packages = GetObject(RS, "Packages")
+    local BN = Packages and GetSafeModule(Packages, "BridgeNet2") or nil
+    local GS = nil
+    do
+        local parent = GetObject(RS, "Shared.Modules.Global.Libraries")
+        GS = parent and GetSafeModule(parent, "Game_Settings") or nil
+    end
+    local Appearance = nil
+    do
+        local parent = GetObject(RS, "Shared.Modules.Shared")
+        Appearance = parent and GetSafeModule(parent, "Appearance") or nil
+    end
+    local Data = nil
+    do
+        local parent = GetObject(Plr, "PlayerScripts.Client")
+        Data = parent and GetSafeModule(parent, "Data") or nil
+    end
+    if not (BN and GS and Appearance and Data and GS.Network and GS.Network.CharacterBridge and GS.Network.CharacterRejectBridge) then
+        return false
+    end
+    ShigakuRoll.GS = GS
+    ShigakuRoll.Appearance = Appearance
+    ShigakuRoll.Data = Data
+    ShigakuRoll.ActionBridge = BN.ReferenceBridge(GS.Network.CharacterBridge)
+    local RejectBridge = BN.ReferenceBridge(GS.Network.CharacterRejectBridge)
+    ShigakuRoll.RejectConn = RejectBridge:Connect(function(arg1)
+        if type(arg1) ~= "table" then
+            return
+        end
+        if arg1.Action ~= "RerollField" and arg1.Action ~= "RerollFightStyle" then
+            return
+        end
+        if Toggles.AutoRoll and Toggles.AutoRoll.Value and ShigakuRoll.Pending and (os.clock() - ShigakuRoll.Pending) < 3 then
+            Library:Notify("Auto Roll rejected: " .. tostring(arg1.Reason), 5)
+            Toggles.AutoRoll:SetValue(false)
+        end
+    end)
+    ShigakuRoll.Ready = true
+    return true
+end
+task.spawn(function()
+    local deadline = os.clock() + 30
+    while os.clock() < deadline do
+        local ok = pcall(InitShigakuRoll)
+        if ok and ShigakuRoll.Ready then
+            return
+        end
+        if ShigakuRoll.RejectConn then
+            pcall(function()
+                ShigakuRoll.RejectConn:Disconnect()
+            end)
+            ShigakuRoll.RejectConn = nil
+        end
+        task.wait(0.5)
+    end
+    Library:Notify("Shigaku roll modules not found", 5)
+end)
+local function AutoRollStop(reason)
+    Library:Notify(reason, 5)
+    Toggles.AutoRoll:SetValue(false)
+end
+local function Func_AutoRollStep()
+    local Data = ShigakuRoll.Data
+    local Appearance = ShigakuRoll.Appearance
+    local field = Options.RollField.Value
+    local activeIndex = Data.Get({ "Slots", "Active" }) or 0
+    if field == "FightStyle" then
+        if Appearance.styleHoldsRare(Data.Get({ "Style" }), Data.Get({ "StyleShiny" }) == true) then
+            AutoRollStop("Rare fight style reached")
+            return
+        end
+    else
+        local active = activeIndex ~= 0 and Data.Get({ "Slots", "Characters", activeIndex }) or nil
+        if not active then
+            AutoRollStop("No active character")
+            return
+        end
+        if Appearance.holdsRare(active, field) then
+            AutoRollStop("Rare " .. field .. " reached")
+            return
+        end
+    end
+    if not (ShigakuRoll.GS.Reroll and ShigakuRoll.GS.Reroll.FreeRerolls == true) then
+        local rerolls = tonumber(Data.Get({ "Rerolls" })) or 0
+        if rerolls < 1 then
+            AutoRollStop("Out of rerolls")
+            return
+        end
+    end
+    ShigakuRoll.Pending = os.clock()
+    if field == "FightStyle" then
+        ShigakuRoll.ActionBridge:Fire({ Action = "RerollFightStyle", Args = table.pack(false) })
+    else
+        ShigakuRoll.ActionBridge:Fire({ Action = "RerollField", Args = table.pack(activeIndex, field, false) })
+    end
+end
+local function Func_AutoRoll()
+    if not ShigakuRoll.Ready then
+        AutoRollStop("Shigaku roll modules not ready")
+        return
+    end
+    local pace = (tonumber(ShigakuRoll.GS.Network.RerollRebuildCooldownSec) or 1) + 0.15
+    while Toggles.AutoRoll.Value do
+        local ok, err = pcall(Func_AutoRollStep)
+        if not ok then
+            Library:Notify("Error in [Auto Roll]: " .. tostring(err), 10)
+        end
+        task.wait(pace)
+        ShigakuRoll.Pending = nil
+    end
+end
+TB_Tabs.Autofarm.T1:AddDropdown("RollField", {
+    Text = "Roll Field",
+    Values = RollFields,
+    Default = "FightStyle",
+})
+Toggles.AutoRoll = TB_Tabs.Autofarm.T1:AddToggle("AutoRoll", { Text = "Auto Roll", Default = false })
+Toggles.AutoRoll:OnChanged(function(state)
+    Thread("AutoRoll", Func_AutoRoll, state)
 end)
 local MenuGroup = Tabs.Config:AddLeftGroupbox("Menu")
 MenuGroup:AddToggle("AutoShowUI", {

@@ -9,11 +9,13 @@ local function ResolveModules()
     M.Muscle = GetSafeModule(GetObject(realRS, "Shared.Modules.Shared"), "Muscle")
     M.GymWeights = GetSafeModule(GetObject(realRS, "Shared.Modules.Shared"), "GymWeights")
     M.BridgeNet2 = GetSafeModule(GetObject(realRS, "Packages"), "BridgeNet2")
-    local clientScripts = realPlr and realPlr:FindFirstChild("PlayerScripts") and realPlr.PlayerScripts:FindFirstChild("Client")
+    local playerScripts = realPlr and realPlr:FindFirstChild("PlayerScripts")
+    local clientScripts = playerScripts and playerScripts:FindFirstChild("Client")
     if clientScripts then
         M.Input = GetSafeModule(clientScripts, "Input")
         M.Combat = GetSafeModule(clientScripts, "Combat")
         M.Data = GetSafeModule(clientScripts, "Data")
+        M.Posture = GetSafeModule(clientScripts, "Posture")
         local gymScript = clientScripts:FindFirstChild("Gym")
         M.Gym = GetSafeModule(clientScripts, "Gym")
         if gymScript then
@@ -254,6 +256,38 @@ local function Func_AutoGym()
     end
 end
 
+local function Func_InfinitePosture()
+    while Toggles.InfinitePosture.Value do
+        local ok, err = pcall(function()
+            local M = Shared.Modules
+            if not (M and M.Posture) then
+                return
+            end
+            M.Posture.Sync(M.Posture.GetMax())
+        end)
+        if not ok then
+            notyuri("InfinitePosture:", err)
+        end
+        task.wait(0.25)
+    end
+end
+
+local function Func_InfinitePosture()
+    while Toggles.InfinitePosture.Value do
+        local ok, err = pcall(function()
+            local M = Shared.Modules
+            if not (M and M.Posture) then
+                return
+            end
+            M.Posture.Sync(M.Posture.GetMax())
+        end)
+        if not ok then
+            notyuri("InfinitePosture:", err)
+        end
+        task.wait(0.25)
+    end
+end
+
 ResolveModules()
 local gymValues = {}
 do
@@ -272,6 +306,8 @@ TB_Tabs.Autofarm.T1:AddDropdown("GymKind", {
     Default = gymValues[1],
 })
 TB_Tabs.Autofarm.T1:AddToggle("AutoGym", { Text = "Auto Gym" })
+TB_Tabs.Autofarm.T1:AddDivider()
+TB_Tabs.Autofarm.T1:AddToggle("InfinitePosture", { Text = "Infinite Posture" })
 
 Thread("Resolve", function()
     while not Shared.Modules and not Library.Unloaded do
@@ -295,4 +331,7 @@ Toggles.AutoGym:OnChanged(function(state)
             end
         end)
     end
+end)
+Toggles.InfinitePosture:OnChanged(function(state)
+    Thread("InfinitePosture", SafeLoop("InfinitePosture", Func_InfinitePosture), state)
 end)
