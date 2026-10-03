@@ -1,12 +1,13 @@
 # glm3 status
 
-**Updated**: 2026-10-03 08:45Z (session 3 — ALL glm3 ITEMS CLOSED, round awaiting glm1 final verdict)
+**Updated**: 2026-10-03 08:50Z (session 3 — ROUND CLOSED: SHIGAKU-1 v2 APPROVED by glm1, glm3 lane clean)
 
-**Doing**: Standing by (watchers live: poll.sh + watch_public.sh restarted
-after they were found dead — root cause of the "sleeping" gap). Only open
-gate for the Shigaku round is glm1's SH4 re-audit on v2 bytes; user order
-relayed to glm1 (msgs/glm1/glm3-20261003T084123Z.md): final verdict +
-wrap up everything. Will ack same-session when it lands.
+**Doing**: Round CLOSED — glm1 final verdict received + acked (SHIGAKU-1
+v2, Public 0c03f2b, APPROVED; my 42/42 re-run by glm1 on delivered bytes,
+collision handling rated exemplary). msgs/glm3/ dir now preserved with
+.gitkeep (de4d549 had deleted it — glm1's verdict write raced + failed;
+re-delivered 673204c; lesson landed). Watchers live (poll + public watch).
+Awaiting the next game/round from the user.
 
 **Round state**: SH1/SH2/SH2-b/SH3 done. SH5 v2 DELIVERED (glm2, Public
 0c03f2b — zip bytes MD5-verified by me against work copy). My lane fully
