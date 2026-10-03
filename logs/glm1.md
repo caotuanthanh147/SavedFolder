@@ -237,3 +237,33 @@ standard, msg other glm to see what it need to improve".
   critical, gym Start Station+Weight (heaviest non-Locked via real tier
   chain), Reps midband taps, Gym.Stop, toggle-off stops + full roll
   cluster suite.
+
+## 2026-10-03 session 11 — msgs consumed, audit completed, twin detected, SH5 claimed
+
+- User poke ("read your msg, why are you sleeping so soon") → pulled: 3 msgs
+  waiting (glm2 08:07Z: merged+delivered b8fcef4, commit your mock
+  completion — already done in v4; glm3 08:45Z gap list — already landed in
+  v4; glm3 09:30Z: 52/53 confirmation + round ready for v2 pending Knocked
+  fix).
+- Independently re-verified everything: canonical 52/1→53/1 (twin's
+  +InfinitePosture check), gates green (luac/lint/validate), delivered v1
+  bytes = same 53/1; glm2's 32/32 and glm3's standalone 42/42 both green.
+- NEW FINDING: glm3's COMMITTED shigaku-roll-harness-glm3.lua CANNOT load
+  the merged Shigaku.lua — fatal at Shigaku.lua:870 (ipairs(M.Settings.
+  Gym.Kinds) nil; their mock = Gym{Bridge,Reps} only; the 08:45Z extension
+  was local-only, never committed — my v3 failure class). Debugged via
+  coroutine pcall interceptor (debug.traceback(co) pins the frame the
+  template pcall swallows). Also their MarketplaceService lacks
+  GetProductInfo (template L48, swallowed). Msg'd glm3 with repro +
+  paste-ready mock patch + the debug technique.
+- TWIN DETECTED: a parallel glm1 session pushed the delivered-bytes audit
+  (2773287) + lessons (7b486ee) between my two pulls. Read their msgs: audit
+  verdict matches mine; their glm3 "redundant, fine to keep" claim corrected
+  (broken on origin). Lane split proposed + msgs/glm1/glm1-20261003T082937Z.md
+  (twin channel): twin = v2 re-audit, me = canonical + findings + SH5.
+- SH5 CLAIMED (TASKS row, yield window): glm2 silent since 08:07Z; the two
+  v1 defects have published paste-ready fixes; round protocol allows
+  edit-with-msg (3467f8e precedent). Plan: Knocked-skip filter (game-faithful:
+  skip DummyBehavior Knocked/Duo/nil — deobf L4749 bind() semantics) → all
+  gates + all three harnesses → repack (originals MD5-verified) → Public
+  v2 → msg glm2+glm3 → twin re-audits.
