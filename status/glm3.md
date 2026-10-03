@@ -1,22 +1,28 @@
 # glm3 status
 
-**Updated**: 2026-10-02 (session 1 — cold start + stress round claim)
+**Updated**: 2026-10-03 (session 3 — stress round closed, Shigaku collab round started)
 
-**Doing**: ST10 (Restaurant Tycoon 3) + ST9 (Pets Universe) — standard
-autofarm, no reference (ONBOARDING §3). Pipeline: deobf study → remote map →
-wire verification → game section on Template.lua → harness → gates → deliver
-`<Game>.lua` inside the game folder at Public root.
+**Doing**: SHIGAKU collaborative round (user order: "next game, I'll launch
+you with other glm to see how you guys work on one game"). Public 71c4793 =
+`[UPDATE] Shigaku.zip` only (all stress folders + per/ deleted by user).
+Pipeline: unzip+inventory → Rule 18 reread → deobf study → remote map →
+wire verification → analysis published to work/lua/shigaku-analysis.md →
+TASKS.md claim + msg all GLMs with proposed feature split (this is a
+MULTI-GLM game — coordinate, don't collide) → build my claimed part.
 
-**Session start**:
-- bootstrap.sh glm3 (fresh sandbox: repos cloned, Lua 5.4.7 portable, watchers up).
-- Read ONBOARDING.md, PROMPT.md, TASKS.md, GLM_SCRIPTING_RULES.md (head-to-toe), TASK_SOURCE.md, lessons.md, statuses, msgs inbox (empty; glm1 stress conventions msg handled — folders not zips, deliver inside folder, standard autofarm only).
-- STRESS ROUND: Public 6aaefd6 = 10 game folders. glm1: ST1-ST4, glm2: ST6. glm3 claims ST9+ST10 (bottom-up to avoid collision with top-down claimers; ST5/ST7/ST8 left for glm4/glm5 if they spawn).
+**Session 3 recovery log**:
+- Sandbox reset again → bootstrap.sh glm3 (repos, Lua 5.4.7, watchers).
+  Token from user chat wired into worklog.md + both remotes (verified).
+- Read 3 glm1 msgs (token options; ST-QA1 audit of my ST10: excellent, 2
+  fixes). Discovered: session 2 delivered ST10 (Public e88e651) before
+  context loss — but never synced to work/lua/, and user's Public cleanup
+  orphaned the commit → script unrecoverable. ST9 never started.
+- TASKS.md: ST9 + ST10 rows closed honestly with lesson recorded.
+- Next-instance note: ALWAYS sync the canonical script copy to
+  SavedFolder work/lua/ at delivery time — Public history is disposable.
 
-**Stuck on**: NO PUSH TOKEN (sandbox reset wiped the old worklog; bootstrap
-found none). All work is local commits until the user supplies a token —
-asked in chat. Claim visibility to other instances is delayed by this.
+**Files changed (mine, this session)**: TASKS.md (ST9/ST10 close),
+status/glm3.md, logs/glm3.md, work/lua/shigaku-analysis.md (pending),
+work/lua/Shigaku.lua (pending).
 
-**Files changed (mine, this session)**: TASKS.md (ST9+ST10 claim), status/glm3.md, logs/glm3.md.
-
-**Next**: ST10 Restaurant Tycoon 3 pipeline, then ST9 Pets Universe, then
-ST5/ST7/ST8 if still open.
+**Next**: Shigaku pipeline above; keep msgs answered same-session.
