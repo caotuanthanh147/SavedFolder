@@ -41,6 +41,7 @@ User instruction (recorded 2026-09-28): *"use the template in the zip file as yo
 | `camera.zip` (commit e0c8e9e) | Cameraman Tower Defense (two-place: lobby + match) — Slop.lua complete ref + task "next game, it's a tower defense game, the ref is the complete version of slop.lua so read it" | CAMERA-1 | `Yuri/Camera/Camera.lua` (3,343 lines, 103/103 checks; pushed back as commit 5a0fe70) |
 | `"[UPD 2] SCP Incremental.zip"` (IM upload 2026-10-01, NOT in repo) | [UPD 2] SCP Incremental | SCPINC-1 | `Yuri/SCPIncremental/SCPIncremental.lua` (1,691 lines, 100/100 checks; repacked zip in Yuri/SCPIncremental/; NOT pushed — token redacted) |
 | `"[⭐UPD2] Tower Incremental.zip"` (commit 47d9709) | [⭐UPD2] Tower Incremental (StairClimb) — plain "next game" | TOWERINC-1 | `Yuri/TowerInc/TowerInc.lua` (1,553 lines, 95/95 checks; pushed back as commit 0a89b0d) |
+| `[UPDATE] Shigaku.zip` (commit 71c4793) | [UPDATE] Shigaku (school-life RP + fist-combat sandbox; BridgeNet2 + ReplicaService) — plain "next game" + user multi-GLM single-game experiment ("I'll launch you with other glm to see how you guys work on one game") | SHIGAKU-1 | `work/lua/Shigaku.lua` (1,369 lines; delivered as Public **b8fcef4** — script inside the repacked zip; multi-GLM round: glm2 SH1 analysis + SH2 build (AutoAttack via game's own Input actions / AutoGym universal minigame tap loop / InfinitePosture client-auth) + glm3 SH2-b AutoRoll cluster merged verbatim; 3 harnesses 32/32+30/30+42/42) |
 | `snack.zip` (commit d139834) | SNACK Defense! 🍉 [TD] (two-place: lobby + in-round, tdref/Slop.lua + NEW canonical Template.lua 888 lines) — plain "next game" + Rule 17 violation feedback (TowerInc RunLoop/inline nearest) + directory cleanup order | SNACK-1 | `Yuri/Snack/Snack.lua` (2,833 lines, 98/98 checks Round 51/Lobby 42/AFK 5; template re-synced with TweenTo + SafeInvoke skip param; pushed back as commit e91ba44) |
 | `MATI.zip` (commit 5521079-era upload; delivered as repacked `MATI.zip` c26a275, re-delivered c2cf4a8) | Melt All The Ice! (2 places: lobby + Level 1 FrozenHouse) | MATI-1/T9/T10 | `Yuri/MATI/MATI.lua` (harness 27+14 checks after T10; work/lua/mati-analysis.md wire table; products=ROBUX excluded). T10 2026-10-02: user-flagged invented "Status" label removed + re-delivered — the reference set is the spec, no-reference games get standard autofarm ONLY. |
 
@@ -57,6 +58,8 @@ Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for com
 - Push token for delivery commits: saved in the glm guide (`/home/z/my-project/worklog.md`, cafe session entry).
 
 ## Open task
+
+- SHIGAKU-1 DELIVERED (Public b8fcef4). Round continues per user experiment: glm1 SH4 QA audit on the delivered bytes pending; glm3 TrashBin job-loop candidate (SH2-c) unclaimed.
 
 - SCPINC-1 complete (Yuri/SCPIncremental/SCPIncremental.lua 100/100 checks). NOT pushed to GitHub: the push token in the oldglm.zip worklog is [REDACTED:github_token] — user must take files from Yuri/SCPIncremental/ or re-supply a token / push themselves.
 - Repo also holds error/error.txt (user's Snack macro test: "Recording [0]" — Alliance §20-class hook capture failure) + tdref.zip (reference scripts incl. usethisfileSnack.lua 2026-10-01 18:52). Snack is closed (zip deleted) — do not touch unless the user re-opens it.
