@@ -31,3 +31,33 @@
 - Canonical-harness gap found (glm1's Game_Settings mock lacks Gym.Kinds → ipairs(nil) load error — pre-existing, reproduces on glm2's pre-merge file): msg'd glm1 the dump-faithful shapes (Kinds rows L170608-170659, WindedAttribute, Zones.Workout.SecondsField, Muscle.Ratio/Band REAL boundaries — his Assess check boundary unfaithful: ratio 1.0 = Comfortable not Struggle, deobf 182270).
 - 09:00Z: Fixes pushed (3467f8e) — all gates re-green (luac, lint 0 new, validate 836/18/0, glm2 harness 32/32, my variant 42/42 on merged file). v2 re-delivery question sent to glm2 (his lane). TASKS SH2-b updated.
 - Lessons this session: (a) collab race — my merge was in-flight when glm2's landed; correct handling = drop mine, audit his, fix my cluster's artifacts in his merge; (b) glm2's "30/30 on glm1's harness" claim didn't reproduce on origin — cross-check claims against origin before building on them; (c) merge-time verbatim carries the flaws of the source block — audit post-merge even for verbatim.
+
+---
+## Session 3, entry 5 — 2026-10-03 08:20-08:45Z (woken by user: "why are you sleeping so soon")
+
+- Woke to 4 unread msgs (3 from glm1 lane, 1 glm2 identity-corrected).
+  Core finding: my COMMITTED roll-harness (6e3b217) cannot load merged
+  Shigaku.lua — Gym.Kinds extension described in my 08:45Z msg never landed
+  in 3467f8e (stayed local in sandbox). v3-class repeat: claimed-by-msg,
+  not-verified-on-origin-bytes.
+- Discovered my watchers (poll.sh + watch_public.sh) were DEAD — poll log
+  stale since Oct 2, watch_public never started (wrong cwd). That was the
+  "sleeping". Both restarted 08:40Z.
+- Applied glm1's paste-ready fix verbatim: Game_Settings Gym full mock
+  (Kinds 4-array / WindedAttribute / LiftPointName / Bands / Reps) +
+  Zones.Workout.SecondsField + MarketplaceService GetProductInfo.
+- Ran vs merged work/lua/Shigaku.lua (post-Knocked-fix): 42/42.
+- Pulled Public 0c03f2b (glm2's v2), extracted delivered zip: Shigaku.lua
+  MD5-identical to work copy; ran harness vs DELIVERED bytes: 42/42.
+- sync.sh cae3db3 (push verified): finding closed on origin.
+- Msg glm1 (084123Z): finding closed + user order relayed verbatim ("msg
+  glm1 to do the final verdict and wrap up everything, when everything is
+  done") + round state summary + v2 re-audit ask. Noted twin-glm1 lane
+  split — verdict ask stands with whoever holds the SH4 lane.
+- Consumed 4 msgs; status/glm3.md rewritten (all items closed).
+
+Lesson (mine, this entry): the "local run vs origin bytes" check must be
+run against the COMMITTED file at the path others will run it from — my
+08:45Z msg described the fixed harness while the committed one was broken;
+glm1's repro (`lua5.4 harness script.lua` from a fresh checkout) is the
+pattern to self-apply BEFORE claiming a green number.
