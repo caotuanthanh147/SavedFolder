@@ -956,6 +956,7 @@ addWeightModel("DB_70", 70)
 -- ===== mock game data (ReplicaService via the game's Client.Data) =====
 local MockCharData = {
     FirstName = "Test",
+    LastName = "Test",
     Gender = "Male",
     Height = 170,
     Hair = "Spiky",
@@ -964,6 +965,11 @@ local MockCharData = {
     Ethnicity = "A",
     Eyes = "Brown",
     Mouth = "Default",
+    Scar = "None",
+    SkinTone = "Medium",
+    Trait = "None",
+    Greeting = "Hey",
+    Ringtone = "Default",
     FightStyle = "Basic",
     Accessories = {},
 }
@@ -1002,6 +1008,10 @@ local Game_Settings = {
     Network = {
         CharacterBridge = "Character.Action",
         CharacterRejectBridge = "Character.Reject",
+        RerollRebuildCooldownSec = 1.0,
+    },
+    Reroll = {
+        FreeRerolls = false,
     },
     Gym = {
         Bridge = "Gym.Sync",
@@ -1434,13 +1444,105 @@ else
     check("guard set", G.ayasemiyatongekissazumirisa == true)
     check("no queueonteleport (template feature deleted upstream)", #TeleportQueue == 0)
     check("save folder set", SaveManager.Folder ~= nil and SaveManager.Folder ~= "")
-    -- SH2 draft checks land here when the draft exists:
-    --   + toggle registry (AutoAttack/AutoGym/AutoRoll as delivered)
-    --   + Input.Fire tuples (attack paced from Game_Settings, equip first,
-    --     LeanLeft taps in Reps midband)
-    --   + Gym.Sync tuples (Start Station+Weight, Stop on toggle-off)
-    --   + Character.Action tuples (RerollField Args=slot,field,confirm shape)
-    --   + rarity stop (holdsRare true → loop stops, no more fires)
+    -- ===== roll cluster (glm3 SH2-b) — permanent SH4 regression checks =====
+    if Library.Toggles.AutoRoll then
+        check("AutoRoll toggle + RollField dropdown registered", Library.Options.RollField ~= nil)
+        check("RollField values = 14 verified fields, FightStyle first", (function()
+            local dd = Library.Options.RollField
+            return dd and dd.Values and #dd.Values == 14 and dd.Values[1] == "FightStyle"
+                and dd.Values[6] == "Hair" and dd.Values[14] == "Ringtone"
+        end)())
+        Library.Options.RollField:SetValue("Hair")
+        Library.Toggles.AutoRoll:SetValue(true)
+        pump(4.0)
+        check("RerollField fires Args=(slot,field,false) packed", (function()
+            local n = bridgeCount("Character.Action", function(c)
+                local p = c[1]
+                return type(p) == "table" and p.Action == "RerollField" and type(p.Args) == "table"
+                    and p.Args.n == 3 and p.Args[1] == 1 and p.Args[2] == "Hair" and p.Args[3] == false
+            end)
+            return n >= 2
+        end)())
+        check("roll pace respects RerollRebuildCooldownSec+0.15 (no spam)", (function()
+            local n = bridgeCount("Character.Action", function(c)
+                return type(c[1]) == "table" and c[1].Action == "RerollField"
+            end)
+            return n >= 2 and n <= 5
+        end)())
+        local rareChar = {}
+        for k, v in pairs(MockCharData) do rareChar[k] = v end
+        rareChar.Hair = "RARE"
+        dataSet({ "Slots", "Characters", 1 }, rareChar)
+        pump(3.0)
+        check("rarity stop: holdsRare true -> toggle off + notify", (function()
+            if Library.Toggles.AutoRoll.Value then return false end
+            for _, n in ipairs(MockState.Notifies) do
+                if string.find(n, "Rare", 1, true) then return true end
+            end
+            return false
+        end)())
+        check("rarity stop halts fires", (function()
+            local a = bridgeCount("Character.Action")
+            pump(3.0)
+            local b = bridgeCount("Character.Action")
+            return a == b
+        end)())
+        dataSet({ "Slots", "Characters", 1 }, MockCharData)
+        dataSet({ "Rerolls" }, 0)
+        local beforeCurrency = bridgeCount("Character.Action")
+        Library.Toggles.AutoRoll:SetValue(true)
+        pump(1.5)
+        check("currency stop: Rerolls=0 -> stop, no new fires", (function()
+            if Library.Toggles.AutoRoll.Value then return false end
+            local n = bridgeCount("Character.Action", function(c)
+                return type(c[1]) == "table" and c[1].Action == "RerollField"
+            end)
+            local total = bridgeCount("Character.Action")
+            return n >= 0 and total == beforeCurrency
+        end)())
+        dataSet({ "Rerolls" }, 10)
+        Library.Toggles.AutoRoll:SetValue(true)
+        pump(1.6)
+        local beforeReject = bridgeCount("Character.Action")
+        serverBridge("Character.Reject", { Action = "RerollField", Reason = "NoCurrency" })
+        pump(1.0)
+        check("Character.Reject -> loop stop + notify", (function()
+            if Library.Toggles.AutoRoll.Value then return false end
+            for _, n in ipairs(MockState.Notifies) do
+                if string.find(n, "rejected", 1, true) then return true end
+            end
+            return false
+        end)())
+        pump(2.5)
+        check("reject stop halts fires", (function()
+            local a = bridgeCount("Character.Action")
+            return a == beforeReject
+        end)())
+        Library.Options.RollField:SetValue("FightStyle")
+        dataSet({ "Style" }, "Karate")
+        Library.Toggles.AutoRoll:SetValue(true)
+        pump(4.0)
+        check("FightStyle variant fires RerollFightStyle Args=(false)", (function()
+            local n = bridgeCount("Character.Action", function(c)
+                local p = c[1]
+                return type(p) == "table" and p.Action == "RerollFightStyle" and type(p.Args) == "table"
+                    and p.Args.n == 1 and p.Args[1] == false
+            end)
+            return n >= 2
+        end)())
+        dataSet({ "Style" }, "Fist of Flowing Water")
+        pump(3.0)
+        check("style rarity stop (styleHoldsRare)", not Library.Toggles.AutoRoll.Value)
+        check("style rarity stop halts fires", (function()
+            local a = bridgeCount("Character.Action")
+            pump(2.5)
+            return a == bridgeCount("Character.Action")
+        end)())
+    end
+    -- SH2-a draft checks (Auto Attack + Auto Gym) land here when merged:
+    --   + attack pacing from Game_Settings.Combat.Styles, equip-first tuple
+    --   + Knocked-dummy skip (HRP ends near usable dummy at 5,5,5 not 2,5,2)
+    --   + Gym.Sync Start Station+Weight shape, LeanLeft midband taps, Stop
     --   + Data reads use array paths
 end
 
