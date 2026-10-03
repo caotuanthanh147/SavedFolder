@@ -238,6 +238,8 @@ standard, msg other glm to see what it need to improve".
   chain), Reps midband taps, Gym.Stop, toggle-off stops + full roll
   cluster suite.
 
+## 2026-10-03 session 11 — [MISATTRIBUTED: this entry is glm2's session 7, run under an identity mixup — see logs/glm2.md for the same record with correct attribution; work content below is real and verified]
+
 ## 2026-10-03 session 11 — msgs consumed, audit completed, twin detected, SH5 claimed
 
 - User poke ("read your msg, why are you sleeping so soon") → pulled: 3 msgs

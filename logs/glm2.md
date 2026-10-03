@@ -165,3 +165,41 @@ Stage Summary:
   harness to get tracebacks. Also: Instance mocks need dynamic child
   indexing OR scripts should use FindFirstChild chains (the game's own
   pattern is WaitForChild/FindFirstChild anyway).
+
+## 2026-10-03 session 7 — identity mixup (glm1 lane for 25 min), correction, v2
+
+- Woke to user poke. CONSUMED THE WRONG INBOX (msgs/glm1/ not msgs/glm2/) →
+  ran as "glm1": re-verified gates + harnesses (53/1), audited v1 delivered
+  bytes, found glm3's committed-harness crash (real finding, msg'd —
+  mis-signed), pushed SH4 verdict + SH5 claim as "glm1". The real glm1 ran
+  in parallel the whole time (2773287 audit, then 6c8ed21 accepting my
+  bogus "twin glm1" lane split).
+- User: "you are glm2 what are you even doing" → correction round: TASKS
+  SH3/SH4/SH5 re-attributed; status/glm1.md restored from a708481 + note;
+  msgs/glm1 + msgs/glm3 re-signed (glm3 header fixed; glm1's consumed
+  "twin" msg replaced by properly-signed glm2 correction msg 083721Z);
+  logs/glm1.md session-11 entry marked MISATTRIBUTED; this entry = the
+  real record.
+- THE ACTUAL WORK (was my todo all along — glm1's finding was addressed
+  TO me): Knocked-skip filter on GetNearest(CombatDummy) — skip exactly
+  "Knocked"/"Duo" (analysis §3.1; deobf CombatDummies bind() L4749 refuses
+  those two; nil passes = game-faithful, glm1's nil-attr mock world still
+  targets). First attempt (strict nil-skip) broke glm1's world (32→30) —
+  relaxed to the spec-literal shape.
+- MOCK GAP FOUND + FIXED (glm1's canonical, edit-with-msg): Vector3.Unit
+  via vmt.__index — v4 lacked it; script `flat.Unit` read nil → `away`
+  fallback (0,0,1) → every TP landed 4 studs +Z. My canonical 53/1 was
+  masking it (position tolerances passed pre-fix because the player stayed
+  at spawn near the Knocked dummy). With Unit: 54/0. Credit in-file
+  L178-181, lifted from my own glm2-world harness (which had Unit).
+- DEBUG TECHNIQUE (reusable): G.pcall interceptor via coroutine —
+  `coroutine.resume(co,...)` + `debug.traceback(co)` on failure pins the
+  exact script line even when the template pcall swallows the error. Needs
+  G.debug = debug in the env. Caught: GetProductInfo gap + the L870
+  Kinds-nil crash in glm3's harness.
+- GATES + HARNESSSES (post-fix, all green): luac OK; lint 0 err / 21
+  inherited template-region warnings; validate head836/tail18/0 comments;
+  canonical 54/0, glm2 32/0, glm3 standalone 42/42 (their merged-context
+  run still crashes — their committed mock lacks the Kinds extension,
+  msg'd with paste-ready patch).
+- Repack + Public v2 push next; re-audit request to glm1 with commit hash.
