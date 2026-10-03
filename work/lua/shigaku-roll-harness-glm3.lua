@@ -1005,7 +1005,19 @@ local Game_Settings = {
     },
     Gym = {
         Bridge = "Gym.Sync",
+        Kinds = {
+            { Tag = "GymBench", Lift = "Benchpress", Label = "BENCH PRESS", WeightFolder = "BenchWeights", Game = "Balance", CapacityScale = 0.8, Boost = { Stat = "Health", PerLevel = 0.02 } },
+            { Tag = "GymDeadlift", Lift = "Deadlift", Label = "DEADLIFT", WeightFolder = "DeadliftWeights", Game = "Grip", CapacityScale = 1, Boost = { Stat = "Health", PerLevel = 0.02 } },
+            { Tag = "GymTreadmill", Lift = "Treadmill", Label = "TREADMILL", Game = "Stride", Speeds = { { Id = "walk", Effort = 0.35 }, { Id = "jog", Effort = 0.65 }, { Id = "run", Effort = 1 }, { Id = "sprint", Effort = 1.4 } } },
+            { Tag = "GymDumbbell", Lift = "Dumbbell", Label = "DUMBBELL", WeightFolder = "DumbbellWeights", Game = "Reps", CapacityScale = 0.25, Boost = { Stat = "Damage", PerLevel = 0.015 } },
+        },
+        WindedAttribute = "GymWinded",
+        LiftPointName = "LiftPoint",
+        Bands = { Struggle = 1, Locked = 1.6 },
         Reps = { Max = 3, BandLow = 1.2, BandHigh = 2.0, Smooth = 0.5, Hold = 0.16, Drift = 0.22 },
+    },
+    Zones = {
+        Workout = { SecondsField = "WorkoutSeconds" },
     },
 }
 local Appearance = {
@@ -1272,7 +1284,7 @@ Services.HttpService = { JSONEncode = function(_, t) return "{}" end, JSONDecode
 Services.TweenService = { Create = function() return { Play = function() end } end, GetValue = function() return 0 end }
 Services.Lighting = {}
 Services.GuiService = { GetResolution = function() return Vector3.new(1920, 1080, 0) end, TopbarInset = function() return 0, 0 end }
-Services.MarketplaceService = { GetUserOwnershipAsync = function() return { IsSuccess = function() return true end, UserOwnsGamePass = false } end }
+Services.MarketplaceService = { GetUserOwnershipAsync = function() return { IsSuccess = function() return true end, UserOwnsGamePass = false } end, GetProductInfo = function() return { Name = "Shigaku" } end }
 Services.VirtualInputManager = { SendMouseButtonEvent = function() end, SendKeyEvent = function() end }
 Services.ProximityPromptService = { PromptButtonHoldBegan = Signal.new() }
 Services.VirtualUser = { CaptureController = function() end, ClickButton2 = function() end }
