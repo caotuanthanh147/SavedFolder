@@ -804,18 +804,16 @@ g.__SmokeResult = { dist = d, parts = #s, folder = sm.Folder }
     summary()
 end
 
--- ===== SHIGAKU HARNESS — SH3 skeleton (glm1, 2026-10-03) ==================
--- Mock world from the independent survey (deobf 258k lines + dump 107k lines):
---   Net: BridgeNet2 client (Wally ffrostflame_bridgenet2@1.0.0; transport remotes
---        at RS["ffrostflame_bridgenet2@1.0.0"].{meta,data}RemoteEvent) +
---        ReplicaService (RS.RemoteEvents.Replica* family: 11 RemoteEvents +
---        1 UnreliableRemoteEvent). Census: 32 RemoteEvent, 0 RemoteFunction —
---        fire-style transport only, no InvokeServer surface in this game.
---   Packages: TopbarPlus, ReplicaServer, Faye, ReplicaShared, crunchyroll,
---        TextPlus, ReplicaClient, SmoothShiftLock, BridgeNet2, ProfileStore.
--- Wire-tuple + feature checks get appended when SH2's draft lands
--- (work/lua/Shigaku.lua — loader below is live and will pick it up).
--- Single place — no lobby/game split in this game.
+-- ===== SHIGAKU HARNESS — SH3 (glm1, 2026-10-03) ============================
+-- Mock world from the independent census (deobf 258k + dump 107k lines) —
+-- cross-checked against SH1's shigaku-analysis.md (glm2, b4cae09); all paths
+-- re-verified in dump/deobf: Game_Settings/Appearance/Muscle/GymWeights under
+-- RS.Shared.Modules.*, Client.Input/Client.Data under PlayerScripts.Client,
+-- ReferenceBridge (deobf L2197/L3682/L5105), CombatDummy/Gym* tags, Files.
+-- Assets.Models weight tree. Census: 32 RemoteEvent, 0 RemoteFunction.
+-- SH2 wire checks (Input.Fire tuples, Gym.Sync/Character.Action bridge tuples,
+-- Data reads, toggle-off stop) activate automatically when work/lua/Shigaku.lua
+-- lands (live loader below). Single place — no lobby/game split.
 
 local ScriptPath = (arg and arg[1]) or "/home/z/SavedFolder/work/lua/Shigaku.lua"
 
@@ -885,6 +883,11 @@ character:AddChild(humanoid)
 character.PrimaryPart = charRoot
 PLR.Character = character
 
+local PlayerScripts = Instance.new("Folder", "PlayerScripts")
+PLR:AddChild(PlayerScripts)
+local ClientDir = Instance.new("Folder", "Client")
+PlayerScripts:AddChild(ClientDir)
+
 local Packages = Instance.new("Folder", "Packages")
 RS:AddChild(Packages)
 local IndexFolder = Instance.new("Folder", "_Index")
@@ -921,14 +924,194 @@ local Archery = Instance.new("Folder", "Archery")
 RS:AddChild(Archery)
 Archery:AddChild(Instance.new("RemoteEvent", "Pose"))
 
+local SharedFolder = Instance.new("Folder", "Shared")
+RS:AddChild(SharedFolder)
+local ModulesFolder = Instance.new("Folder", "Modules")
+SharedFolder:AddChild(ModulesFolder)
+local GlobalFolder = Instance.new("Folder", "Global")
+ModulesFolder:AddChild(GlobalFolder)
+local LibrariesFolder = Instance.new("Folder", "Libraries")
+GlobalFolder:AddChild(LibrariesFolder)
+local SharedModsFolder = Instance.new("Folder", "Shared")
+ModulesFolder:AddChild(SharedModsFolder)
+
+local FilesFolder = Instance.new("Folder", "Files")
+RS:AddChild(FilesFolder)
+local AssetsFolder = Instance.new("Folder", "Assets")
+FilesFolder:AddChild(AssetsFolder)
+local ModelsFolder = Instance.new("Folder", "Models")
+AssetsFolder:AddChild(ModelsFolder)
+local WeightFolder = Instance.new("Folder", "Dumbbells")
+ModelsFolder:AddChild(WeightFolder)
+local function addWeightModel(name, weight)
+    local w = Instance.new("Model", name)
+    w:SetAttribute("Weight", weight)
+    WeightFolder:AddChild(w)
+    return w
+end
+addWeightModel("DB_25", 25)
+addWeightModel("DB_45", 45)
+addWeightModel("DB_70", 70)
+
+-- ===== mock game data (ReplicaService via the game's Client.Data) =====
+local MockCharData = {
+    FirstName = "Test",
+    Gender = "Male",
+    Height = 170,
+    Hair = "Spiky",
+    HairColor = "Black",
+    FacialHair = "None",
+    Ethnicity = "A",
+    Eyes = "Brown",
+    Mouth = "Default",
+    FightStyle = "Basic",
+    Accessories = {},
+}
+local MockData = {
+    Style = "Basic",
+    StyleShiny = false,
+    Rerolls = 10,
+    Cash = 1000,
+    Kills = 0,
+    Class = "None",
+    Steps = 0,
+    WorkoutSeconds = 120,
+    Workouts = 3,
+    PlaytimeSeconds = 500,
+    Vip = false,
+    MachineUnlocked = true,
+    Slots = {
+        Active = 1,
+        Owned = 2,
+        Characters = { MockCharData, MockCharData },
+    },
+}
+
+-- ===== game module mocks (require-able, Rule 2 surface only) =====
+local Game_Settings = {
+    Combat = {
+        Bridge = "Combat.Sync",
+        Authority = { RangeSlack = 4, FacingDot = 0, LineOfSight = true, SwingSlack = 0.25, PaceSlack = 0.75, PingCap = 0.35 },
+        Styles = {
+            Basic = { HitRange = 7, HitAngle = 0.65, AttackDebounce = 0.35, StringLength = 4, Rarity = "Common" },
+            Karate = { HitRange = 6.5, HitAngle = 0.6, AttackDebounce = 0.31, StringLength = 4, Rarity = "Uncommon" },
+            ["Fist of Flowing Water"] = { HitRange = 7, HitAngle = 0.65, AttackDebounce = 0.33, StringLength = 5, Rarity = "Epic" },
+        },
+        DefaultStyle = "Basic",
+    },
+    Network = {
+        CharacterBridge = "Character.Action",
+        CharacterRejectBridge = "Character.Reject",
+    },
+    Gym = {
+        Bridge = "Gym.Sync",
+        Reps = { Max = 3, BandLow = 1.2, BandHigh = 2.0, Smooth = 0.5, Hold = 0.16, Drift = 0.22 },
+    },
+}
+local Appearance = {
+    holdsRare = function(charTable, field)
+        return type(charTable) == "table" and charTable[field] == "RARE"
+    end,
+    styleHoldsRare = function(styleName, styleShinyBool)
+        return styleShinyBool == true or styleName == "Fist of Flowing Water"
+    end,
+    StyleRarity = { Basic = "Common", Karate = "Uncommon", ["Fist of Flowing Water"] = "Epic" },
+}
+local Muscle = {}
+Muscle.Capacity = function(workoutSeconds)
+    if workoutSeconds >= 200 then return 245 end
+    if workoutSeconds >= 100 then return 120 end
+    return 45
+end
+Muscle.Assess = function(weight, seconds)
+    local cap = Muscle.Capacity(seconds)
+    if weight > cap then return "Locked" end
+    if weight >= cap * 0.6 then return "Struggle" end
+    return "Comfortable"
+end
+local GymWeights = {}
+GymWeights.List = function(folderName)
+    local out = {}
+    for _, m in ipairs(WeightFolder:GetChildren()) do
+        table.insert(out, { Name = m.Name, Weight = m:GetAttribute("Weight") or 0, Template = m })
+    end
+    table.sort(out, function(a, b) return a.Weight < b.Weight end)
+    return out
+end
+GymWeights.Find = function(name)
+    for _, row in ipairs(GymWeights.List()) do
+        if row.Name == name then return row end
+    end
+    return nil
+end
+
+-- ===== Client.Input mock (the game's own action system — WIRE SURFACE) =====
+local InputFires = {}
+local InputBinds = {}
+local Input = {
+    Bind = function(id, began, ended)
+        InputBinds[id] = { began = began, ended = ended }
+    end,
+    Fire = function(id, state)
+        table.insert(InputFires, { id = id, state = state })
+    end,
+    IsDown = function(id) return false end,
+}
+local function inputCount(id, state)
+    local n = 0
+    for _, f in ipairs(InputFires) do
+        if f.id == id and (state == nil or f.state == state) then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+-- ===== Client.Data mock (ReplicaService surface) =====
+local DataSetHandlers = {}
+local Data = {
+    IsReady = function() return true end,
+    OnReady = function(fn)
+        G.task.spawn(fn)
+        return { Disconnect = function() end }
+    end,
+    Get = function(path)
+        local cur = MockData
+        for _, k in ipairs(path) do
+            if type(cur) ~= "table" then return nil end
+            cur = cur[k]
+        end
+        return cur
+    end,
+    OnSet = function(path, fn)
+        local key = table.concat(path, ".")
+        DataSetHandlers[key] = DataSetHandlers[key] or {}
+        table.insert(DataSetHandlers[key], fn)
+        return { Disconnect = function() end }
+    end,
+}
+local function dataSet(path, value)
+    local cur = MockData
+    for i = 1, #path - 1 do
+        cur = cur[path[i]]
+    end
+    cur[path[#path]] = value
+    local list = DataSetHandlers[table.concat(path, ".")]
+    if list then
+        for _, fn in ipairs(list) do
+            G.task.spawn(function() pcall(fn, value) end)
+        end
+    end
+end
+
 -- ===== BridgeNet2 client mock =====
--- API surface the game's own client code uses (deobf: ClientBridge.Fire/Connect,
--- wrapper via RS.Packages.BridgeNet2 re-export of the _Index module).
+-- Game resolves bridges via ReferenceBridge(Game_Settings.X.Bridge) — deobf
+-- L2197/L2205/L3682/L5105. Reference kept as alias (real lib has both).
 local BridgeFires = {}
 local BridgeListeners = {}
 local BridgeCache = {}
 local BridgeNet2Client = {}
-function BridgeNet2Client.Reference(name)
+local function makeBridge(name)
     if BridgeCache[name] then
         return BridgeCache[name]
     end
@@ -954,6 +1137,9 @@ function BridgeNet2Client.Reference(name)
     BridgeCache[name] = bridge
     return bridge
 end
+BridgeNet2Client.ReferenceBridge = makeBridge
+BridgeNet2Client.Reference = makeBridge
+BridgeNet2Client.Server = { Bridge = function() error("server-only") end }
 function BridgeNet2Client.initBridge() return BridgeNet2Client end
 
 local ModuleRegistry = {}
@@ -981,6 +1167,12 @@ addModule(Packages, "crunchyroll", {})
 addModule(Packages, "TextPlus", {})
 addModule(Packages, "SmoothShiftLock", {})
 addModule(Packages, "TopbarPlus", {})
+addModule(LibrariesFolder, "Game_Settings", Game_Settings)
+addModule(SharedModsFolder, "Appearance", Appearance)
+addModule(SharedModsFolder, "Muscle", Muscle)
+addModule(SharedModsFolder, "GymWeights", GymWeights)
+addModule(ClientDir, "Input", Input)
+addModule(ClientDir, "Data", Data)
 
 local function serverBridge(name, ...)
     local list = BridgeListeners[name]
@@ -1011,6 +1203,54 @@ local function bridgeCount(name, pred)
     return n
 end
 
+-- ===== workspace: gym station + combat dummies (tagged) =====
+local GymStation = Instance.new("Model", "DumbbellStation1")
+local LiftPoint = Instance.new("Part", "LiftPoint")
+LiftPoint.CFrame = CFrame.new(Vector3.new(20, 3, 10))
+GymStation:AddChild(LiftPoint)
+GymStation.PrimaryPart = LiftPoint
+WS:AddChild(GymStation)
+
+local function makeDummy(name, behavior, pos)
+    local d = Instance.new("Model", name)
+    local root = Instance.new("Part", "HumanoidRootPart")
+    root.CFrame = CFrame.new(Vector3.new(pos[1], pos[2], pos[3]))
+    d:AddChild(root)
+    d:AddChild(Instance.new("Humanoid", "Humanoid"))
+    d.PrimaryPart = root
+    d:SetAttribute("DummyBehavior", behavior)
+    WS:AddChild(d)
+    return d
+end
+local DummyUsable = makeDummy("CombatDummy1", "Regular", { 5, 5, 5 })
+local DummyKnocked = makeDummy("CombatDummy2", "Knocked", { -5, 5, 5 })
+
+local Tagged = {
+    CombatDummy = { DummyUsable, DummyKnocked },
+    GymDumbbell = { GymStation },
+    GymBench = {},
+    GymDeadlift = {},
+    GymTreadmill = {},
+}
+local TagSignals = {}
+Services.CollectionService = {
+    GetTagged = function(tag) return Tagged[tag] or {} end,
+    HasTag = function(inst, tag)
+        for _, m in ipairs(Tagged[tag] or {}) do
+            if m == inst then return true end
+        end
+        return false
+    end,
+    GetInstanceAddedSignal = function(tag)
+        if not TagSignals[tag] then TagSignals[tag] = Signal.new() end
+        return TagSignals[tag]
+    end,
+    GetInstanceRemovedSignal = function(tag)
+        if not TagSignals["-" .. tag] then TagSignals["-" .. tag] = Signal.new() end
+        return TagSignals["-" .. tag]
+    end,
+}
+
 -- ===== services / game =====
 Services.Players = { LocalPlayer = PLR, GetPlayers = function() return { PLR } end }
 Services.ReplicatedStorage = RS
@@ -1023,7 +1263,6 @@ Services.Lighting = {}
 Services.GuiService = { GetResolution = function() return Vector3.new(1920, 1080, 0) end, TopbarInset = function() return 0, 0 end }
 Services.MarketplaceService = { GetUserOwnershipAsync = function() return { IsSuccess = function() return true end, UserOwnsGamePass = false } end }
 Services.VirtualInputManager = { SendMouseButtonEvent = function() end, SendKeyEvent = function() end }
-Services.CollectionService = { GetTagged = function() return {} end, HasTag = function() return false end }
 Services.ProximityPromptService = { PromptButtonHoldBegan = Signal.new() }
 Services.VirtualUser = { CaptureController = function() end, ClickButton2 = function() end }
 
@@ -1053,7 +1292,7 @@ G.Enum = enumChildren
 local Camera = Instance.new("Folder", "Camera")
 WS:AddChild(Camera)
 
--- ===== skeleton self-checks (mock world correctness) =====
+-- ===== mock-world self-checks (skeleton + module surface) =====
 check("tree: BridgeNet2 packages path resolvable", (function()
     local pk = RS:FindFirstChild("Packages")
     local idx = pk and pk:FindFirstChild("_Index")
@@ -1074,29 +1313,75 @@ check("tree: 12 Replica remotes present", (function()
     end
     return n == 11 and re:FindFirstChild("ReplicaSignalUnreliable") ~= nil
 end)())
-check("bridgenet2 mock: Reference caches per name", (function()
-    local a = BridgeNet2Client.Reference("TestBridge")
-    local b = BridgeNet2Client.Reference("TestBridge")
-    return a == b and BridgeNet2Client.Reference("Other") ~= a
+check("tree: Game_Settings module path (Shared.Modules.Global.Libraries)", (function()
+    local m = RS:FindFirstChild("Shared"):FindFirstChild("Modules"):FindFirstChild("Global")
+        :FindFirstChild("Libraries"):FindFirstChild("Game_Settings")
+    local ok, res = pcall(function() return G.require(m) end)
+    return ok and res == Game_Settings
+end)())
+check("tree: Appearance/Muscle/GymWeights module paths", (function()
+    local sm = RS:FindFirstChild("Shared"):FindFirstChild("Modules"):FindFirstChild("Shared")
+    local ok1 = pcall(function() return G.require(sm:FindFirstChild("Appearance")) end)
+    local ok2 = pcall(function() return G.require(sm:FindFirstChild("Muscle")) end)
+    local ok3 = pcall(function() return G.require(sm:FindFirstChild("GymWeights")) end)
+    return ok1 and ok2 and ok3
+end)())
+check("tree: Client.Input/Client.Data under PlayerScripts", (function()
+    local ps = PLR:FindFirstChild("PlayerScripts")
+    local c = ps and ps:FindFirstChild("Client")
+    local ok1 = pcall(function() return G.require(c:FindFirstChild("Input")) end)
+    local ok2 = pcall(function() return G.require(c:FindFirstChild("Data")) end)
+    return ok1 and ok2
+end)())
+check("bridgenet2 mock: ReferenceBridge caches per name", (function()
+    local a = BridgeNet2Client.ReferenceBridge("Combat.Sync")
+    local b = BridgeNet2Client.ReferenceBridge("Combat.Sync")
+    return a == b and BridgeNet2Client.ReferenceBridge("Gym.Sync") ~= a
 end)())
 check("bridgenet2 mock: Fire records wire tuples", (function()
-    local br = BridgeNet2Client.Reference("TestBridge")
-    br:Fire({ T = "Regime", Hold = true })
+    local br = BridgeNet2Client.ReferenceBridge("TestBridge")
+    br:Fire({ T = "Start", Station = GymStation, Weight = "DB_45" })
     local calls = bridgeCalls("TestBridge")
-    return #calls == 1 and calls[1][1].T == "Regime" and calls[1][1].Hold == true
+    return #calls == 1 and calls[1][1].T == "Start" and calls[1][1].Station == GymStation and calls[1][1].Weight == "DB_45"
 end)())
 check("bridgenet2 mock: server dispatch reaches Connect", (function()
     local got = nil
-    local br = BridgeNet2Client.Reference("TestBridge")
+    local br = BridgeNet2Client.ReferenceBridge("TestBridge")
     br:Connect(function(payload) got = payload end)
-    serverBridge("TestBridge", { T = "Ping" })
+    serverBridge("TestBridge", { T = "Begin", User = PLR.UserId })
     pump(0.05)
-    return got ~= nil and got.T == "Ping"
+    return got ~= nil and got.T == "Begin"
 end)())
-check("require mock resolves Packages.BridgeNet2", (function()
-    local m = RS:FindFirstChild("Packages"):FindFirstChild("BridgeNet2")
-    local ok, res = pcall(function() return G.require(m) end)
-    return ok and res == BridgeNet2Client
+check("input mock: Fire records tuples; Bind visible", (function()
+    Input.Bind("Combat.Attack", function() end, function() end)
+    Input.Fire("Combat.Attack", true)
+    Input.Fire("Combat.Attack", false)
+    Input.Fire("Gym.LeanLeft", true)
+    return inputCount("Combat.Attack", true) == 1 and inputCount("Combat.Attack", false) == 1
+        and inputCount("Gym.LeanLeft", true) == 1 and InputBinds["Combat.Attack"] ~= nil
+end)())
+check("data mock: Get navigates array paths; OnSet dispatches", (function()
+    local seen = nil
+    Data.OnSet({ "Rerolls" }, function(v) seen = v end)
+    dataSet({ "Rerolls" }, 7)
+    pump(0.05)
+    return Data.Get({ "Style" }) == "Basic"
+        and Data.Get({ "Slots", "Active" }) == 1
+        and Data.Get({ "Rerolls" }) == 7
+        and seen == 7
+end)())
+check("gym mock: GymWeights.List sorted rows + Muscle.Assess bands", (function()
+    local rows = GymWeights.List("Dumbbells")
+    return #rows == 3 and rows[1].Weight == 25 and rows[3].Weight == 70
+        and Muscle.Assess(45, 120) == "Comfortable"
+        and Muscle.Assess(120, 120) == "Struggle"
+        and Muscle.Assess(200, 120) == "Locked"
+end)())
+check("world: tagged dummies + station resolvable", (function()
+    local tagged = Services.CollectionService.GetTagged("CombatDummy")
+    return #tagged == 2 and tagged[1]:GetAttribute("DummyBehavior") == "Regular"
+        and tagged[2]:GetAttribute("DummyBehavior") == "Knocked"
+        and GymStation.PrimaryPart ~= nil
 end)())
 
 -- ===== loader (live — picks up SH2's draft when it lands) =====
@@ -1131,11 +1416,18 @@ else
     end)())
     check("guard set", G.ayasemiyatongekissazumirisa == true)
     check("no queueonteleport (template feature deleted upstream)", #TeleportQueue == 0)
-    -- SH2 draft checks land here: toggle registry, wire tuples vs the SH1
-    -- analysis, toggle-off stop, Rule 23 checklist items.
+    check("save folder set", SaveManager.Folder ~= nil and SaveManager.Folder ~= "")
+    -- SH2 draft checks land here when the draft exists:
+    --   + toggle registry (AutoAttack/AutoGym/AutoRoll as delivered)
+    --   + Input.Fire tuples (attack paced from Game_Settings, equip first,
+    --     LeanLeft taps in Reps midband)
+    --   + Gym.Sync tuples (Start Station+Weight, Stop on toggle-off)
+    --   + Character.Action tuples (RerollField Args=slot,field,confirm shape)
+    --   + rarity stop (holdsRare true → loop stops, no more fires)
+    --   + Data reads use array paths
 end
 
-print(string.format("Shigaku harness (skeleton): %d pass / %d fail", Pass, Fail))
+print(string.format("Shigaku harness: %d pass / %d fail", Pass, Fail))
 if Fail > 0 then
     for _, f in ipairs(Failures) do
         print("  failed: " .. f)
