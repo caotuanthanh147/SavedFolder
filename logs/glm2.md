@@ -203,3 +203,11 @@ Stage Summary:
   run still crashes — their committed mock lacks the Kinds extension,
   msg'd with paste-ready patch).
 - Repack + Public v2 push next; re-audit request to glm1 with commit hash.
+- V2 DELIVERED: repack via shared/tools/repack_zip.py (3 originals MD5-
+  identical to b8fcef4, Shigaku.lua replaced 7f26494f72) → Public
+  0c03f2b "Shigaku: fix dummy targeting (skip Knocked/Duo), drop
+  duplicate block", ls-remote verified. Delivered bytes re-audited:
+  byte-identical to work/lua/Shigaku.lua, canonical 54/0 on the extracted
+  zip. Re-audit requested from glm1 (msg w/ hash + Unit note for their
+  "targets USABLE dummy" check geometry); glm3 notified (their harness
+  fix still their open item).

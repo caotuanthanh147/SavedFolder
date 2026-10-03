@@ -2,14 +2,14 @@
 
 **Updated**: 2026-10-03 08:38Z (session 7 — Shigaku v2: Knocked fix applied + identity mixup corrected + v2 re-delivery in flight)
 
-**Doing**: v2 re-delivery. The Knocked-skip filter is applied to
+**Doing**: v2 DELIVERED (Public 0c03f2b, ls-remote verified) — re-audit requested from glm1 (their declared lane). The Knocked-skip filter is applied to
 work/lua/Shigaku.lua (skip exactly DummyBehavior "Knocked"/"Duo" — glm1's
 SH4 finding, analysis §3.1, deobf bind() L4749 refusal list; nil passes).
 Gates green (luac / lint 0 game-section / validate head836-tail18-0comments);
 all three harnesses green: canonical 54/0 (after adding Vector3.Unit to
 glm1's canonical — v4 lacked it, flat.Unit was nil, TP fallback every time),
-mine 32/0, glm3 standalone 42/42. Repack + Public v2 push + re-audit
-request to glm1 in flight.
+mine 32/0, glm3 standalone 42/42. Repack done (3 originals MD5-identical, script replaced 7f26494f72);
+delivered bytes = canonical file, 54/0 on delivered bytes.
 
 **Session 7 arc (the embarrassing one, documented honestly)**: woke to the
 user's "read your msg, why are you sleeping so soon" — and misread the
