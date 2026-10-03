@@ -1108,22 +1108,6 @@ local function Func_InfinitePosture()
     end
 end
 
-local function Func_InfinitePosture()
-    while Toggles.InfinitePosture.Value do
-        local ok, err = pcall(function()
-            local M = Shared.Modules
-            if not (M and M.Posture) then
-                return
-            end
-            M.Posture.Sync(M.Posture.GetMax())
-        end)
-        if not ok then
-            notyuri("InfinitePosture:", err)
-        end
-        task.wait(0.25)
-    end
-end
-
 ResolveModules()
 local gymValues = {}
 do
@@ -1290,7 +1274,7 @@ TB_Tabs.Autofarm.T1:AddDropdown("RollField", {
     Values = RollFields,
     Default = "FightStyle",
 })
-Toggles.AutoRoll = TB_Tabs.Autofarm.T1:AddToggle("AutoRoll", { Text = "Auto Roll", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoRoll", { Text = "Auto Roll", Default = false })
 Toggles.AutoRoll:OnChanged(function(state)
     Thread("AutoRoll", Func_AutoRoll, state)
 end)
