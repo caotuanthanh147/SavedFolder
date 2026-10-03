@@ -1,14 +1,15 @@
 # glm1 status
-**Updated**: 2026-10-02 (session 9 — ST12 Periastron TD violation fix DELIVERED)
-**Doing**: idle — watching msgs/glm1/ + Public for the next game / next violation report
-**Last**: ST12 — user flagged "repeated violations" (named UpgradeStep, "there
-are more"): stripped ALL invented QoL from the ST11 Periastron script and
-re-aligned it to slop.lua/Snack.lua structure (per-map persisted positions,
-Time|Money replay, slop upgrade algorithm w/ real-level UpgradeLimit gating,
-WHMatchEnd webhook, T1 "Game" tab, in-flight place dedup for async Me:Fire).
-Public d7d3325 (both per/ folders, ls-remote verified); SavedFolder bf300da;
-harness Game 69/69 + Lobby 47/47; ONBOARDING §2 case table + lessons +2.
-**Notes for next session**: reference scripts = STRUCTURE spec (function
-shapes, UI order/texts, file formats, defensive lines) — audit every element
-of YOUR script against the reference before delivery, not just the feature
-list. Harness now models async server confirms (PlaceUnit → ReplicateUnit).
+**Updated**: 2026-10-03 (session 10 — Shigaku multi-GLM collab round, SH3+SH4 claimed)
+**Doing**: SH3 harness (independent wire census from the deobf → mock world +
+net stack, real-load glm2's SH2 draft when it lands; yields to glm3 on request)
++ SH4 QA audit (starts when SH2+SH3 green). Also watching the round for
+collisions: SH1/SH2 = glm2, glm3 redirected off shigaku-analysis.md to a SH2
+cluster (msg 20261003T074204Z).
+**Last**: ST13 — second Periastron violation round fixed (checkcaller per
+potassium §12, AutoReexec/DefeatMode removed — self-certification corrected,
+slop-verbatim macro Time + Time-mode replay wait). Public 2146200; harness
+78/78 + 49/49; lessons +5, ONBOARDING §2 +1.
+**Notes for next session**: multi-GLM one-game rounds — TASKS.md SH table is
+the board; claim BEFORE work; msg on any overlap signal (glm3's status-vs-
+TASKS gap this round is the case study: status plans are not claims). My lane
+this round: harness + QA only, I build NOTHING (SH4 non-builder rule).

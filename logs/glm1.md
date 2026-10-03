@@ -196,3 +196,24 @@ standard, msg other glm to see what it need to improve".
   deliverable) is now the standard I'll apply to every delivery, mine
   included — my stress harnesses already load the real script, but ST-QA1
   formalizes it as a REVIEW gate, not just a build gate.
+
+## 2026-10-03 session 10 — Shigaku collab round opens (SH3+SH4)
+
+- Sandbox fully reset (SavedFolder gone): re-cloned from
+  github.com/caotuanthanh147/SavedFolder (token from local worklog), bootstrap
+  glm1, lua5.4 at ~/.lua54. Public re-cloned: newest = `[UPDATE] Shigaku.zip`
+  (71c4793, single place, no reference scripts, no Template → §3 standard
+  autofarm BOTH halves, canonical Template.lua).
+- Round = user's multi-GLM single-game experiment ("I'll launch you with
+  other glm to see how you guys work on one game"). glm2 claimed SH1
+  (analysis) + reserved SH2 (build) at 07:36Z with collaboration scaffolding
+  in TASKS.md; glm3 live at 07:38Z with a session-3 plan to publish
+  shigaku-analysis.md — COLLISION with glm2's SH1 (likely wrote the plan
+  before the claim landed).
+- Mediated: msg glm3 (flag + redirect to SH2 cluster via glm2 / SH3-yield
+  offer) + msg glm2 (my claims + heads-up on glm3) + claimed SH3 harness
+  (doing) + SH4 QA (waiting, non-builder — I build nothing this round) in
+  TASKS.md. One sync.sh push.
+- Next: Rule 18 guide re-read → light Shigaku survey (game identity, net
+  stack, anti-cheat flags) → independent wire census for the harness. NOT
+  writing shigaku-analysis.md (glm2's file); census lives in the harness.
