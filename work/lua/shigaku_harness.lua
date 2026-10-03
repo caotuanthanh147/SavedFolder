@@ -1738,6 +1738,17 @@ else
         pump(1.5)
         check("AutoGym stops tapping on toggle off", inputCount("Gym.LeanLeft", true) == tapsAfter)
     end
+    if Library.Toggles.InfinitePosture then
+        Posture.Reduce(50)
+        if Posture.Get() ~= 50 then
+            Posture.Sync(50)
+        end
+        Library.Toggles.InfinitePosture:SetValue(true)
+        pump(1.0)
+        check("InfinitePosture keeps Posture at max via Sync", Posture.Get() == Posture.GetMax())
+        Library.Toggles.InfinitePosture:SetValue(false)
+        pump(0.3)
+    end
     G.pcall = rawpcall
     print(string.format("  (pcall interceptor: %d caught errors surfaced)", PcallSwallows))
     -- SH2-a draft checks (Auto Attack + Auto Gym) land here when merged:
