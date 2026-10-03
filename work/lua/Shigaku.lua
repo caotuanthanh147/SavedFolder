@@ -1030,7 +1030,10 @@ local function Func_AutoAttack()
             if not hrp then
                 return
             end
-            local dummy = GetNearest(realCS:GetTagged("CombatDummy"))
+            local dummy = GetNearest(realCS:GetTagged("CombatDummy"), function(inst)
+                local behavior = inst.GetAttribute and inst:GetAttribute("DummyBehavior")
+                return behavior ~= "Knocked" and behavior ~= "Duo"
+            end)
             if not dummy then
                 return
             end

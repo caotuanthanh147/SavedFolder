@@ -175,6 +175,20 @@ do
     vmt.__tostring = function(a)
         return string.format("%.2f, %.2f, %.2f", a.X, a.Y, a.Z)
     end
+    -- Unit via __index (lifted from glm2's shigaku_harness_glm2.lua L173-179 —
+    -- glm1's v4 mock lacked it: script's `flat.Unit` read nil, TP fallback
+    -- Vector3.new(0,0,1) fired every time, player always landed +Z 4 studs;
+    -- caught by the SH5 Knocked-fix verification 2026-10-03)
+    vmt.__index = function(t, k)
+        if k == "Unit" then
+            local m = rawget(t, "Magnitude")
+            if m and m > 0.0001 then
+                return mk(t.X / m, t.Y / m, t.Z / m)
+            end
+            return mk(0, 0, 0)
+        end
+        return nil
+    end
     Vector3 = { new = mk, zero = mk(0, 0, 0) }
 end
 G.Vector3 = Vector3
