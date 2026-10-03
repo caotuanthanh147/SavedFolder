@@ -134,3 +134,34 @@ Work Log:
 
 Stage Summary:
 - ST5/ST6/ST7 re-delivered load-clean with real-script-verified harnesses. Feature counts unchanged (6/6/4 toggles). Two durable lessons: (1) harness must load the delivered script — green harnesses that re-implement the logic validate nothing; (2) verifying a wire's CALL SITE shape isn't enough — arg SEMANTICS need their producer traced (sword uid vs enemy uid both "uids" at the same call site). glm1 re-QA pending.
+
+## 2026-10-03 session 6 — Shigaku multi-GLM round (SH1+SH2+merge+deliver)
+
+- 07:35Z session start (sandbox reset again): bootstrap.sh glm3... glm2 with
+  token from worklog. Watchers up. Public 71c4793 = [UPDATE] Shigaku.zip
+  (uploaded 4 min earlier — single place, 258k-line deobf + 107k dump, no
+  reference, no Template in zip).
+- Claimed SH1+SH2 with the collab scaffolding (analysis file = coordination
+  point). glm1 claimed SH3 harness + SH4 QA (07:42Z); glm3 claimed SH2-b
+  roll cluster off my split offer (07:52Z, via glm1's mediation).
+- SH1 delivered 07:43Z: shigaku-analysis.md (wire table w/ call-site lines;
+  the Input.Fire strategy; module require paths; Rule 11 plan incl. the
+  removed one-shots). Zero census disagreements from glm1; glm3 supplement
+  +65 bridges, TrashBin wire, Posture client-auth.
+- SH2 built: my harness caught (1) module-vs-instance child resolution bug,
+  (2) Thread-cancel vs post-loop cleanup (Gym.Stop moved into OnChanged).
+  Real-load 32/32 (faithful minigame dynamics: Balance tilt/vel/gust/
+  runaway/damping, Stride alternation+idle, Grip drain/regrip/lockout,
+  Reps pace band — all from the deobf math).
+- glm1's harness + glm3's roll harness both needed the Game_Settings mock
+  completion (Gym.Kinds etc.) — patched locally, 30/30 + 42/42 verified,
+  patches messaged to owners (their lanes).
+- Merged glm3's AutoRoll block verbatim + built InfinitePosture myself
+  (glm3 scoped it out). All 3 harnesses green on the merged 1369-line file.
+- DELIVERED: Public b8fcef4, [UPDATE] Shigaku.zip + Shigaku/Shigaku.lua
+  (SCPINC convention), MD5-verified originals, ls-remote verified.
+- Lesson: template-internal pcall errors are invisible to an outer xpcall
+  (the eh_success pcall swallows + notifies) — intercept G.pcall in the
+  harness to get tracebacks. Also: Instance mocks need dynamic child
+  indexing OR scripts should use FindFirstChild chains (the game's own
+  pattern is WaitForChild/FindFirstChild anyway).
