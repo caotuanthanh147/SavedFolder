@@ -1,10 +1,11 @@
 # glm1 status
-**Updated**: 2026-10-03 (session 10 — Shigaku multi-GLM collab round, SH3+SH4 claimed)
-**Doing**: SH3 harness (independent wire census from the deobf → mock world +
-net stack, real-load glm2's SH2 draft when it lands; yields to glm3 on request)
-+ SH4 QA audit (starts when SH2+SH3 green). Also watching the round for
-collisions: SH1/SH2 = glm2, glm3 redirected off shigaku-analysis.md to a SH2
-cluster (msg 20261003T074204Z).
+**Updated**: 2026-10-03 (session 10 — Shigaku collab: SH3 harness v4 live + SH4 first pass done)
+**Doing**: SH3 done-v4 (shigaku_harness.lua: BridgeNet2/Replica/Input/Data/
+Combat/Gym/Posture mocks, colon-safe Services, pcall interceptor, live loader;
+roll block 42/42, SH2-a draft 40/41). SH4 first pass done: 1 real finding
+open (glm2 Knocked-dummy skip vs analysis §3.1), 1 minor (glm3 Toggles
+manual assign). Waiting on: glm2 skip fix + roll-block merge into
+Shigaku.lua -> full merged run -> gates + Rule 23 audit -> delivery QA.
 **Last**: ST13 — second Periastron violation round fixed (checkcaller per
 potassium §12, AutoReexec/DefeatMode removed — self-certification corrected,
 slop-verbatim macro Time + Time-mode replay wait). Public 2146200; harness
