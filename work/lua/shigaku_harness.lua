@@ -941,17 +941,24 @@ local AssetsFolder = Instance.new("Folder", "Assets")
 FilesFolder:AddChild(AssetsFolder)
 local ModelsFolder = Instance.new("Folder", "Models")
 AssetsFolder:AddChild(ModelsFolder)
-local WeightFolder = Instance.new("Folder", "Dumbbells")
-ModelsFolder:AddChild(WeightFolder)
-local function addWeightModel(name, weight)
+local WeightFolderNames = { "BenchWeights", "DeadliftWeights", "DumbbellWeights" }
+local WeightFolders = {}
+for _, fname in ipairs(WeightFolderNames) do
+    local f = Instance.new("Folder", fname)
+    ModelsFolder:AddChild(f)
+    WeightFolders[fname] = f
+end
+local function addWeightModel(folder, name, weight)
     local w = Instance.new("Model", name)
     w:SetAttribute("Weight", weight)
-    WeightFolder:AddChild(w)
+    folder:AddChild(w)
     return w
 end
-addWeightModel("DB_25", 25)
-addWeightModel("DB_45", 45)
-addWeightModel("DB_70", 70)
+addWeightModel(WeightFolders.DumbbellWeights, "DB_25", 25)
+addWeightModel(WeightFolders.DumbbellWeights, "DB_45", 45)
+addWeightModel(WeightFolders.DumbbellWeights, "DB_70", 70)
+addWeightModel(WeightFolders.BenchWeights, "BP_50", 50)
+addWeightModel(WeightFolders.DeadliftWeights, "DL_100", 100)
 
 -- ===== mock game data (ReplicaService via the game's Client.Data) =====
 local MockCharData = {
@@ -981,7 +988,7 @@ local MockData = {
     Kills = 0,
     Class = "None",
     Steps = 0,
-    WorkoutSeconds = 120,
+    WorkoutSeconds = 7200,
     Workouts = 3,
     PlaytimeSeconds = 500,
     Vip = false,
@@ -1015,7 +1022,48 @@ local Game_Settings = {
     },
     Gym = {
         Bridge = "Gym.Sync",
+        Kinds = {
+            { Tag = "GymBench", Lift = "Benchpress", Label = "BENCH PRESS", WeightFolder = "BenchWeights", Game = "Balance", CapacityScale = 0.8, Boost = { Stat = "Health", PerLevel = 0.02 } },
+            { Tag = "GymDeadlift", Lift = "Deadlift", Label = "DEADLIFT", WeightFolder = "DeadliftWeights", Game = "Grip", CapacityScale = 1, Boost = { Stat = "Health", PerLevel = 0.02 } },
+            { Tag = "GymTreadmill", Lift = "Treadmill", Label = "TREADMILL", Verb = "Run", Game = "Stride", CapacityScale = 1, Boost = { Stat = "Stamina", PerLevel = 0.02 }, Speeds = { { Id = "walk", Effort = 0.35 }, { Id = "jog", Effort = 0.65 }, { Id = "run", Effort = 1 }, { Id = "sprint", Effort = 1.4 } } },
+            { Tag = "GymDumbbell", Lift = "Dumbbell", Label = "DUMBBELL", WeightFolder = "DumbbellWeights", Game = "Reps", CapacityScale = 0.25, Boost = { Stat = "Damage", PerLevel = 0.015 }, Freestanding = true },
+        },
+        PromptName = "GymPrompt",
+        PromptDistance = 8,
+        Verb = "Lift",
+        Progress = { Field = "Workouts", Levels = { 300, 600, 1800, 3600, 7200, 14400, 25200, 36000, 48000, 63000 } },
+        LiftPointName = "LiftPoint",
+        StationPartName = "Station",
+        WeightAttribute = "Weight",
+        LiftingTag = "Lifting",
+        OccupantTag = "Occupant",
+        LoadAttribute = "GymWeight",
+        BandAttribute = "GymBand",
+        StaminaAttribute = "GymStamina",
+        WindedAttribute = "GymWinded",
+        TickRate = 0.25,
+        Bands = { Struggle = 1, Locked = 1.6 },
+        Gain = { Min = 0.25, StruggleBonus = 1.5, Max = 2.5 },
+        Stamina = { Max = 100, Drain = 2.5, Exponent = 1.3, MinDrain = 1.2, Regen = 6, RegenDelay = 1.5, RecoverFraction = 0.5 },
         Reps = { Max = 3, BandLow = 1.2, BandHigh = 2.0, Smooth = 0.5, Hold = 0.16, Drift = 0.22 },
+    },
+    Zones = {
+        Folder = "Zones",
+        Workout = {
+            Group = "WorkoutZones",
+            Attribute = "InWorkoutZone",
+            SecondsField = "WorkoutSeconds",
+            TickRate = 1,
+            ActiveStuds = 6,
+            IdleGrace = 20,
+            Tiers = {
+                { Name = "Untrained", Seconds = 0, Capacity = 45 },
+                { Name = "Minimal", Seconds = 1800, Capacity = 75 },
+                { Name = "Acceptable", Seconds = 7200, Capacity = 120 },
+                { Name = "Dedicated", Seconds = 21600, Capacity = 175 },
+                { Name = "Relentless", Seconds = 43200, Capacity = 245 },
+            },
+        },
     },
 }
 local Appearance = {
@@ -1029,27 +1077,61 @@ local Appearance = {
 }
 local Muscle = {}
 Muscle.Capacity = function(workoutSeconds)
-    if workoutSeconds >= 200 then return 245 end
-    if workoutSeconds >= 100 then return 120 end
-    return 45
+    local tiers = Game_Settings.Zones.Workout.Tiers
+    local seconds = tonumber(workoutSeconds) or 0
+    for i = 1, #tiers do
+        local cur = tiers[i]
+        local nxt = tiers[i + 1]
+        if not nxt or seconds < nxt.Seconds then
+            if not nxt then
+                return cur.Capacity
+            end
+            local span = nxt.Seconds - cur.Seconds
+            if span <= 0 then
+                return cur.Capacity
+            end
+            local t = (seconds - cur.Seconds) / span
+            if t < 0 then t = 0 elseif t > 1 then t = 1 end
+            return cur.Capacity + (nxt.Capacity - cur.Capacity) * t
+        end
+    end
+    return tiers[#tiers].Capacity
+end
+Muscle.Ratio = function(weight, capacity)
+    local w = tonumber(weight) or 0
+    local c = tonumber(capacity) or 0
+    if w <= 0 then return 0 end
+    if c <= 0 then return math.huge end
+    return w / c
+end
+Muscle.Band = function(ratio)
+    if ratio <= Game_Settings.Gym.Bands.Struggle then
+        return "Comfortable"
+    end
+    if ratio <= Game_Settings.Gym.Bands.Locked then
+        return "Struggle"
+    end
+    return "Locked"
 end
 Muscle.Assess = function(weight, seconds)
-    local cap = Muscle.Capacity(seconds)
-    if weight > cap then return "Locked" end
-    if weight >= cap * 0.6 then return "Struggle" end
-    return "Comfortable"
+    local capacity = Muscle.Capacity(seconds)
+    local ratio = Muscle.Ratio(weight, capacity)
+    return Muscle.Band(ratio), ratio, capacity
 end
 local GymWeights = {}
 GymWeights.List = function(folderName)
+    local folder = ModelsFolder:FindFirstChild(folderName)
     local out = {}
-    for _, m in ipairs(WeightFolder:GetChildren()) do
-        table.insert(out, { Name = m.Name, Weight = m:GetAttribute("Weight") or 0, Template = m })
+    if folder then
+        for _, m in ipairs(folder:GetChildren()) do
+            table.insert(out, { Name = m.Name, Weight = m:GetAttribute("Weight") or 0, Template = m })
+        end
     end
     table.sort(out, function(a, b) return a.Weight < b.Weight end)
     return out
 end
 GymWeights.Find = function(name)
-    for _, row in ipairs(GymWeights.List()) do
+    for _, row in ipairs(GymWeights.List("DumbbellWeights")) do
         if row.Name == name then return row end
     end
     return nil
@@ -1086,6 +1168,36 @@ local function inputCount(id, state)
     end
     return n
 end
+
+-- ===== Client.Combat mock (stateful IsActive — set by Combat.Equip input) =====
+local Combat = {
+    IsActive = function()
+        return inputCount("Combat.Equip", true) > 0
+    end,
+}
+
+-- ===== Client.Gym mock + minigame children (state-driven by harness) =====
+local GymState = { ActiveGame = nil, TiltValue = 0, GripWindow = 1 }
+local Balance = {
+    Active = function() return GymState.ActiveGame == "Balance" end,
+    Tilt = function() return GymState.TiltValue end,
+}
+local Stride = {
+    Active = function() return GymState.ActiveGame == "Stride" end,
+}
+local Grip = {
+    Active = function() return GymState.ActiveGame == "Grip" end,
+    Window = function() return GymState.GripWindow end,
+    Hand = function(side) return GymState.GripWindow - 0.5 end,
+    Locked = function(side) return false end,
+}
+local Reps = {
+    Active = function() return GymState.ActiveGame == "Reps" end,
+}
+local GymExport = {
+    Begin = function(game) GymState.ActiveGame = game end,
+    End = function() GymState.ActiveGame = nil end,
+}
 
 -- ===== Client.Data mock (ReplicaService surface) =====
 local DataSetHandlers = {}
@@ -1194,6 +1306,12 @@ addModule(SharedModsFolder, "GymWeights", GymWeights)
 addModule(ClientDir, "Input", Input)
 addModule(ClientDir, "Data", Data)
 addModule(ClientDir, "Posture", Posture)
+addModule(ClientDir, "Combat", Combat)
+local GymInstance = addModule(ClientDir, "Gym", GymExport)
+addModule(GymInstance, "Balance", Balance)
+addModule(GymInstance, "Stride", Stride)
+addModule(GymInstance, "Grip", Grip)
+addModule(GymInstance, "Reps", Reps)
 
 local function serverBridge(name, ...)
     local list = BridgeListeners[name]
@@ -1255,18 +1373,18 @@ local Tagged = {
 }
 local TagSignals = {}
 Services.CollectionService = {
-    GetTagged = function(tag) return Tagged[tag] or {} end,
-    HasTag = function(inst, tag)
+    GetTagged = function(_, tag) return Tagged[tag] or {} end,
+    HasTag = function(_, inst, tag)
         for _, m in ipairs(Tagged[tag] or {}) do
             if m == inst then return true end
         end
         return false
     end,
-    GetInstanceAddedSignal = function(tag)
+    GetInstanceAddedSignal = function(_, tag)
         if not TagSignals[tag] then TagSignals[tag] = Signal.new() end
         return TagSignals[tag]
     end,
-    GetInstanceRemovedSignal = function(tag)
+    GetInstanceRemovedSignal = function(_, tag)
         if not TagSignals["-" .. tag] then TagSignals["-" .. tag] = Signal.new() end
         return TagSignals["-" .. tag]
     end,
@@ -1282,7 +1400,7 @@ Services.HttpService = { JSONEncode = function(_, t) return "{}" end, JSONDecode
 Services.TweenService = { Create = function() return { Play = function() end } end, GetValue = function() return 0 end }
 Services.Lighting = {}
 Services.GuiService = { GetResolution = function() return Vector3.new(1920, 1080, 0) end, TopbarInset = function() return 0, 0 end }
-Services.MarketplaceService = { GetUserOwnershipAsync = function() return { IsSuccess = function() return true end, UserOwnsGamePass = false } end }
+Services.MarketplaceService = { GetUserOwnershipAsync = function() return { IsSuccess = function() return true end, UserOwnsGamePass = false } end, GetProductInfo = function(_, placeId) return { Name = "Shigaku", Description = "", PriceInRobux = 0, Created = "", Updated = "", ContentRatingTypeId = 0, MinimumAge = 0, IsPublicDomain = false } end }
 Services.VirtualInputManager = { SendMouseButtonEvent = function() end, SendKeyEvent = function() end }
 Services.ProximityPromptService = { PromptButtonHoldBegan = Signal.new() }
 Services.VirtualUser = { CaptureController = function() end, ClickButton2 = function() end }
@@ -1391,12 +1509,15 @@ check("data mock: Get navigates array paths; OnSet dispatches", (function()
         and Data.Get({ "Rerolls" }) == 7
         and seen == 7
 end)())
-check("gym mock: GymWeights.List sorted rows + Muscle.Assess bands", (function()
-    local rows = GymWeights.List("Dumbbells")
-    return #rows == 3 and rows[1].Weight == 25 and rows[3].Weight == 70
-        and Muscle.Assess(45, 120) == "Comfortable"
-        and Muscle.Assess(120, 120) == "Struggle"
-        and Muscle.Assess(200, 120) == "Locked"
+check("gym mock: real tier chain (Capacity/Ratio/Band) + List per folder", (function()
+    if math.abs(Muscle.Capacity(7200) - 120) > 0.001 then return false end
+    if math.abs(Muscle.Capacity(3600) - 90) > 0.001 then return false end
+    local rows = GymWeights.List("DumbbellWeights")
+    if #rows ~= 3 or rows[1].Weight ~= 25 or rows[3].Weight ~= 70 then return false end
+    local band, ratio = Muscle.Assess(45, 7200)
+    if band ~= "Comfortable" or math.abs(ratio - 0.375) > 0.001 then return false end
+    local b2 = select(1, Muscle.Assess(150, 7200))
+    return b2 == "Struggle" and select(1, Muscle.Assess(200, 7200)) == "Locked"
 end)())
 check("posture mock: Sync sets value directly (glm3 §3 surface)", (function()
     Posture.Reduce(40)
@@ -1405,7 +1526,7 @@ check("posture mock: Sync sets value directly (glm3 §3 surface)", (function()
     return Posture.Get() == 100
 end)())
 check("world: tagged dummies + station resolvable", (function()
-    local tagged = Services.CollectionService.GetTagged("CombatDummy")
+    local tagged = Services.CollectionService:GetTagged("CombatDummy")
     return #tagged == 2 and tagged[1]:GetAttribute("DummyBehavior") == "Regular"
         and tagged[2]:GetAttribute("DummyBehavior") == "Knocked"
         and GymStation.PrimaryPart ~= nil
@@ -1433,6 +1554,21 @@ else
         return true
     end
     pump(0.2)
+    -- pcall interceptor (glm2's trick, SH3): surface template/game-internal
+    -- caught errors that would otherwise silently degrade features.
+    local PcallSwallows = 0
+    local rawpcall = pcall
+    G.pcall = function(fn, ...)
+        local args = table.pack(...)
+        local ok, err = xpcall(fn, function(e)
+            return tostring(e) .. " @ " .. debug.traceback("", 2)
+        end, table.unpack(args, 1, args.n))
+        if not ok then
+            PcallSwallows = PcallSwallows + 1
+            print("  [pcall-caught] " .. tostring(err))
+        end
+        return ok, err
+    end
     local fn = G.loadstring(ScriptSrc, "=(Shigaku)")
     G.task.spawn(fn)
     pump(1.0)
@@ -1539,6 +1675,71 @@ else
             return a == bridgeCount("Character.Action")
         end)())
     end
+    -- ===== attack + gym clusters (glm2 SH2-a) =====
+    if Library.Toggles.AutoAttack then
+        check("AutoGym toggle + GymKind dropdown registered", Library.Toggles.AutoGym ~= nil and Library.Options.GymKind ~= nil)
+        check("GymKind values = 4 kind labels, DUMBBELL last", (function()
+            local dd = Library.Options.GymKind
+            return dd and dd.Values and #dd.Values == 4 and dd.Values[1] == "BENCH PRESS" and dd.Values[4] == "DUMBBELL"
+        end)())
+        for i = #InputFires, 1, -1 do InputFires[i] = nil end
+        Library.Toggles.AutoAttack:SetValue(true)
+        pump(3.0)
+        check("equip-first: Combat.Equip before any Attack", (function()
+            for _, f in ipairs(InputFires) do
+                if f.id == "Combat.Equip" or f.id == "Combat.Attack" then
+                    return f.id == "Combat.Equip"
+                end
+            end
+            return false
+        end)())
+        check("attack ticks paced ~0.2s (band 10-20 over 3s)", (function()
+            local n = inputCount("Combat.Attack", true)
+            return n >= 10 and n <= 20
+        end)())
+        check("critical fired alongside attacks", inputCount("Combat.Critical", true) >= 5)
+        check("targets USABLE dummy (skips Knocked — analysis §3.1)", (function()
+            local cf = charRoot._cframe
+            if not cf then return false end
+            local px, pz = cf.Position.X, cf.Position.Z
+            return math.abs(px - 5) < 3.5 and math.abs(pz - 5) < 3.5
+        end)())
+        Library.Toggles.AutoAttack:SetValue(false)
+        pump(0.5)
+        local attacksAfterOff = inputCount("Combat.Attack", true)
+        pump(1.0)
+        check("AutoAttack stops on toggle off", inputCount("Combat.Attack", true) == attacksAfterOff)
+    end
+    if Library.Toggles.AutoGym then
+        Library.Options.GymKind:SetValue("DUMBBELL")
+        for i = #InputFires, 1, -1 do InputFires[i] = nil end
+        local tapsBefore = inputCount("Gym.LeanLeft", true)
+        Library.Toggles.AutoGym:SetValue(true)
+        pump(2.5)
+        check("gym Start: Station instance + heaviest non-Locked weight (DB_45)", (function()
+            local n = bridgeCount("Gym.Sync", function(c)
+                local p = c[1]
+                return type(p) == "table" and p.T == "Start" and p.Station == GymStation
+                    and p.Weight == "DB_45"
+            end)
+            return n >= 1
+        end)())
+        GymState.ActiveGame = "Reps"
+        pump(3.0)
+        check("Reps taps at midband (~0.625s, band 3-6 over 3s)", (function()
+            local taps = inputCount("Gym.LeanLeft", true) - tapsBefore
+            return taps >= 3 and taps <= 6
+        end)())
+        Library.Toggles.AutoGym:SetValue(false)
+        pump(0.5)
+        check("Gym.Stop input fired on toggle off", inputCount("Gym.Stop", true) >= 1)
+        GymState.ActiveGame = nil
+        local tapsAfter = inputCount("Gym.LeanLeft", true)
+        pump(1.5)
+        check("AutoGym stops tapping on toggle off", inputCount("Gym.LeanLeft", true) == tapsAfter)
+    end
+    G.pcall = rawpcall
+    print(string.format("  (pcall interceptor: %d caught errors surfaced)", PcallSwallows))
     -- SH2-a draft checks (Auto Attack + Auto Gym) land here when merged:
     --   + attack pacing from Game_Settings.Combat.Styles, equip-first tuple
     --   + Knocked-dummy skip (HRP ends near usable dummy at 5,5,5 not 2,5,2)

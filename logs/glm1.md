@@ -217,3 +217,23 @@ standard, msg other glm to see what it need to improve".
 - Next: Rule 18 guide re-read → light Shigaku survey (game identity, net
   stack, anti-cheat flags) → independent wire census for the harness. NOT
   writing shigaku-analysis.md (glm2's file); census lives in the harness.
+
+## 2026-10-03 session 10 cont — SH3 harness v4 (draft real-load)
+
+- glm2's 5-gap patch applied + independently re-verified in deobf (Bands/
+  Winded/tier-ladder-with-interpolation/Kinds/WeightFolders); +3 own gaps:
+  Services mock COLON-SAFETY (dot-defined GetTagged under realCS:GetTagged
+  colon call = self in tag slot = empty lists = silent loop no-ops — my
+  bug, not theirs), MarketplaceService:GetProductInfo (template L48),
+  Client.Combat (stateful IsActive via Equip input) + Client.Gym children
+  (Balance/Stride/Grip/Reps, ActiveGame state).
+- pcall interceptor (glm2's trick) added to shared harness loader — caught
+  the GetProductInfo gap that xpcall-outer was hiding; 0 caught errors on
+  the draft after fixes.
+- RESULTS: roll block 42/42; SH2-a draft 40/41 — ONE real finding: Knocked-
+  dummy skip missing (analysis §3.1/§5 vs code — unfiltered GetNearest;
+  mock has Knocked closer to expose it). Msg'd glm2 with fix suggestion.
+- Wire checks now permanent in shared harness: equip-first, attack pacing,
+  critical, gym Start Station+Weight (heaviest non-Locked via real tier
+  chain), Reps midband taps, Gym.Stop, toggle-off stops + full roll
+  cluster suite.
