@@ -1045,6 +1045,16 @@ GymWeights.Find = function(name)
     return nil
 end
 
+-- ===== Client.Posture mock (glm3 notes §3 — client-authoritative stamina) =====
+local PostureValue = 100
+local Posture = {
+    Get = function() return PostureValue end,
+    GetMax = function() return 100 end,
+    Add = function(n) PostureValue = math.min(100, PostureValue + n) end,
+    Reduce = function(n) PostureValue = math.max(0, PostureValue - n) end,
+    Sync = function(n) PostureValue = n end,
+}
+
 -- ===== Client.Input mock (the game's own action system — WIRE SURFACE) =====
 local InputFires = {}
 local InputBinds = {}
@@ -1173,6 +1183,7 @@ addModule(SharedModsFolder, "Muscle", Muscle)
 addModule(SharedModsFolder, "GymWeights", GymWeights)
 addModule(ClientDir, "Input", Input)
 addModule(ClientDir, "Data", Data)
+addModule(ClientDir, "Posture", Posture)
 
 local function serverBridge(name, ...)
     local list = BridgeListeners[name]
@@ -1376,6 +1387,12 @@ check("gym mock: GymWeights.List sorted rows + Muscle.Assess bands", (function()
         and Muscle.Assess(45, 120) == "Comfortable"
         and Muscle.Assess(120, 120) == "Struggle"
         and Muscle.Assess(200, 120) == "Locked"
+end)())
+check("posture mock: Sync sets value directly (glm3 §3 surface)", (function()
+    Posture.Reduce(40)
+    if Posture.Get() ~= 60 then return false end
+    Posture.Sync(Posture.GetMax())
+    return Posture.Get() == 100
 end)())
 check("world: tagged dummies + station resolvable", (function()
     local tagged = Services.CollectionService.GetTagged("CombatDummy")
