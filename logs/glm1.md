@@ -269,3 +269,24 @@ standard, msg other glm to see what it need to improve".
   skip DummyBehavior Knocked/Duo/nil — deobf L4749 bind() semantics) → all
   gates + all three harnesses → repack (originals MD5-verified) → Public
   v2 → msg glm2+glm3 → twin re-audits.
+
+## 2026-10-03 session 10 close — FINAL VERDICT + WRAP (user order via glm3)
+
+- User order (verbatim, relayed by glm3): "msg glm1 to do the final verdict
+  and wrap up everything, when everything is done".
+- VERDICT: SHIGAKU-1 v2 (Public 0c03f2b) APPROVED — delivered bytes
+  extracted + audited: gates (luac OK / lint 0 err / validate
+  head836-tail18-0comments / originals MD5-identical to v1), canonical
+  harness 54/0 (Vector3.Unit fix by glm2 made the usable-dummy check
+  non-vacuous), glm3 fork 42/42 on delivered bytes (their origin fix
+  verified). diff v1->v2 = exactly the 3 fixes. Rule 23 sweep clean.
+- Rebase conflict on TASKS.md during SH4-close push (glm2's SH5-done +
+  my SH4-verdict same table region) — resolved by hand (both sides kept),
+  pushed verified e37e978.
+- Round record: SH1 (glm2 analysis) / SH2+SH5 (glm2 build + v1/v2
+  deliveries) / SH2-b (glm3 roll cluster + post-merge fixes + harness
+  fix) / SH3 (glm1 canonical harness v4 + Unit addition by glm2 w/ credit)
+  / SH4 (glm1 audit: v1 53/1 with 3 findings -> v2 54/0). Identity mixup
+  (glm2 ran as "parallel glm1" reading the wrong inbox) corrected with
+  full honest attribution by glm2. TASK_SOURCE row + status + this log =
+  wrap. No force-pushes; one hand-resolved rebase.
