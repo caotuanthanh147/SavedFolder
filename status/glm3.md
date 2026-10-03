@@ -1,28 +1,34 @@
 # glm3 status
 
-**Updated**: 2026-10-03 (session 3 — stress round closed, Shigaku collab round started)
+**Updated**: 2026-10-03 08:25Z (session 3 — Shigaku collab round, SH2-b roll cluster BUILT)
 
-**Doing**: SHIGAKU collaborative round (user order: "next game, I'll launch
-you with other glm to see how you guys work on one game"). Public 71c4793 =
-`[UPDATE] Shigaku.zip` only (all stress folders + per/ deleted by user).
-Pipeline: unzip+inventory → Rule 18 reread → deobf study → remote map →
-wire verification → analysis published to work/lua/shigaku-analysis.md →
-TASKS.md claim + msg all GLMs with proposed feature split (this is a
-MULTI-GLM game — coordinate, don't collide) → build my claimed part.
+**Doing**: SH2-b Auto Roll cluster — DELIVERED merge-ready (6e3b217):
+`work/lua/Shigaku-roll-glm3.lua` (Template head 836/tail 18 + 178-line
+section, 0 comments) + `shigaku-roll-harness-glm3.lua` (42/42 real-load).
+Gates: luac OK, lint 0 new, validate PASS. Awaiting glm2's Shigaku.lua
+skeleton to merge (agreed: I port my section in with msg heads-up), then
+glm1's canonical harness on the merged file.
 
-**Session 3 recovery log**:
-- Sandbox reset again → bootstrap.sh glm3 (repos, Lua 5.4.7, watchers).
-  Token from user chat wired into worklog.md + both remotes (verified).
-- Read 3 glm1 msgs (token options; ST-QA1 audit of my ST10: excellent, 2
-  fixes). Discovered: session 2 delivered ST10 (Public e88e651) before
-  context loss — but never synced to work/lua/, and user's Public cleanup
-  orphaned the commit → script unrecoverable. ST9 never started.
-- TASKS.md: ST9 + ST10 rows closed honestly with lesson recorded.
-- Next-instance note: ALWAYS sync the canonical script copy to
-  SavedFolder work/lua/ at delivery time — Public history is disposable.
+**Round state** (collab round, user order "one game, all GLMs"):
+- SH1 analysis: glm2 done (b4cae09). My supplement: shigaku-notes-glm3.md
+  (65-bridge census, TrashBin wires, Posture exploit, combat deep-dive).
+- SH2 build: glm2 (skeleton + Auto Attack + Auto Gym) — skeleton pending.
+- SH2-b roll cluster: glm3 — BUILT + gated, standing by.
+- SH3 harness: glm1 v3 26/26 (+Posture mock from my notes).
+- SH4 QA: glm1 waiting for SH2 draft.
+- Unclaimed: Trash Run / Gym extras / minigames (SH rows open in TASKS.md).
 
-**Files changed (mine, this session)**: TASKS.md (ST9/ST10 close),
-status/glm3.md, logs/glm3.md, work/lua/shigaku-analysis.md (pending),
-work/lua/Shigaku.lua (pending).
+**Session 3 log**: sandbox reset → bootstrap (token from user chat, wired +
+worklog-persisted) → ST9/ST10 closed honestly (round closed by user
+cleanup; ST10 e88e651 orphaned, lesson recorded) → Shigaku study (own
+census) → collision mediated by glm1 → accepted glm2's split (roll cluster)
+→ verified all reroll wires at own call sites → built + gated + pushed →
+msgs glm1 (surface) + glm2 (merge-ready).
 
-**Next**: Shigaku pipeline above; keep msgs answered same-session.
+**Files changed (mine, session 3)**: TASKS.md (ST9/ST10 close, SH2/SH2-b
+rows), status/glm3.md, logs/glm3.md, work/lua/shigaku-notes-glm3.md,
+work/lua/Shigaku-roll-glm3.lua, work/lua/shigaku-roll-harness-glm3.lua,
+msgs to glm1/glm2.
+
+**Next**: merge into glm2's skeleton when it lands → canonical harness on
+merged → reply QA msgs → support SH4 audit.

@@ -17,3 +17,9 @@
 - ST9: never started beyond claim; round closed.
 - TASKS.md ST9/ST10 closed; status+logs updated; pushed.
 - Shigaku: unzipped, inventory taken, Rule 18 reread done, deobf study + remote map + wire verification → shigaku-analysis.md; TASKS claim + msg to glm1/glm2/glm4/glm5 with analysis + proposed split; built my part with harness + gates.
+
+## Session 3 — 2026-10-03 (continued — Shigaku collab round)
+
+- 08:10Z: SH2-b claimed (glm2's split offer via glm1 mediation). Verified reroll wires at own call sites: fireRoll L34570 (0.1s debounce, FightStyle→RerollFightStyle(confirm), else RerollField(activeIdx, field, confirm)), rare gate = local holdsRare L32308 → Appearance.holdsRare(charTable, field) / styleHoldsRare(Style, StyleShiny), rollCost L32722 (roll fields cost 1; FreeRerolls gate; unregistered=0), Reject bridge {Action, Reason} L35912 handler pattern, RerollRebuildCooldownSec=1 pacing, field census = 14 UI-roll buttons (Reroll.Fields minus Style/accessory slots — no call sites, §10).
+- 08:25Z: BUILT work/lua/Shigaku-roll-glm3.lua (Template verbatim + 178-line section). Design: nil-guarded module resolution w/ 30s retry (glm1's ST-QA1 fix applied), §22-7 loop w/ per-step pcall, pending-window reject stop, rarity/currency stops w/ toggle-off + Notify. Gates: luac OK, lint 0 new (21 inherited), validate head 836/tail 18/0 comments. Harness: glm1's v3 copy + 12 roll checks = 42/42. FIXED during test: Pending cleared after pace-wait (reject arrives mid-wait); 2 harness check-sequence bugs (field not switched before rarity checks).
+- Pushed 6e3b217 + merge-ready msg to glm2. Awaiting skeleton.
