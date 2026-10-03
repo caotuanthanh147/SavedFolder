@@ -29,8 +29,11 @@ Weapons.Sync, Zodiac.Exam.
   dist 8, 0.35s debounce, one at a time (HoldingTag "HoldingBin" on char).
 - `{T="Throw", At=<Vector3>}` — L142333 (client sets HRP CFrame to face At
   first; ThrowCooldown 1.2s, Range 40). `{T="Drop"}` — L142344.
-- Candidate "Auto Trash Run" job loop (Take→carry→Throw at a trash can) —
-  NOT claimed by anyone; open if the user wants economy farming.
+- NOT a job loop — CORRECTED 09:15Z after full config read (L170062-170094):
+  TrashBin is a throwable WEAPON/prop (Damage=10, RagdollSec=1.6, HitSpeed,
+  LaunchUp + HomeStuds=300/LooseSec=90/VoidY cleanup — zero reward/cash/score
+  fields). Take/Throw = pick up bin, throw at players. No autofarm value
+  (Rule 11); declined SH2-c on this evidence.
 
 ### One-shot claims (recorded for completeness; glm2 Rule 11 REMOVE concurred)
 - GroupReward.Action `{Action="Claim"}` L153742 (client gates via own
