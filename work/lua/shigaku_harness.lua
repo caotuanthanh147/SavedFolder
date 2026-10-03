@@ -1234,7 +1234,7 @@ local function makeDummy(name, behavior, pos)
     return d
 end
 local DummyUsable = makeDummy("CombatDummy1", "Regular", { 5, 5, 5 })
-local DummyKnocked = makeDummy("CombatDummy2", "Knocked", { -5, 5, 5 })
+local DummyKnocked = makeDummy("CombatDummy2", "Knocked", { 2, 5, 2 })
 
 local Tagged = {
     CombatDummy = { DummyUsable, DummyKnocked },
