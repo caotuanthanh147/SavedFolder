@@ -323,13 +323,20 @@ do
         end
         return nil
     end
-    function imt:FindFirstChildWhichIsA(cls)
-        for _, c in ipairs(self._children) do
+    local function findWhichIsA(inst, cls, recursive)
+        for _, c in ipairs(inst._children) do
             if c:IsA(cls) then
                 return c
             end
+            if recursive then
+                local deep = findWhichIsA(c, cls, true)
+                if deep then return deep end
+            end
         end
         return nil
+    end
+    function imt:FindFirstChildWhichIsA(cls, recursive)
+        return findWhichIsA(self, cls, recursive)
     end
     function imt:FindFirstChildOfClass(cls)
         for _, c in ipairs(self._children) do
@@ -902,6 +909,8 @@ local WorldItemMock = {
     Config = { InteractRadius = 10 },
     GetBox = function(root)
         if root._cframe then return root._cframe, root.Size or Vector3.new(2, 2, 2) end
+        local pp = root.PrimaryPart
+        if pp and pp._cframe then return pp._cframe, pp.Size or Vector3.new(2, 2, 2) end
         return CFrame.new(0, 0, 0), Vector3.new(2, 2, 2)
     end,
     OutOfRange = function(a, b)
@@ -920,6 +929,16 @@ local ExtractMock = {
     MIN_HOLD = 1,
     MAX_HOLD = 60,
     RANGE_SLACK = 4,
+    IsDisabled = function(inst)
+        return inst ~= nil and inst:GetAttribute("ExtractDisabled") == true
+    end,
+    HoldSecondsOf = function(prompt)
+        local v = prompt and tonumber(prompt.HoldDuration)
+        if v == nil or v <= 0 then v = 5 end
+        if v < 1 then v = 1 end
+        if v > 60 then v = 60 end
+        return v
+    end,
 }
 
 local InteractableMock = {
@@ -949,6 +968,22 @@ local ContainerNetMock = {
     },
 }
 local ContainerMock = { Rules = ContainerRulesMock, Net = ContainerNetMock }
+
+local PickupPointMock = {
+    Encode = function(cf, size, pos)
+        return Vector3.new(0, 0, 0)
+    end,
+}
+
+local GlovesMock = {
+    Net = {
+        ACT = "GlovesAct",
+        RESULT = "GlovesResult",
+        DENY = "GlovesDeny",
+        Sync = "Gloves",
+        Op = { ROLL = "roll", EQUIP = "equip", ROLL_TICKET = "rollTicket" },
+    },
+}
 
 -- ===== RS tree =====
 local RS = Instance.new("Folder", "ReplicatedStorage")
@@ -988,9 +1023,17 @@ do
 end
 addModule(rsClientCore, "ContainerState", ContainerStateMock)
 addModule(rsFeatures, "WorldItem", WorldItemMock)
+do
+    local wiModule
+    for _, m in ipairs(rsFeatures._children) do
+        if m.Name == "WorldItem" then wiModule = m end
+    end
+    addModule(wiModule, "PickupPoint", PickupPointMock)
+end
 addModule(rsFeatures, "Extract", ExtractMock)
 addModule(rsFeatures, "Interactable", InteractableMock)
 addModule(rsFeatures, "Container", ContainerMock)
+addModule(rsFeatures, "Gloves", GlovesMock)
 do
     local containerModule
     for _, m in ipairs(rsFeatures._children) do
@@ -1061,14 +1104,15 @@ local function mkContainer(name, pos, cid)
     local body = mkPart("Body", model, pos)
     model.PrimaryPart = body
     containerZone:AddChild(model)
-    model:SetAttribute("ContainerCid", cid)
     local prompt = mkPrompt("SearchPrompt", body)
+    prompt:SetAttribute("ContainerCid", cid)
+    model:SetAttribute("ContainerCid", cid)
     addTag(model, "Interactable")
-    model:SetAttribute("InteractId", cid and 7000 + tonumber(string.match(cid, "%d+") or 1) or 7001)
+    model:SetAttribute("InteractId", 7000 + tonumber(string.match(cid, "%d+") or 1))
     return model, prompt
 end
-local safe1, safe1Prompt = mkContainer("Safe_01", Vector3.new(10, 1, 0), "cid_safe_1")
-local safe2, safe2Prompt = mkContainer("Safe_02", Vector3.new(20, 1, 0), "cid_safe_2")
+local safe1, safe1Prompt = mkContainer("Safe_01", Vector3.new(5, 1, 0), "cid_safe_1")
+local safe2, safe2Prompt = mkContainer("Safe_02", Vector3.new(8, 1, 3), "cid_safe_2")
 local cabinetFar, cabinetFarPrompt = mkContainer("Cabinet_Far", Vector3.new(500, 1, 0), "cid_cab_9")
 
 -- world items (loose loot: parts with WorldItemId attr + registry records)
@@ -1099,8 +1143,11 @@ RegistryMock.Remove(4)
 
 -- character + camera
 local PLR = Instance.new("Player", "LocalPlayer")
+PLR.Idled = Signal.new()
 PLR.Character = Instance.new("Model", "Character")
-local HRP = mkPart("HumanoidRootPart", PLR.Character, Vector3.new(0, 3, 0))
+PLR.Character.PrimaryPart = mkPart("HumanoidRootPart", PLR.Character, Vector3.new(0, 3, 0))
+PLR.Character:AddChild(Instance.new("Humanoid", "Humanoid"))
+local HRP = PLR.Character.PrimaryPart
 local Camera = Instance.new("Camera", "Camera")
 Camera:SetCFrame(CFrame.new(0, 5, -10))
 WS:AddChild(Camera)
@@ -1206,6 +1253,13 @@ G.pcall = function(fn, ...)
     end
     return ok, err
 end
+local oldLoadstring = G.loadstring
+G.loadstring = function(src, name)
+    if src == "LIB" then return function() return Library end end
+    if src == "THEME" then return function() return ThemeManager end end
+    if src == "SAVE" then return function() return SaveManager end end
+    return oldLoadstring(src, name)
+end
 local fn = G.loadstring(ScriptSrc, "=(Plunder)")
 G.task.spawn(fn)
 pump(2.0)
@@ -1247,7 +1301,7 @@ if Library.Toggles.AutoPickup then
         local a = teArgs("ToolPickupAction", function(c)
             return c.args[1] == "pickup"
         end)
-        return a ~= nil and typeof(a[3]) == "Vector3"
+        return a ~= nil and type(a[3]) == "table" and a[3].X ~= nil
     end)())
     check("AutoPickup: near records 1+2 both picked, far record 3 not", (function()
         local got1, got2, got3 = false, false, false
@@ -1344,12 +1398,14 @@ if Library.Toggles.AutoRequeue then
     Library.Toggles.AutoRequeue:SetValue(true)
     pump(0.5)
     if resultSig then resultSig.OnClientEvent:Fire({ won = true }) end
-    pump(1.0)
+    pump(2.2)
     check("AutoRequeue: MatchResultShow -> MatchResultChoice lobby", teCount("MatchResultChoice", function(c) return c.args[1] == "lobby" end) >= 1)
     local reconnectSig = TEOnRemote["ReconnectOffer"]
     if reconnectSig then
-        for _, f in ipairs(reconnectSig) do f() end
-        pump(1.0)
+        for _, f in ipairs(reconnectSig) do
+            G.task.spawn(f)
+        end
+        pump(1.5)
     end
     check("AutoRequeue: ReconnectOffer -> ReconnectChoice return", teCount("ReconnectChoice", function(c) return c.args[1] == "return" end) >= 1)
     Library.Toggles.AutoRequeue:SetValue(false)

@@ -180,3 +180,32 @@ NOTHING else. The toggles ARE the UI; no labels, no invented controls.
 — glm1, PL1-A, 2026-10-04 ~16:05Z. Harness (PL1-H) next: TEvent mock
 world + Registry/ContainerState/Value mocks + the 5 core features'
 wire tuples.
+
+## 8. Addendum — build decisions (PL1 executed by glm1 after glm2 no-response, 2026-10-04 ~17:00Z)
+
+- glm2 never claimed PL1 (offline since 15:17 +0700, pre-dates the game
+  upload); per the TASKS fallback note glm1 built it. glm2 gets first
+  review / any wrap lane on return.
+- **Dropped from v1 (§10, not verifiable)**: AutoSell — the sell wire
+  (`{op="sell", cid, uid, bulk}`, L187543) carries a UI-selection context
+  (SellSelectionModels); the sell-panel flow (which cid owns which uid at
+  sell time, sell-zone gating) is not traceable from client code alone.
+  Needs a user order or server-side intel. AutoVault (StoreAct vault) +
+  SkeletonCrew draw/claim: same class, left out.
+- **Included**: AutoRoll (GlovesAct Net.Op.ROLL via module) — the
+  auto-gacha class (ST6 precedent), currency gate is server-side.
+- **Listener-registration risk (documented assumption)**: TEvent.OnRemote
+  multi-listener support is unverified (TEvent.Module runtime-injected).
+  The build registers ONE OnRemote handler (ReconnectOffer) alongside
+  the game's own — if OnRemote is overwrite-style this would break the
+  game's handler. Natural framework implementation is Connect-based
+  (multi-safe); MatchResultShow uses Remote.new().OnClientEvent (the
+  multi-safe pattern) instead. Residual risk flagged; harness models the
+  Connect semantics.
+- **Listener late-registration fix**: the AutoRequeue listener block
+  retries via task.spawn loop (module-wait pattern, §14.2 lazy-wait
+  precedent) — TEvent.Module is runtime-injected; one-shot resolution at
+  auto-exec time could silently skip listener wiring forever.
+- Gates: luac OK / lint 0 err / validate head846-tail18-0comments /
+  harness 25/25 on delivered bytes (both Public paths + canonical).
+  Delivered Public 4b0000a.

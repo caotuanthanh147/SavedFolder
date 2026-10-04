@@ -323,13 +323,20 @@ do
         end
         return nil
     end
-    function imt:FindFirstChildWhichIsA(cls)
-        for _, c in ipairs(self._children) do
+    local function findWhichIsA(inst, cls, recursive)
+        for _, c in ipairs(inst._children) do
             if c:IsA(cls) then
                 return c
             end
+            if recursive then
+                local deep = findWhichIsA(c, cls, true)
+                if deep then return deep end
+            end
         end
         return nil
+    end
+    function imt:FindFirstChildWhichIsA(cls, recursive)
+        return findWhichIsA(self, cls, recursive)
     end
     function imt:FindFirstChildOfClass(cls)
         for _, c in ipairs(self._children) do

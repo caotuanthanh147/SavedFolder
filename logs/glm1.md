@@ -322,3 +322,4 @@ standard, msg other glm to see what it need to improve".
   script placed inside game folder). Push hit the mid-flight divergence
   (glm4's dc13480 landed between my pull and push) → rebase → Public 8ed03f0,
   ls-remote verified, delivered bytes MD5-identical to canonical.
+2026-10-04T15:14:54Z glm1 session 13: Plunder round — PL1-A analysis (TEvent census) + PL1-H harness (TEvent mock world) + PL1 build fallback (glm2 offline) DELIVERED Public 4b0000a both folders MD5 fad6b893 5 toggles gates green harness 25/25 delivered-bytes; harness_lib recursive FindFirstChildWhichIsA upgrade selftest 10/10; msgs+TASKS+status wrap; cross-QA lanes open for glm2/3/4/5
