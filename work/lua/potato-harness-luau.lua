@@ -135,7 +135,12 @@ function M.transform(src)
     local prevSig = nil     -- last significant token (comment/nl excluded)
 
     local function emit(s) out[#out + 1] = s end
-    local function emitTok(t) emit(t.pre); emit(t.text) end
+    local function emitTok(t)
+        emit(t.pre)
+        if t.insertBefore then emit(t.insertBefore) end
+        if not t.skip then emit(t.text) end
+        if t.insertAfter then emit(t.insertAfter) end
+    end
 
     -- close if-expr frames whose else-branch terminates before `closer`
     local function closeFrames(closer)
@@ -241,6 +246,40 @@ function M.transform(src)
                 emitTok(t); prevSig = t
                 S[#S + 1] = { kind = "whilehdr" }
             elseif x == "for" then
+                -- Luau generalized iteration repair: `for k, v in EXPR, nil do`
+                -- is table iteration; Lua 5.4 needs pairs(EXPR). Detect at the
+                -- header, flag the tokens, emit rewritten.
+                do
+                    local j = idx + 1
+                    local depth = 0
+                    local inPos, commaPos, doPos
+                    while j <= #toks do
+                        local tk, tx = toks[j].kind, toks[j].text
+                        if tx == "(" or tx == "{" or tx == "[" then
+                            depth = depth + 1
+                        elseif tx == ")" or tx == "}" or tx == "]" then
+                            depth = depth - 1
+                        elseif depth == 0 then
+                            if tk == "kw" and tx == "in" and not inPos then
+                                inPos = j
+                            elseif tk == "kw" and tx == "do" then
+                                doPos = j
+                                break
+                            elseif inPos and tx == "," and not commaPos then
+                                commaPos = j
+                            end
+                        end
+                        j = j + 1
+                    end
+                    if inPos and commaPos and doPos and doPos == commaPos + 2
+                        and toks[commaPos + 1].kind == "kw"
+                        and toks[commaPos + 1].text == "nil" then
+                        toks[inPos].insertAfter = " pairs("
+                        toks[commaPos].insertBefore = ")"
+                        toks[commaPos].skip = true
+                        toks[commaPos + 1].skip = true
+                    end
+                end
                 emitTok(t); prevSig = t
                 S[#S + 1] = { kind = "forhdr" }
             elseif x == "do" then
@@ -404,6 +443,26 @@ if arg and arg[0] and arg[0]:match("potato%-harness%-luau") then
     local f12 = load(t12, "=t12", "t", {})
     check("t12 loads (repeat trailing return)", f12 ~= nil)
     if f12 then local ok, r = pcall(f12); check("t12 runs: 4", ok and r == 4) end
+
+    -- Luau generalized iteration: `for k, v in t, nil do` -> pairs
+    local s13 = 'local t = { a = 1, b = 2 }\nlocal n = 0\nfor k, v in t, nil do\n\tn = n + v\nend\nreturn n\n'
+    local t13 = M.transform(s13)
+    local f13 = load(t13, "=t13", "t", {})
+    check("t13 loads (generalized iteration)", f13 ~= nil)
+    if f13 then local ok, r = pcall(f13); check("t13 runs: 3", ok and r == 3) end
+
+    local s14 = 'local t = { 10, 20 }\nlocal n = 0\nfor k1, v1 in t, nil do\n\tif v1 == 10 then\n\t\tcontinue\n\tend\n\tn = n + v1\nend\nreturn n\n'
+    local t14 = M.transform(s14)
+    local f14 = load(t14, "=t14", "t", {})
+    check("t14 loads (gen-iter + continue)", f14 ~= nil)
+    if f14 then local ok, r = pcall(f14); check("t14 runs: 20", ok and r == 20) end
+
+    -- numeric for must NOT be rewritten
+    local s15 = "local n = 0\nfor i = 1, 10 do\n\tn = n + i\nend\nreturn n\n"
+    local t15 = M.transform(s15)
+    local f15 = load(t15, "=t15", "t", {})
+    check("t15 loads (numeric for untouched)", f15 ~= nil)
+    if f15 then local ok, r = pcall(f15); check("t15 runs: 55", ok and r == 55) end
 
     print(("LUAU-XFORM: %d/%d PASS"):format(pass, pass + fail))
     if fail > 0 then os.exit(1) end

@@ -31,6 +31,8 @@ end
 
 local Buffer = {}
 
+-- Luau buffer semantics: 0-BASED offsets, fixed size, overflow errors.
+
 local function bcheck(b)
     if type(b) ~= "table" or type(b.data) ~= "string" then
         error("buffer: expected buffer", 3)
@@ -57,17 +59,18 @@ end
 
 local function wrbytes(b, offset, s)
     bcheck(b)
-    if offset < 1 or offset + #s - 1 > #b.data then
+    if offset < 0 or offset + #s > #b.data then
         error("buffer: write out of bounds", 2)
     end
-    if #s == 0 then return offset end
-    b.data = b.data:sub(1, offset - 1) .. s .. b.data:sub(offset + #s)
+    if #s > 0 then
+        b.data = b.data:sub(1, offset) .. s .. b.data:sub(offset + #s + 1)
+    end
     return offset + #s
 end
 
 local function rdbounds(b, offset, n)
     bcheck(b)
-    if offset < 1 or offset + n - 1 > #b.data then
+    if offset < 0 or offset + n > #b.data then
         error("buffer: read out of bounds", 2)
     end
 end
@@ -100,35 +103,36 @@ end
 
 Buffer.readu8 = function(b, offset)
     rdbounds(b, offset, 1)
-    return string.unpack("<I1", b.data, offset)
+    return string.unpack("<I1", b.data, offset + 1)
 end
 Buffer.readu16 = function(b, offset)
     rdbounds(b, offset, 2)
-    return string.unpack("<I2", b.data, offset)
+    return string.unpack("<I2", b.data, offset + 1)
 end
 Buffer.readu32 = function(b, offset)
     rdbounds(b, offset, 4)
-    return string.unpack("<I4", b.data, offset)
+    return string.unpack("<I4", b.data, offset + 1)
 end
 Buffer.readi16 = function(b, offset)
     rdbounds(b, offset, 2)
-    return string.unpack("<i2", b.data, offset)
+    return string.unpack("<i2", b.data, offset + 1)
 end
 Buffer.readi32 = function(b, offset)
     rdbounds(b, offset, 4)
-    return string.unpack("<i4", b.data, offset)
+    return string.unpack("<i4", b.data, offset + 1)
 end
 Buffer.readf32 = function(b, offset)
     rdbounds(b, offset, 4)
-    return string.unpack("<f", b.data, offset)
+    return string.unpack("<f", b.data, offset + 1)
 end
 Buffer.readf64 = function(b, offset)
     rdbounds(b, offset, 8)
-    return string.unpack("<d", b.data, offset)
+    return string.unpack("<d", b.data, offset + 1)
 end
 Buffer.readstring = function(b, offset, count)
     rdbounds(b, offset, count)
-    return b.data:sub(offset, offset + count - 1), offset + count
+    if count <= 0 then return "", offset end
+    return b.data:sub(offset + 1, offset + count), offset + count
 end
 
 Buffer.fromstring = function(s)
@@ -143,24 +147,76 @@ end
 Buffer.copy = function(dst, dstOffset, src, srcOffset, count)
     bcheck(dst); bcheck(src)
     if count < 0 then error("buffer.copy: negative count", 2) end
-    if dstOffset < 1 or dstOffset + count - 1 > #dst.data
-        or srcOffset < 1 or srcOffset + count - 1 > #src.data then
+    if dstOffset < 0 or dstOffset + count > #dst.data
+        or srcOffset < 0 or srcOffset + count > #src.data then
         error("buffer: copy out of bounds", 2)
     end
-    if count == 0 then return end
-    local chunk = src.data:sub(srcOffset, srcOffset + count - 1)
-    dst.data = dst.data:sub(1, dstOffset - 1) .. chunk .. dst.data:sub(dstOffset + count)
+    if count > 0 then
+        local chunk = src.data:sub(srcOffset + 1, srcOffset + count)
+        dst.data = dst.data:sub(1, dstOffset) .. chunk .. dst.data:sub(dstOffset + count + 1)
+    end
 end
 
 Buffer.fill = function(b, offset, count, value)
     bcheck(b)
     if count < 0 then error("buffer.fill: negative count", 2) end
-    if offset < 1 or offset + count - 1 > #b.data then
+    if offset < 0 or offset + count > #b.data then
         error("buffer: fill out of bounds", 2)
     end
-    if count == 0 then return end
-    local byte = string.pack("<I1", masku(value or 0, 8))
-    b.data = b.data:sub(1, offset - 1) .. byte:rep(count) .. b.data:sub(offset + count)
+    if count > 0 then
+        local byte = string.pack("<I1", masku(value or 0, 8))
+        b.data = b.data:sub(1, offset) .. byte:rep(count) .. b.data:sub(offset + count + 1)
+    end
+end
+
+-- Luau bit-level access: LSB-first bit numbering across the buffer.
+Buffer.readbits = function(b, bitOffset, width)
+    bcheck(b)
+    if width < 1 or width > 32 then
+        error("buffer.readbits: width must be 1..32", 2)
+    end
+    local lastBit = bitOffset + width - 1
+    local lastByte = lastBit // 8
+    if bitOffset < 0 or lastByte >= #b.data then
+        error("buffer: readbits out of bounds", 2)
+    end
+    local value = 0
+    for i = 0, width - 1 do
+        local bit = bitOffset + i
+        local bytePos = bit // 8
+        local bitPos = bit % 8
+        local byte = b.data:byte(bytePos + 1)
+        local bitVal = (byte >> bitPos) & 1
+        value = value | (bitVal << i)
+    end
+    return value
+end
+
+Buffer.writebits = function(b, bitOffset, width, value)
+    bcheck(b)
+    value = value // 1
+    if width < 1 or width > 32 then
+        error("buffer.writebits: width must be 1..32", 2)
+    end
+    local lastBit = bitOffset + width - 1
+    local lastByte = lastBit // 8
+    if bitOffset < 0 or lastByte >= #b.data then
+        error("buffer: writebits out of bounds", 2)
+    end
+    for i = 0, width - 1 do
+        local bit = bitOffset + i
+        local bytePos = bit // 8
+        local bitPos = bit % 8
+        local byte = b.data:byte(bytePos + 1)
+        local bitVal = (value >> i) & 1
+        if bitVal == 1 then
+            byte = byte | (1 << bitPos)
+        else
+            byte = byte & (~(1 << bitPos))
+        end
+        b.data = b.data:sub(1, bytePos) .. string.char(byte & 0xFF)
+            .. b.data:sub(bytePos + 2)
+    end
 end
 
 M.Buffer = Buffer
@@ -347,15 +403,15 @@ local function selftest()
 
     -- buffer roundtrips
     local b = Buffer.create(64)
-    local o = 1
+    local o = 0
     o = Buffer.writeu8(b, o, 255); o = Buffer.writeu16(b, o, 65535)
     o = Buffer.writeu32(b, o, 4294967295); o = Buffer.writei16(b, o, -32768)
     o = Buffer.writei32(b, o, -2147483648)
     o = Buffer.writef32(b, o, 0.25); o = Buffer.writef64(b, o, math.pi)
     o = Buffer.writestring(b, o, "hello")
-    check("buffer writes consumed 30", o == 31)
+    check("buffer writes consumed 30", o == 30)
     local v
-    o = 1
+    o = 0
     v = Buffer.readu8(b, o); check("readu8 255", v == 255); o = o + 1
     v = Buffer.readu16(b, o); check("readu16 65535", v == 65535); o = o + 2
     v = Buffer.readu32(b, o); check("readu32 max", v == 4294967295); o = o + 4
@@ -364,22 +420,40 @@ local function selftest()
     v = Buffer.readf32(b, o); check("readf32 0.25", v == 0.25); o = o + 4
     v = Buffer.readf64(b, o); check("readf64 pi", math.abs(v - math.pi) < 1e-15); o = o + 8
     local s2
-    s2, o = Buffer.readstring(b, o, 5); check("readstring hello", s2 == "hello" and o == 31)
+    s2, o = Buffer.readstring(b, o, 5); check("readstring hello", s2 == "hello" and o == 30)
     check("len", Buffer.len(b) == 64)
     check("tostring/fromstring", Buffer.tostring(Buffer.fromstring("abc")) == "abc")
     local b2 = Buffer.fromstring("AAAABBBBCCCC")
-    Buffer.copy(b2, 5, Buffer.fromstring("XY"), 1, 2)
+    Buffer.copy(b2, 4, Buffer.fromstring("XY"), 0, 2)
     check("copy", Buffer.tostring(b2) == "AAAAXYBBCCCC")
     local b3 = Buffer.create(4)
-    Buffer.fill(b3, 2, 2, 7)
+    Buffer.fill(b3, 1, 2, 7)
     check("fill", Buffer.tostring(b3) == "\0\7\7\0")
-    local okOvf = pcall(Buffer.writeu8, b, 65, 1)
+    local okOvf = pcall(Buffer.writeu8, b, 64, 1)
     check("write overflow errors", not okOvf)
-    local okRd = pcall(Buffer.readu8, b, 65)
+    local okRd = pcall(Buffer.readu8, b, 64)
     check("read overflow errors", not okRd)
     local okNeg = pcall(Buffer.writeu8, Buffer.create(2), 1, 300)
     check("writeu8 masks (no error)", okNeg)
     check("writeu8 mask value", (function() local bb = Buffer.create(2); Buffer.writeu8(bb, 1, 300); return Buffer.readu8(bb, 1) == 44 end)())
+    check("offset 0 valid (Luau 0-based)", (function() local bb = Buffer.create(2); local no = Buffer.writeu8(bb, 0, 9); return no == 1 and Buffer.readu8(bb, 0) == 9 end)())
+
+    -- bit-level roundtrips (Luau readbits/writebits, LSB-first)
+    do
+        local bb = Buffer.create(4)
+        Buffer.writebits(bb, 0, 10, 1023)
+        check("writebits/readbits 10 bits", Buffer.readbits(bb, 0, 10) == 1023)
+        Buffer.writebits(bb, 10, 5, 31)
+        check("writebits/readbits 5 bits @10", Buffer.readbits(bb, 10, 5) == 31)
+        Buffer.writebits(bb, 15, 1, 1)
+        check("writebits/readbits 1 bit @15", Buffer.readbits(bb, 15, 1) == 1)
+        check("readbits 16 all", Buffer.readbits(bb, 0, 16) == 65535)
+        local bc = Buffer.create(4)
+        Buffer.writebits(bc, 4, 24, 0xABCDEF)
+        check("writebits/readbits 24 bits @4", Buffer.readbits(bc, 4, 24) == 0xABCDEF)
+        local okBits = pcall(Buffer.readbits, bb, 32, 1)
+        check("readbits out of bounds errors", not okBits)
+    end
 
     print(("CORE-1: %d/%d PASS"):format(pass, pass + fail))
     if fail > 0 then os.exit(1) end
