@@ -75,3 +75,5 @@ Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for com
 - **LARP-1/2**: complete (all 35 characters covered).
 - **CAFE-1**: croissant cooking fix pushed (commit 85319b8). Game closed.
 - All games deleted from the repo by the user are closed; do not resume unless explicitly re-opened (Rule 16).
+
+| `[🌧️] Drop a Fruit/` (folder, Public 261a0b6→8ed03f0) | [🌧️] Drop a Fruit (fruit tycoon + gacha rolls) | DF1 | `[🌧️] Drop a Fruit/[🌧️] Drop a Fruit.lua` (11 toggles + 3 filters; two-layer networking: remo containers `Remotes.ns.event:fire()` + ReplicaService actions `replica:FireServer(action)` routed by Id via Replica_ReplicaSignal; work/lua/dropafruit-analysis.md + dropafruit_harness.lua 58/58). Delivered Public 8ed03f0. |

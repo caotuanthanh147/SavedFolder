@@ -290,3 +290,35 @@ standard, msg other glm to see what it need to improve".
   (glm2 ran as "parallel glm1" reading the wrong inbox) corrected with
   full honest attribution by glm2. TASK_SOURCE row + status + this log =
   wrap. No force-pushes; one hand-resolved rebase.
+
+## Session 11 (2026-10-04 00:41-01:35Z) — DF1 Drop a Fruit solo round + multi-GLM coordination
+
+- Sandbox reset again (SavedFolder/Public gone) → re-cloned + bootstrap glm1 +
+  watchers. Mandatory reading done in order (ONBOARDING → PROMPT → TASKS →
+  guide head-to-toe → Template head-to-toe → lessons).
+- New game `[🌧️] Drop a Fruit.zip` arrived Public 261a0b6 (~5 min before I
+  saw it); claimed DF1 solo (7ae4c00). Second game (Steal A Car) arrived 7 min
+  later — glm3 claimed SAC1+SAC2; glm4 back online, took SAC1 after glm3 stall
+  → delivered buggy → WITHDREW (glm3 census caught 2 mis-verified wires) →
+  now on SAC1-H harness lane. I stayed DF-only, mediated lane discipline.
+- Analysis: two-layer networking (remo containers + ReplicaService replica
+  actions routed by Id). Full wire table + Rule 11 keep/remove list with
+  NAMED removals (timeskip/pack/offline/fountain/serverluck/session etc.) at
+  work/lua/dropafruit-analysis.md (97ee764). Key finds: fruit SendToHole is
+  THE value action (client-auth, hole bonus); rolls are FREE + buy costs;
+  game's own autoRoll needs a rebirth unlock (mine works from start); blitz =
+  instant N fruits/plant; _replicas registry is public = catch-up path for
+  pre-existing replicas.
+- Build: 11 toggles + 3 AddMultiDropdown filters, all §22-7 loops, template
+  helpers only, 0 comments, head836/tail18.
+- Harness REAL-LOAD 58/58 (dropafruit_harness.lua): remo wire tuples, replica
+  id-routing, roll state machine (match/buy/non-match/unaffordable), sell
+  chunking, upgrade spend-gating, blitz cooldown math, stars TP+collect +
+  MaxCollects, claims memo, no-removed-wires + no-transport-spam sweeps,
+  pcall interceptor 0. One real find during harness dev: test-data bug (mock
+  Rare entity cost 50000 vs profile 10000 Coin = genuinely unaffordable —
+  the harness caught MY check being wrong, not the script).
+- Delivery: folder mode (user converted zips→folders in 0acfce8 — no repack;
+  script placed inside game folder). Push hit the mid-flight divergence
+  (glm4's dc13480 landed between my pull and push) → rebase → Public 8ed03f0,
+  ls-remote verified, delivered bytes MD5-identical to canonical.
