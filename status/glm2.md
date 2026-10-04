@@ -1,29 +1,27 @@
 # glm2 status
 
-**Updated**: 2026-10-04 (session 8 — Potato round: POT1-H harness lane claimed)
+**Updated**: 2026-10-04 (session 8 — POT1-H DONE: 58/58 on delivered bytes)
 
-**Doing**: POT1-H — independent real-load harness for Peel THE Potato
-(two-place: game + lobby). Building the mock-world census from both
-deobfs (potato-census-glm2.md), then potato-harness-glm2.lua (SH3 v4
-canonical pattern: io.open+loadstring+spawn real-load, pcall
-interceptor, colon-safe mocks, wire tuples, toggle-off stop). Will run
-it against glm1's POT1 delivered bytes when they land + msg findings.
-glm1 owns POT1 full pipeline (claimed 04:35Z c13c1ea) — msg'd them
-before touching the game. SAC2 reply sent to glm3 (SCP zip: DELETE;
-scratch-section removals: no flag). 7 stale Shigaku msgs consumed
-(round closed, all handled sessions 6/7).
+**Doing**: idle — watching msgs + Public. POT1-H complete (2abc8de): the
+deobf-backed real-module harness ran glm1's delivered Potato.lua (Public
+4fcbc2d) through the REAL game wire stack — Resources.Packets +
+ModifiedPackages.Packet + _Types/_Signal/_Task executed from the deobf
+regions in a mock world, 5 documented deobf-mask repairs, Luau->Lua5.4
+transform (if-expr/continue/gen-iter/0-based buffer + readbits/writebits).
+58/58: real-load, 15 toggles, decoded-wire assertions via loopback (real
+serializer -> Heartbeat flush -> FireServer capture -> real decoder),
+toggle-off stops, banned sweep, 0 swallows. Findings msg'd to glm1 (zero
+findings vs their delivery). Census (world+code, spot-verified 6/6) +
+intel msgs earlier in the session.
 
-**Session note**: sandbox reset again -> bootstrap.sh glm2, watchers
-restarted. This session's direct tools glitched (Bash/Read failing —
-suspect the nohup watcher startup); operating via subagents whose
-shells are clean. Work unaffected.
+**Last**: Shigaku round (v2 Public 0c03f2b approved); SAC2 reply to glm3
+(SCP zip delete — glm3 executed); lane coordination with glm4 (analysis=
+theirs, harness=mine).
 
-**Last**: Shigaku round CLOSED — v2 Public 0c03f2b APPROVED (glm1
-final verdict, 54/0 canonical on delivered bytes).
+**Files (mine, session 8)**: work/lua/{potato-census-world-glm2.md,
+potato-census-code-glm2.md, potato-harness-core.lua, potato-harness-luau.lua,
+potato-harness-glm2.lua}; TASKS POT1-H row; msgs (glm1 x3, glm3, glm4 x2);
+status/logs.
 
-**Files (mine, this session)**: msgs/glm3 + msgs/glm1 (SAC2 reply,
-POT1-H claim), TASKS.md POT1-H row, status/glm2.md, logs/glm2.md,
-work/lua/potato-census-glm2.md + potato-harness-glm2.lua (in flight).
-
-**Next**: census both places -> build harness -> POT1 delivery lands ->
-run + report -> audit support if glm1 wants it.
+**Next**: round wrap — glm1 re-audit call if they want; standing by for
+the next game / user orders.

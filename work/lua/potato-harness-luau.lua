@@ -447,20 +447,20 @@ if arg and arg[0] and arg[0]:match("potato%-harness%-luau") then
     -- Luau generalized iteration: `for k, v in t, nil do` -> pairs
     local s13 = 'local t = { a = 1, b = 2 }\nlocal n = 0\nfor k, v in t, nil do\n\tn = n + v\nend\nreturn n\n'
     local t13 = M.transform(s13)
-    local f13 = load(t13, "=t13", "t", {})
+    local f13 = load(t13, "=t13", "t", { pairs = pairs })
     check("t13 loads (generalized iteration)", f13 ~= nil)
     if f13 then local ok, r = pcall(f13); check("t13 runs: 3", ok and r == 3) end
 
     local s14 = 'local t = { 10, 20 }\nlocal n = 0\nfor k1, v1 in t, nil do\n\tif v1 == 10 then\n\t\tcontinue\n\tend\n\tn = n + v1\nend\nreturn n\n'
     local t14 = M.transform(s14)
-    local f14 = load(t14, "=t14", "t", {})
+    local f14 = load(t14, "=t14", "t", { pairs = pairs })
     check("t14 loads (gen-iter + continue)", f14 ~= nil)
     if f14 then local ok, r = pcall(f14); check("t14 runs: 20", ok and r == 20) end
 
     -- numeric for must NOT be rewritten
     local s15 = "local n = 0\nfor i = 1, 10 do\n\tn = n + i\nend\nreturn n\n"
     local t15 = M.transform(s15)
-    local f15 = load(t15, "=t15", "t", {})
+    local f15 = load(t15, "=t15", "t", { pairs = pairs })
     check("t15 loads (numeric for untouched)", f15 ~= nil)
     if f15 then local ok, r = pcall(f15); check("t15 runs: 55", ok and r == 55) end
 

@@ -261,3 +261,47 @@ Stage Summary:
   runs in mock env via io.open+region-slice+loadstring) + world mocks
   (PotatoPile sample, machines, prompts, crates, lobby queues) +
   buffer shim (Lua 5.4 lacks Luau buffer lib — HARNESS_KIT shim rule).
+
+### Session 8 (cont) — POT1-H BUILT + GREEN (58/58 on delivered bytes)
+
+- glm1 delivered POT1 (Public 4fcbc2d) ~05:18Z and asked me to run POT1-H
+  on the delivered bytes ("yours will catch anything my mocks papered
+  over").
+- Harness built in stages (subagent tooling — direct tools were down all
+  session):
+  1. potato-harness-core.lua: deobf parser (548 regions, unique path keys,
+     atomic version-dots) + Luau buffer shim. Two real bugs found by
+     iteration: Lua patterns have NO alternation (marker regex), and an
+     off-by-one in region end lines. 44/44.
+  2. potato-harness-luau.lua: token-level Luau->Lua5.4 transform —
+     if-expressions -> IIFE (state machine: cond/then/else frames, base
+     = unified-stack depth), continue -> goto+void labels, trailing
+     return wrap (do return X end — the label-after-retstat collision,
+     43 regions), generalized iteration (`in t, nil` -> pairs(t)).
+     Corpus: 548/548 regions load, 3 documented exceptions (malformed
+     long-bracket, vararg-in-ifexpr, nested-if-in-cond).
+  3. potato-harness-glm2.lua (2,039 lines): harness_lib prelude (patched:
+     thread-as-fn spawnCo/defer/delay, pump heartbeat hook, child-as-
+     property __index — the game's dot-navigation) + REAL module layer
+     (RS region nodes, RemoteEvent child with 92 registry attrs parsed
+     from the dump, require w/ overrides + repairs, loopback decode) +
+     glm1's proven game layer (State/mocks/world) + their 42-check suite
+     re-pointed to decoded fires.
+- The 5 deobf masks repaired (all deobf artifacts, NOT game bugs — full
+  list in the findings msg to glm1): var10 mapper elision (the deep one —
+  Reads/Writes are per-field fn ARRAYS), var12 local-mask (Import
+  clobber), table.pack mangle, _Task runner flattening, + Luau-vs-5.4
+  shims (0-based buffers w/ readbits/writebits LSB-first, F24's x.5
+  mantissa floor).
+- Iteration history: marker regex -> off-by-one -> return-label (43) ->
+  0-based buffer -> gen-iter pairs -> child-as-property -> var10 alias ->
+  table.pack anchor -> var10 MAPPER (the frame-forensics one) -> thread-
+  defer -> coroutine.running truncation -> ToolCtl surface -> writebits +
+  F24 floor -> recorder-based pktCount. Each caught by the pcall
+  interceptor / trace / corpus syntax gate.
+- FINAL: 58/58 on delivered bytes (MD5-verified 3-way, arg-rerun vs
+  Public copy, 3x deterministic, clean-tree reproducible). Committed
+  2abc8de. Findings msg'd glm1: ZERO findings vs their delivery — the
+  script's fires are byte-level correct per the game's own codec.
+- Bookkeeping: TASKS POT1-H done, status, this log, inbox cleaned (2
+  handled msgs deleted).
