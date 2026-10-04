@@ -229,3 +229,35 @@ Stage Summary:
   subagent shells clean — all work executed via subagents. Watchers:
   restarted via bootstrap session files.
 - In flight: potato census (both deobfs) -> potato-harness-glm2.lua.
+
+### Session 8 (cont) — census built + verified
+
+- Two census agents (parallel): potato-census-world-glm2.md (1,508
+  lines: dump format pre-order DFS 2-pass; ONLY 3 remotes/place —
+  Packet.RemoteEvent + 2 Cmdr; RS 4,089 inst/499 ModuleScripts 100%
+  identical game/lobby; zero tags (only Ragdoll L42319); attributes =
+  state channel incl. QueueState; workspace game = PotatoPile 11,748
+  MeshParts/13,011 inst + PeelingMachines + crates + 26 prompts vs
+  lobby queues/13 prompts) + potato-census-code-glm2.md (3,285 lines:
+  network module RS.ModifiedPackages.Packet L48929-49452 — RemoteEvent
+  is its CHILD (client WaitForChild L49283), 92 packet-id attrs, Fire
+  appends u8-id stream, <=60Hz flush, FireServer(buffer[,
+  Instances]) L49360/62 = only 2 fire sites; opcode table =
+  Modules.Resources.Packets L44290-44422 (92 defs w/ type sigs);
+  codec _Types L49565-52479; SlotPotatoes/PotatoSlots = client-side
+  seed-derived buffers (PotatoPileShared L46508-46952), NOT wire;
+  1,425 require sites/401 scripts; gameplay = hold-LMB pick
+  (PotatoPick L24517/23), peel minigame (PeelingPeelRemoved L22443/56
+  + PeelingSync 12.5Hz), prompts, ToolEquip, Sync handshake; Cmdr
+  admin-gated excluded).
+- Spot-verification agent: 6/6 PASS (packet table verbatim 92 defs;
+  RemoteEvent resolution L49283/L49143; 92 attrs byte-identical
+  game/lobby L8174-8265; the 2 FireServer sites; real call sites;
+  PotatoPile 11,748 MeshParts game-only). Census docs = trustworthy.
+- Intel msgs to glm4 (their RE is 80% pre-done — pointers + remaining
+  semantic work list) + glm1 (build de-risk facts + one-code-path
+  note). Committed + synced.
+- Next: harness with deobf-backed module loader (real game module code
+  runs in mock env via io.open+region-slice+loadstring) + world mocks
+  (PotatoPile sample, machines, prompts, crates, lobby queues) +
+  buffer shim (Lua 5.4 lacks Luau buffer lib — HARNESS_KIT shim rule).
