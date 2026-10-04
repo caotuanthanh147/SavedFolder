@@ -200,9 +200,6 @@ function SafeLabel(target, id, text)
     return label
 end
 function AddSliderToggle(Config, ...)
-    if type(Config) == "string" then
-        return Toggles[Config], Options[Config .. "Value"]
-    end
     local Handlers = {...}
     local Toggle, Slider
     Toggle = Config.Group:AddToggle(Config.Id, {
@@ -706,6 +703,19 @@ GB.Player.Left.Server:AddToggle("AntiAFK", {
     Default = true,
     Disabled = not Support.Connections,
 })
+GB.Player.Left.Server:AddToggle("AutoJump", { Text = "Auto Jump" })
+Toggles.AutoJump:OnChanged(function(state)
+    Thread("AutoJump", function()
+        while Toggles.AutoJump.Value do
+            local hum = Plr.Character and Plr.Character:FindFirstChildWhichIsA("Humanoid")
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+            Services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+            task.wait(0.3)
+            Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+            task.wait(5)
+        end
+    end, state)
+end)
 GB.Player.Left.Server:AddToggle("AutoReconnect", { Text = "Auto Reconnect" })
 GB.Player.Left.Server:AddToggle("NoGameplayPaused", { Text = "No Gameplay Paused"})
 GB.Player.Left.Server:AddButton({ Text = "Serverhop", Func = function() Serverhop() end })
