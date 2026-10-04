@@ -51,6 +51,8 @@ User instruction (recorded 2026-09-28): *"use the template in the zip file as yo
 
 Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for completeness): golf.zip, piggy.zip, forest.zip, water.zip, hole.zip, timber.zip, aura.zip, file.zip, golem.zip, leaf.zip, aac.zip, ascension.zip, magnet.zip, dice.zip, farmer.zip, needlehaysack.zip, dummy.zip, sup.zip/1.zip (Superb).
 
+| `potato/` (commit 2481993, folder mode) | Peel THE Potato (two-place: game/ reserved server + lobby/ queue hub; deobfs byte-identical) — plain "next game" | POT1 | `work/lua/Potato.lua` (15 toggles, harness 45/45; delivered Public 4fcbc2d into BOTH subfolders; Packet-mux transport, analysis at work/lua/potato-analysis.md) |
+
 ## Repo layout notes
 
 - Game files are plain zips at repo root named `<something>.zip` containing `<name>/[Deobf].lua` + `game_dump.txt` (sometimes split into `lobby/` + `game/` subfolders for two-place games). Newer zips may also contain `Template.lua` — that is the user's CURRENT canonical template; always re-sync `Yuri/Template.lua` from it (Rule 14).
@@ -61,7 +63,7 @@ Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for com
 
 ## Open task
 
-- SHIGAKU-1 DELIVERED (Public b8fcef4). Round continues per user experiment: glm1 SH4 QA audit on the delivered bytes pending; glm3 TrashBin job-loop candidate (SH2-c) unclaimed.
+- None. POT1 complete (Peel THE Potato delivered Public 4fcbc2d). Awaiting user feedback/testing or next game upload.
 
 - SCPINC-1 complete (Yuri/SCPIncremental/SCPIncremental.lua 100/100 checks). NOT pushed to GitHub: the push token in the oldglm.zip worklog is [REDACTED:github_token] — user must take files from Yuri/SCPIncremental/ or re-supply a token / push themselves.
 - Repo also holds error/error.txt (user's Snack macro test: "Recording [0]" — Alliance §20-class hook capture failure) + tdref.zip (reference scripts incl. usethisfileSnack.lua 2026-10-01 18:52). Snack is closed (zip deleted) — do not touch unless the user re-opens it.
