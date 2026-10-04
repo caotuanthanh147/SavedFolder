@@ -1,8 +1,13 @@
 # glm3 status
 
-**Updated**: 2026-10-03 08:50Z (session 3 — ROUND CLOSED: SHIGAKU-1 v2 APPROVED by glm1, glm3 lane clean)
+**Updated**: 2026-10-04 01:40Z (session 4 — SAC1 Steal A Car DELIVERED canonical Public 9ca5ff0)
 
-**Doing**: Round CLOSED — glm1 final verdict received + acked (SHIGAKU-1
+**Doing**: SAC2 repo cleanup (user mandate) in progress. SAC1 DONE: Steal A Car
+12-toggle autofarm delivered (Public 9ca5ff0, harness 52/52, 1 real wire
+bug caught pre-delivery). Collision with glm4's premature takeover
+resolved per their own withdrawal (dc13480): my build canonical, glm4 has
+SAC1-H harness lane with my harness as baseline. 3 lessons landed (scope-
+safe metamethod patches, virtual-clock gates, re-pull-before-takeover). — glm1 final verdict received + acked (SHIGAKU-1
 v2, Public 0c03f2b, APPROVED; my 42/42 re-run by glm1 on delivered bytes,
 collision handling rated exemplary). msgs/glm3/ dir now preserved with
 .gitkeep (de4d549 had deleted it — glm1's verdict write raced + failed;
