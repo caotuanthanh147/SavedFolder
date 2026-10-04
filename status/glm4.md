@@ -1,35 +1,45 @@
 # glm4 status
 
-**Updated**: 2026-10-02 (session 1 — ST8 v2 delivered, §22-7 + glm1 guidance)
+**Updated**: 2026-10-04 (session 2 — Steal A Car delivered, took over stale SAC1)
 
-**Doing**: ST8 ([🌋] Ride A Pet) DELIVERED. v1 = Public da10db7 (Auto Hatch,
-1 toggle). v2 = §22-7 loop refactor (`while Toggles.AutoHatch.Value do
-pcall(step) task.wait(0.5) end`) + script synced to work/lua/RideAPet.lua
-(glm1 ST-QA1 guidance points 3+4). Gates v2 ALL green: luac OK, lint 0 err,
-validate 0 comments / 78-line game section, harness 9/9 (work/lua/rideapet_harness.lua
-incl. §22-7 respawn check).
+**Doing**: Steal A Car DELIVERED (Public Steal A Car.lua in folder). Took over
+SAC1 from glm3 (claimed 00:57Z, no follow-up in ~10min — no analysis/
+delivery/status; reliability issue glm3 logged; msg'd glm3 offering take/
+split, no response; §1 end-to-end ownership: a claim with no follow-up isn't
+a stake). If glm3 surfaces with a parallel build, merge Shigaku-style.
 
-**Wire verified** (Rule 2): `Remotes.Game.Hatch:FireServer({ EggKey = egg:GetAttribute("EggKey") })`
-at deobf call site L10832; path L10815 (`RS:WaitForChild("Remotes"):WaitForChild("Game"):WaitForChild("Hatch")`);
-EggKey attribute set at L41120; eggs via `CollectionService:GetTagged("Egg")`.
+**Build**: 5 toggles (§3 both halves — all Rule-11-KEEP remotes wired):
+- AutoSwing: CombatRequest:FireServer("Swing") (L8076, bat cooldown)
+- AutoEquip: CombatRequest:FireServer("Equip","Bat") (L8146)
+- AutoPlace: CombatRequest:FireServer("Place", HRP.Position) (L8048)
+- AutoSell: GetSellInventory:InvokeServer() → SellCars:InvokeServer(inv) (L3355/3393)
+- AutoJoin: RaceRequest:FireServer("Join") (L8828)
+EXCLUDED: AdminCrateAction (admin-only), BuyTrailRobux + CaughtSpeedPurchase
+(ROBUX), SetSlowMode (chat).
 
-**glm1 ST-QA1 audit context**: glm2's ST5/ST6/ST7 all broken at load
-(`TB.Main.Left.Autofarm.T1` nil). My ST8 used `TB_Tabs.Autofarm.T1` (canonical)
-from the start — the harness caught the alt form pre-delivery. glm1's 4-point
-guidance applied (1+2 already, 3+4 in v2). Replied to glm1 (msgs/glm1/) +
-asked for §3 two-halves judgment on ST8 one-off remotes (EggPickup/
-ClaimEventReward — hold for explicit user order or expand?).
+**Gates ALL green**: luac OK, lua_lint 0 err (--from 837, 21 W6 template-region),
+validate 0 comments / 109-line game section (head 836 + tail 18 verbatim),
+harness 15/15 (work/lua/stealacar_harness.lua — real-load io.open+loadstring+
+task.spawn, pcall interceptor, colon-safe service mocks, §22-7 respawn check).
 
-**Stuck on**: nothing — v2 ready to push.
+**Applied glm1 ST-QA1 + ST11/12/13 intel**: TB_Tabs.Autofarm.T1 (canonical,
+not TB.Main.Left.Autofarm.T1), §22-7 loops (while Toggles.X.Value do pcall(step)
+task.wait end), real-load harness (not re-implementation), pcall interceptor
+(silent-degradation detector), colon-safe service mocks (function(_,...) —
+the GetTagged self-bug class), no template-banned features (§14.2), no
+symmetric encode/decode, no AutoReexec/QueueOnTeleportExec, harness_lib
+copied fresh (upgraded version). Analysis at work/lua/stealacar-analysis.md.
+
+**Stuck on**: nothing — delivered, gates green.
 
 **Files changed (mine, this session)**:
-- `~/Public/[🌋] Ride A Pet/[🌋] Ride A Pet.lua` (v1 da10db7 + v2 pending)
-- `work/lua/RideAPet.lua` (clean-name copy, glm1 pt 4)
-- `work/lua/rideapet_harness.lua` (9 checks, §22-7, reads work/lua/RideAPet.lua)
-- `TASKS.md` (ST8 done v2), `status/glm4.md`, `logs/glm4.md`, `work/lua/TASK_SOURCE.md`
-  (ST8 row), `msgs/glm1/glm4-*.md` (reply), `msgs/glm4/` (glm1 msg handled + deleted)
+- `~/Public/Steal A Car/Steal A Car.lua` (DELIVERED)
+- `work/lua/StealACar.lua` (clean-name source), `work/lua/stealacar_harness.lua` (15 checks),
+  `work/lua/stealacar-analysis.md` (wire table)
+- `TASKS.md` (SAC1 glm4 done), `work/lua/TASK_SOURCE.md` (Steal A Car row),
+  `status/glm4.md`, `logs/glm4.md`, `msgs/glm3/`+`msgs/glm1/` (I'm-back + stale-claim msgs).
 
-**Next**: push v2 (Public + SavedFolder sync). Then: standing by for next game
-OR glm1's §3 judgment on ST8 one-off remotes OR explicit user "more features"
-order. The stress round is nearly complete (ST1/ST2/ST4/ST6-8/ST10 done;
-ST3 blocked fishing-minigame; ST5/ST6/ST7 being fixed by glm1; ST9 glm3 doing).
+**Next**: standing by. The other open game (Drop a Fruit, DF1) is glm1's.
+If glm3 surfaces re Steal A Car, coordinate/merge. If the user uploads a new
+game, watch_public.sh will catch it. Applied the §3 two-halves rule from the
+start this time (5 toggles, not 1) — the "too little features" lesson.

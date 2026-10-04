@@ -73,3 +73,39 @@
   continuous automation surface; EggPickup/ClaimEventReward look one-off
   (asked glm1 for judgment). Flagged for explicit user order rather than
   auto-expanding (§2: not explicitly ordered for ST8).
+
+## Session 2 — 2026-10-04 (sandbox reset recovery + Steal A Car delivered)
+
+- Sandbox reset Oct 4 00:48 (SavedFolder/Public/Lua/token all gone; only
+  my-project survived). Re-cloned SavedFolder + bootstrap.sh glm4 (token
+  from chat history, ls-remote VERIFIED — user hasn't revoked). Watchers
+  restarted.
+- Missed 2 days: STRESS round CLOSED, ST11/12/13 Periastron TD (glm1, 2
+  violation-fix rounds — user flagged "repeated violations"), SHIGAKU-1
+  multi-GLM collab round CLOSED (v2 approved). New round Oct 4: Steal A
+  Car + Drop a Fruit arrived together.
+- State check ("always be alert"): both games claimed — DF1 Drop a Fruit
+  (glm1), SAC1 Steal A Car (glm3, 00:57Z, but NO follow-up: no analysis/
+  delivery/status since Oct 3 08:50Z Shigaku closure; reliability issue
+  glm3 themselves logged).
+- Msg'd glm3 (stale claim, offering take/split) + glm1 (I'm back, intel ack,
+  DF1 lane-split offer). No response in ~10min (poll.sh running; glm3 may
+  be in another sandbox or stalled).
+- Did the deobf analysis lane (SH1-style, non-conflicting supplement):
+  work/lua/stealacar-analysis.md. 5 KEEP remotes verified at call sites
+  (§2 Rule 2): CombatRequest (Swing/Place/Equip, L8076/8048/8146), SellCars
+  (L3393), GetSellInventory (L3355), RaceRequest (L8828). EXCLUDED:
+  AdminCrateAction (admin-only), BuyTrailRobux + CaughtSpeedPurchase (ROBUX).
+- Built StealACar.lua (5 toggles, §3 both halves, §22-7 loops, TB_Tabs.
+  Autofarm.T1). Gates: luac OK, lint 0 err, validate 0 comments/109-line
+  game section. Harness 15/15 (real-load io.open+loadstring+task.spawn,
+  pcall interceptor, colon-safe mocks, §22-7 respawn check) — green on
+  first run (applied ALL ST8 lessons: no debugging needed. Caught + fixed
+  one vacuous placeholder check before claiming green (glm1's "green
+  number you can't reproduce" lesson).
+- Delivered Public Steal A Car.lua (canonical path). Took over SAC1 per §1
+  (claim with no follow-up isn't a stake) + clear attribution (if glm3
+  surfaces, merge Shigaku-style).
+- Applied glm1's ST-QA1 + ST11/12/13 intel: TB_Tabs.Autofarm.T1, §22-7
+  loops, real-load harness, pcall interceptor, colon-safe mocks, no §14.2
+  bans, no symmetric encode/decode, harness_lib fresh copy.

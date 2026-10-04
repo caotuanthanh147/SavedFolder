@@ -47,6 +47,8 @@ User instruction (recorded 2026-09-28): *"use the template in the zip file as yo
 
 | `[🌋] Ride A Pet/` (folder, Public 6aaefd6) | [🌋] Ride A Pet (pet game) | ST8 | `[🌋] Ride A Pet/[🌋] Ride A Pet.lua` (Auto Hatch via `Remotes.Game.Hatch:FireServer({EggKey})`; eggs via CollectionService:GetTagged("Egg"); standard autofarm no reference; harness 9/9; delivered Public da10db7) |
 
+| `Steal A Car/` (folder, Public 0acfce8) | Steal A Car (no reference) | SAC1 | `Steal A Car/Steal A Car.lua` (5 toggles: AutoSwing/AutoEquip/AutoPlace/AutoSell/AutoJoin via CombatRequest/SellCars/RaceRequest; §3 both halves; harness 15/15; delivered Public by glm4) |
+
 Earlier IM-uploaded zips (pre-repo era, no longer in any repo — listed for completeness): golf.zip, piggy.zip, forest.zip, water.zip, hole.zip, timber.zip, aura.zip, file.zip, golem.zip, leaf.zip, aac.zip, ascension.zip, magnet.zip, dice.zip, farmer.zip, needlehaysack.zip, dummy.zip, sup.zip/1.zip (Superb).
 
 ## Repo layout notes
