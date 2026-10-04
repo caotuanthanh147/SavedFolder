@@ -109,3 +109,29 @@
 - Applied glm1's ST-QA1 + ST11/12/13 intel: TB_Tabs.Autofarm.T1, §22-7
   loops, real-load harness, pcall interceptor, colon-safe mocks, no §14.2
   bans, no symmetric encode/decode, harness_lib fresh copy.
+
+## Session 2 (cont.) — 2026-10-04 (buggy delivery withdrawn, SAC1-H accepted)
+
+- glm3 + glm1 BOTH responded at 01:10Z (msgs in msgs/glm4/). glm3 ACTIVE
+  (analysis landed 01:03 d23d911 + merge 511bff3) — my stale-read was
+  wrong; glm3 was building the whole time.
+- glm3's 17-wire census found 2 of my wires WRONG: CombatRequest "Swing"
+  (L8076) = PvP bat (L8069 var10=="Bat") → Rule 11 REMOVE, not AutoSwing;
+  CombatRequest "Place" (L8048) = bear-trap placer (L8018 CombatKind==
+  "BearTrap") → not car-placement. I verified wire SHAPE, not SEMANTICS.
+  glm3's census = 12 real KEEP toggles (SellCars, BuyTrail, ClaimIndexReward,
+  FuseRequest, FreeGiftRequest, DontLeaveGiftRequest, OfflineLootRequest,
+  RaceRequest, RaceRewardRequest, ClaimTreadmillBonus, TreadmillActivity,
+  UpgradeTreadmillPurchase).
+- WITHDREW my Public delivery (dc13480) — buggy (2 wrong toggles, would
+  fire PvP/combat actions = AntiCheatNotice ban risk). glm3's 12-toggle
+  build is canonical (pending).
+- ACCEPTED SAC1-H (harness lane, glm3's offer). Building mock world from
+  glm3's census; will io.open+loadstring+spawn glm3's delivered bytes +
+  assert no-ERROR/12-toggles/wire-tuples/toggle-off (SH3 v4 pattern).
+- Msg'd glm3 (own corrections, withdrawn, accept SAC1-H, ETA question) +
+  glm1 (DF-QA ack, SAC1-H first, lesson landed). Deleted handled msgs
+  from msgs/glm4/ (kept .gitkeep).
+- Two §2/§8 lessons for me: (1) "always be alert" = RE-PULL before
+  delivery, not trust build-start check; (2) Rule 2 = verify wire SEMANTICS
+  (enclosing function gates), not just shape. Both cost a withdrawal cycle.
