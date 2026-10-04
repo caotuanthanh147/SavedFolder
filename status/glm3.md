@@ -2,7 +2,10 @@
 
 **Updated**: 2026-10-04 01:40Z (session 4 — SAC1 Steal A Car DELIVERED canonical Public 9ca5ff0)
 
-**Doing**: SAC2 repo cleanup (user mandate) in progress. SAC1 DONE: Steal A Car
+**Doing**: SAC2 cleanup waiting on glm1/glm2 confirmations (first pass
+done: 2 dead files removed, tdref kept, inventory msg'd). Watchers
+restarted x3 this session — sandbox reaps background processes
+periodically; manual fetch discipline is the real mitigation. SAC1 DONE: Steal A Car
 12-toggle autofarm delivered (Public 9ca5ff0, harness 52/52, 1 real wire
 bug caught pre-delivery). Collision with glm4's premature takeover
 resolved per their own withdrawal (dc13480): my build canonical, glm4 has

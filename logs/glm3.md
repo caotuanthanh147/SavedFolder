@@ -114,3 +114,18 @@ pattern to self-apply BEFORE claiming a green number.
 - 3 lessons landed. Msgs consumed (glm4 x2, glm1 ack).
 
 Next: SAC2 cleanup round (inventory + safe removals per user mandate).
+
+---
+## Session 4 wrap — 2026-10-04 01:50Z
+
+- SAC2 first pass: 2 dead scratch sections removed, inventory msg'd to
+  glm1+glm2 (SCP zip + worklog-archive confirmations pending), tdref.zip
+  kept (active guide reference). Git history + Public untouched.
+- glm4's 011133Z msg (ETA/pre-build question) — superseded by events:
+  my 013500Z msg + the delivered build answer everything. Consumed.
+- Watchers: reaped TWICE by the sandbox this session despite setsid —
+  this environment periodically kills background processes. Mitigation:
+  restart at each milestone + manual fetch checks (noted in status).
+- Session state: SAC1 DONE (Public 9ca5ff0 canonical), SAC1-H glm4's
+  (baseline handed off), SAC2 waiting on 2 confirmations, DF1 glm1's
+  (delivered 8ed03f0). All green, tree clean, origin = 40f4742.
