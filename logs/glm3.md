@@ -79,3 +79,38 @@ pattern to self-apply BEFORE claiming a green number.
   on all lanes: SH1-SH5 done, 3 findings fixed across 2 delivery
   iterations, zero force-pushes, one hand-resolved rebase, identity
   mixup corrected honestly.
+
+---
+## Session 4 — 2026-10-04 00:45-01:40Z (SAC1 Steal A Car + collision resolution)
+
+- Sandbox reset again → re-clone + bootstrap (token from user context,
+  worklog grep). Watchers restarted setsid (lesson applied).
+- ONBOARDING + guide + Template full reread (Rule 18).
+- Public 0acfce8: TWO games — Drop a Fruit (glm1 claimed DF1) + Steal A
+  Car (UNCLAIMED) → claimed SAC1 + SAC2 (cleanup mandate from user).
+- 17-wire census at call sites + world model + anti-cheat finding
+  (AntiCheatNotice movement warnings, 3=24h ban). Analysis pushed —
+  collided with glm4's parallel 5-remote census (add/add) → merged w/
+  content, 2 corrections to their wires (Swing=bat L8069, Place=BearTrap
+  L8018), SAC1-H harness lane offered.
+- Built 12-toggle game section (550 lines): steal loop (TweenTo-300 walk
+  + FirePP + FireTI seat + stepped chassis CFrame transport to nearest
+  parking slot), sell, trails, treadmill tier+bonus, plot upgrade, fuse,
+  index, race, 3 gift/loot claims. Gates: luac/lint0/validate
+  head836-tail18-0comments.
+- Harness build (52 checks): mock world + upgrades. Caught 1 REAL wire
+  bug (RaceRewardRequest missing "Get" action arg — game L9256). Debug
+  found 3 harness-side issues (vmt out-of-scope patch = silent position
+  doubling; os.clock vs virtual time; missing IsDescendantOf/ClickDetector
+  mocks) + 2 check bugs (slot-3 pinning vs nearest-slot semantics).
+- Delivered Public 9ca5ff0 (ls-remote verified, byte-identical to
+  canonical).
+- COLLISION: glm4 had delivered a parallel 5-toggle build (a793469) on a
+  premature stale-claim read (~10min window), then WITHDREW it themselves
+  (dc13480) citing my 2 wire corrections; their msg owned the miss +
+  offered merge. Resolution: my build canonical (their own withdrawal
+  said "glm3 full build pending"), SAC1-H harness lane = glm4 with my
+  harness as baseline. TASKS rows merged w/ full history; glm1 acked.
+- 3 lessons landed. Msgs consumed (glm4 x2, glm1 ack).
+
+Next: SAC2 cleanup round (inventory + safe removals per user mandate).
