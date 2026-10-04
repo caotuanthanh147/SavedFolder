@@ -834,61 +834,556 @@ Toggles.AntiAFK:OnChanged(function(state)
     end
 end)
 if Toggles.AntiAFK.Value then RunAntiAFK() end
-Remotes.CombatRequest = RS:WaitForChild("Remotes"):WaitForChild("Events"):WaitForChild("CombatRequest")
-Remotes.RaceRequest = RS:WaitForChild("Remotes"):WaitForChild("Events"):WaitForChild("RaceRequest")
-Remotes.SellCars = RS:WaitForChild("Remotes"):WaitForChild("Functions"):WaitForChild("SellCars")
-Remotes.GetSellInventory = RS:WaitForChild("Remotes"):WaitForChild("Functions"):WaitForChild("GetSellInventory")
-local function Func_AutoSwing()
-    while Toggles.AutoSwing.Value do
-        local ok, err = pcall(function() Remotes.CombatRequest:FireServer("Swing") end)
-        if not ok then Library:Notify("Error in Auto Swing: " .. tostring(err), 10) end
+local realRS = game:GetService("ReplicatedStorage")
+local SACEvents = { "CurrencyUpdated", "FuseUpdated", "BuyTrail", "RaceRequest", "TreadmillActivity" }
+local SACFunctions = { "SellCars", "GetSellInventory", "ClaimIndexReward", "GetCarIndex", "FuseRequest", "FreeGiftRequest", "DontLeaveGiftRequest", "OfflineLootRequest", "RaceRewardRequest", "ClaimTreadmillBonus", "UpgradeTreadmillPurchase", "GetPlayerData", "GetTrailData" }
+Shared.SAC = { Cash = nil, TimeOffset = 0, FuseState = nil, LastBonusToken = nil, LastActivity = 0, LastJoin = 0, FuseRetry = {} }
+
+local function SACConfig(name)
+    return GetSafeModule(GetObject(realRS, "Configs"), name)
+end
+
+local function ResolveRemotes()
+    local folder = realRS:FindFirstChild("Remotes")
+    local events = folder and folder:FindFirstChild("Events")
+    local functions = folder and folder:FindFirstChild("Functions")
+    if not events or not functions then
+        return false
+    end
+    for _, name in ipairs(SACEvents) do
+        if not Remotes[name] then
+            local remote = events:FindFirstChild(name)
+            if remote then
+                Remotes[name] = remote
+            end
+        end
+    end
+    for _, name in ipairs(SACFunctions) do
+        if not Remotes[name] then
+            local remote = functions:FindFirstChild(name)
+            if remote then
+                Remotes[name] = remote
+            end
+        end
+    end
+    return true
+end
+
+local function MyPlot()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then
+        return nil
+    end
+    for _, plot in ipairs(plots:GetChildren()) do
+        if plot:IsA("Model") and plot:GetAttribute("Owner") == Plr.UserId then
+            return plot
+        end
+    end
+    return nil
+end
+
+local function GetCash()
+    if Shared.SAC.Cash == nil and Remotes.GetPlayerData then
+        local data = SafeInvoke(Remotes.GetPlayerData)
+        if type(data) == "table" and data.Cash ~= nil then
+            Shared.SAC.Cash = data.Cash
+        end
+    end
+    return Shared.SAC.Cash
+end
+
+local function ParkingPrompt(plot, fromPos)
+    local folder = plot:FindFirstChild("ParkingInteractions")
+    if not folder then
+        return nil
+    end
+    local best, bestDist = nil, math.huge
+    for _, part in ipairs(folder:GetChildren()) do
+        if part:IsA("BasePart") then
+            local prompt = GetObject(part, "Attachment.ParkingPrompt")
+            if prompt and prompt:IsA("ProximityPrompt") and prompt:GetAttribute("PromptAvailable") ~= false then
+                local dist = (part.Position - fromPos).Magnitude
+                if dist < bestDist then
+                    bestDist = dist
+                    best = prompt
+                end
+            end
+        end
+    end
+    return best
+end
+
+local function StealTarget()
+    local folder = workspace:FindFirstChild("LiveStolenCars")
+    if not folder then
+        return nil
+    end
+    return GetNearest(folder:GetChildren(), function(inst)
+        return inst:IsA("Model") and inst:GetAttribute("TheftState") == "Available" and not inst:GetAttribute("TutorialDuplicateHidden")
+    end)
+end
+
+local function Func_AutoStealStep()
+    local char = GetCharacter()
+    if not char then
+        return
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        return
+    end
+    local seat = hum.SeatPart
+    if seat then
+        local car = seat:FindFirstAncestorWhichIsA("Model")
+        local folder = workspace:FindFirstChild("LiveStolenCars")
+        if car and folder and car:IsDescendantOf(folder) then
+            local chassis = car:FindFirstChild("Chassis")
+            local plot = MyPlot()
+            if chassis and plot then
+                local prompt = ParkingPrompt(plot, chassis.Position)
+                if prompt then
+                    local part = prompt:FindFirstAncestorWhichIsA("BasePart")
+                    local goal = part and part.Position or chassis.Position
+                    local diff = goal - chassis.Position
+                    local dist = diff.Magnitude
+                    if dist <= 22 then
+                        FirePP(prompt, true)
+                        return
+                    end
+                    local step = math.min(48, dist)
+                    chassis.CFrame = chassis.CFrame + diff.Unit * step
+                    chassis.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+            end
+            return
+        end
+    end
+    local target = StealTarget()
+    if not target then
+        return
+    end
+    local chassis = target:FindFirstChild("Chassis")
+    if not chassis or not chassis:IsA("BasePart") then
+        return
+    end
+    if not TweenTo(300, chassis, Vector3.new(0, 0, 4), 8) then
+        return
+    end
+    local prompt = GetObject(target, "Chassis.StealAttachment.StealPrompt")
+    if prompt then
+        FirePP(prompt, true)
+    end
+    local driverSeat = target:FindFirstChild("DriverSeat")
+    if driverSeat and driverSeat:IsA("BasePart") then
+        FireTI(driverSeat)
+    end
+end
+
+local function Func_AutoSteal()
+    while Toggles.AutoSteal.Value do
+        local ok, err = pcall(Func_AutoStealStep)
+        if not ok then
+            Library:Notify("Error in [Auto Steal]: " .. tostring(err), 10)
+        end
         task.wait(0.5)
     end
 end
-local function Func_AutoEquip()
-    while Toggles.AutoEquip.Value do
-        local ok, err = pcall(function() Remotes.CombatRequest:FireServer("Equip", "Bat") end)
-        if not ok then Library:Notify("Error in Auto Equip: " .. tostring(err), 10) end
-        task.wait(2)
+
+local function Func_AutoSellStep()
+    if not Remotes.GetSellInventory or not Remotes.SellCars then
+        return
+    end
+    local inventory = SafeInvoke(Remotes.GetSellInventory)
+    if type(inventory) ~= "table" or #inventory == 0 then
+        return
+    end
+    local uids = {}
+    for _, item in ipairs(inventory) do
+        if type(item) == "table" and item.Uid ~= nil then
+            table.insert(uids, item.Uid)
+        end
+    end
+    if #uids > 0 then
+        SafeInvoke(Remotes.SellCars, true, uids)
     end
 end
-local function Func_AutoPlace()
-    while Toggles.AutoPlace.Value do
-        local char = GetCharacter()
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local ok, err = pcall(function() if hrp then Remotes.CombatRequest:FireServer("Place", hrp.Position) end end)
-        if not ok then Library:Notify("Error in Auto Place: " .. tostring(err), 10) end
-        task.wait(1)
-    end
-end
+
 local function Func_AutoSell()
     while Toggles.AutoSell.Value do
-        local ok, err = pcall(function()
-            local inv = Remotes.GetSellInventory:InvokeServer()
-            if inv then Remotes.SellCars:InvokeServer(inv) end
-        end)
-        if not ok then Library:Notify("Error in Auto Sell: " .. tostring(err), 10) end
+        local ok, err = pcall(Func_AutoSellStep)
+        if not ok then
+            Library:Notify("Error in [Auto Sell]: " .. tostring(err), 10)
+        end
         task.wait(2)
     end
 end
-local function Func_AutoJoin()
-    while Toggles.AutoJoin.Value do
-        local ok, err = pcall(function() Remotes.RaceRequest:FireServer("Join") end)
-        if not ok then Library:Notify("Error in Auto Join: " .. tostring(err), 10) end
+
+local function Func_AutoBuyTrailStep()
+    if not Remotes.GetTrailData or not Remotes.BuyTrail then
+        return
+    end
+    local config = SACConfig("TrailConfig")
+    local data = SafeInvoke(Remotes.GetTrailData)
+    if type(config) ~= "table" or type(config.Trails) ~= "table" then
+        return
+    end
+    if type(data) ~= "table" or type(data.Trails) ~= "table" then
+        return
+    end
+    local cash = GetCash()
+    if cash == nil then
+        return
+    end
+    local best, bestMult = nil, 1
+    for _, row in ipairs(data.Trails) do
+        if type(row) == "table" and row.Owned ~= true and type(row.Id) == "string" then
+            local def = config.Trails[row.Id]
+            if def then
+                local price = tonumber(def.Price) or 0
+                local mult = tonumber(def.SpeedMultiplier) or 1
+                if mult > bestMult and price > 0 and cash >= price then
+                    best, bestMult = row.Id, mult
+                end
+            end
+        end
+    end
+    if best then
+        Remotes.BuyTrail:FireServer(best)
+    end
+end
+
+local function Func_AutoBuyTrail()
+    while Toggles.AutoBuyTrail.Value do
+        local ok, err = pcall(Func_AutoBuyTrailStep)
+        if not ok then
+            Library:Notify("Error in [Auto Buy Trail]: " .. tostring(err), 10)
+        end
         task.wait(5)
     end
 end
-Toggles.AutoSwing = TB_Tabs.Autofarm.T1:AddToggle("AutoSwing", { Text = "Auto Swing", Default = false })
-Toggles.AutoSwing:OnChanged(function(state) Thread("AutoSwing", SafeLoop("Auto Swing", Func_AutoSwing), state) end)
-Toggles.AutoEquip = TB_Tabs.Autofarm.T1:AddToggle("AutoEquip", { Text = "Auto Equip", Default = false })
-Toggles.AutoEquip:OnChanged(function(state) Thread("AutoEquip", SafeLoop("Auto Equip", Func_AutoEquip), state) end)
-Toggles.AutoPlace = TB_Tabs.Autofarm.T1:AddToggle("AutoPlace", { Text = "Auto Place", Default = false })
-Toggles.AutoPlace:OnChanged(function(state) Thread("AutoPlace", SafeLoop("Auto Place", Func_AutoPlace), state) end)
-Toggles.AutoSell = TB_Tabs.Autofarm.T1:AddToggle("AutoSell", { Text = "Auto Sell", Default = false })
-Toggles.AutoSell:OnChanged(function(state) Thread("AutoSell", SafeLoop("Auto Sell", Func_AutoSell), state) end)
-Toggles.AutoJoin = TB_Tabs.Autofarm.T1:AddToggle("AutoJoin", { Text = "Auto Join", Default = false })
-Toggles.AutoJoin:OnChanged(function(state) Thread("AutoJoin", SafeLoop("Auto Join", Func_AutoJoin), state) end)
 
+local function Func_AutoUpgradeTreadmillStep()
+    if not Remotes.UpgradeTreadmillPurchase then
+        return
+    end
+    local config = SACConfig("TreadmillConfig")
+    local plot = MyPlot()
+    if type(config) ~= "table" or type(config.Tiers) ~= "table" or not plot then
+        return
+    end
+    local tier = tonumber(plot:GetAttribute("TreadmillTier")) or 0
+    local nextTier = tier + 1
+    local def = config.Tiers[nextTier]
+    if not def then
+        return
+    end
+    local price = tonumber(def.Price) or 0
+    local cash = GetCash()
+    if cash ~= nil and cash >= price then
+        SafeInvoke(Remotes.UpgradeTreadmillPurchase, true, nextTier)
+    end
+end
+
+local function Func_AutoUpgradeTreadmill()
+    while Toggles.AutoUpgradeTreadmill.Value do
+        local ok, err = pcall(Func_AutoUpgradeTreadmillStep)
+        if not ok then
+            Library:Notify("Error in [Auto Upgrade Treadmill]: " .. tostring(err), 10)
+        end
+        task.wait(5)
+    end
+end
+
+local function Func_AutoUpgradePlotStep()
+    local config = SACConfig("PlotConfig")
+    local plot = MyPlot()
+    if type(config) ~= "table" or not plot then
+        return
+    end
+    local level = tonumber(plot:GetAttribute("Level")) or 0
+    if level >= (config.MaxLevel or 5) then
+        return
+    end
+    local cost = tonumber(plot:GetAttribute("UpgradeCost")) or (config.UpgradeCosts or {})[level] or 0
+    local cash = GetCash()
+    if cash == nil or cash < cost then
+        return
+    end
+    local sign = GetObject(plot, "Sign.Sign")
+    if not sign or not sign:IsA("BasePart") then
+        return
+    end
+    local detector = sign:FindFirstChildOfClass("ClickDetector")
+    if detector then
+        TPTo(sign)
+        FireCD(detector)
+    end
+end
+
+local function Func_AutoUpgradePlot()
+    while Toggles.AutoUpgradePlot.Value do
+        local ok, err = pcall(Func_AutoUpgradePlotStep)
+        if not ok then
+            Library:Notify("Error in [Auto Upgrade Plot]: " .. tostring(err), 10)
+        end
+        task.wait(5)
+    end
+end
+
+local function Func_AutoTreadmillStep()
+    if not Plr:GetAttribute("TrainingTier") then
+        return
+    end
+    local now = os.clock()
+    if now - Shared.SAC.LastActivity >= 5 and Remotes.TreadmillActivity then
+        Shared.SAC.LastActivity = now
+        Remotes.TreadmillActivity:FireServer()
+    end
+    local token = Plr:GetAttribute("TreadmillBonusOfferId")
+    local untilStamp = Plr:GetAttribute("TreadmillBonusOfferUntil")
+    if Remotes.ClaimTreadmillBonus and type(token) == "string" and type(untilStamp) == "number" and untilStamp > workspace:GetServerTimeNow() and token ~= Shared.SAC.LastBonusToken then
+        local char = GetCharacter()
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if char and char:GetAttribute("TrainingTreadmill") and hum and hum.Health > 0 then
+            local result = SafeInvoke(Remotes.ClaimTreadmillBonus, nil, token)
+            if type(result) == "table" and result.Success then
+                Shared.SAC.LastBonusToken = token
+            end
+        end
+    end
+end
+
+local function Func_AutoTreadmill()
+    while Toggles.AutoTreadmill.Value do
+        local ok, err = pcall(Func_AutoTreadmillStep)
+        if not ok then
+            Library:Notify("Error in [Auto Treadmill]: " .. tostring(err), 10)
+        end
+        task.wait(1)
+    end
+end
+
+local function Func_AutoFuseStep()
+    if not Remotes.FuseRequest then
+        return
+    end
+    local config = SACConfig("FuseConfig")
+    local state = Shared.SAC.FuseState
+    if type(config) ~= "table" or type(config.Tiers) ~= "table" or type(state) ~= "table" or type(state.Tiers) ~= "table" then
+        return
+    end
+    for tier = 1, #config.Tiers do
+        local st = state.Tiers[tier]
+        if type(st) == "table" then
+            if st.Claimed ~= true and type(st.EndsAt) == "number" and st.EndsAt > 0 and st.EndsAt <= os.time() + Shared.SAC.TimeOffset then
+                SafeInvoke(Remotes.FuseRequest, true, "Claim", tier)
+                return
+            end
+        elseif tier == 1 or (type(state.Tiers[tier - 1]) == "table" and state.Tiers[tier - 1].Claimed == true) then
+            local now = os.clock()
+            if now - (Shared.SAC.FuseRetry[tier] or 0) >= 30 then
+                Shared.SAC.FuseRetry[tier] = now
+                for slot = 1, 3 do
+                    SafeInvoke(Remotes.FuseRequest, true, "Toggle", tier, slot)
+                end
+                SafeInvoke(Remotes.FuseRequest, true, "Fuse", tier)
+                return
+            end
+        end
+    end
+end
+
+local function Func_AutoFuse()
+    while Toggles.AutoFuse.Value do
+        local ok, err = pcall(Func_AutoFuseStep)
+        if not ok then
+            Library:Notify("Error in [Auto Fuse]: " .. tostring(err), 10)
+        end
+        task.wait(5)
+    end
+end
+
+local function Func_AutoIndexRewardStep()
+    if not Remotes.GetCarIndex or not Remotes.ClaimIndexReward then
+        return
+    end
+    local state = SafeInvoke(Remotes.GetCarIndex)
+    if type(state) == "table" and state.Claimable then
+        SafeInvoke(Remotes.ClaimIndexReward, true)
+    end
+end
+
+local function Func_AutoIndexReward()
+    while Toggles.AutoIndexReward.Value do
+        local ok, err = pcall(Func_AutoIndexRewardStep)
+        if not ok then
+            Library:Notify("Error in [Auto Index Reward]: " .. tostring(err), 10)
+        end
+        task.wait(10)
+    end
+end
+
+local function Func_AutoRaceStep()
+    if not Remotes.RaceRequest or not Remotes.RaceRewardRequest then
+        return
+    end
+    local raceState = realRS:FindFirstChild("RaceState")
+    if raceState and raceState:GetAttribute("Phase") == "Joining" and os.clock() - Shared.SAC.LastJoin >= 5 then
+        Shared.SAC.LastJoin = os.clock()
+        Remotes.RaceRequest:FireServer("Join")
+    end
+    local result = SafeInvoke(Remotes.RaceRewardRequest, nil, "Get")
+    if type(result) == "table" and result.Ready and type(result.Offer) == "table" and result.Offer.Id ~= nil then
+        SafeInvoke(Remotes.RaceRewardRequest, true, "Claim", result.Offer.Id)
+    end
+end
+
+local function Func_AutoRace()
+    while Toggles.AutoRace.Value do
+        local ok, err = pcall(Func_AutoRaceStep)
+        if not ok then
+            Library:Notify("Error in [Auto Race]: " .. tostring(err), 10)
+        end
+        task.wait(2)
+    end
+end
+
+local function Func_AutoFreeGiftStep()
+    if not Remotes.FreeGiftRequest then
+        return
+    end
+    local state = SafeInvoke(Remotes.FreeGiftRequest, nil, "Get")
+    if type(state) == "table" and state.Success and not state.Claimed then
+        SafeInvoke(Remotes.FreeGiftRequest, true, "Claim")
+    end
+end
+
+local function Func_AutoFreeGift()
+    while Toggles.AutoFreeGift.Value do
+        local ok, err = pcall(Func_AutoFreeGiftStep)
+        if not ok then
+            Library:Notify("Error in [Auto Free Gift]: " .. tostring(err), 10)
+        end
+        task.wait(60)
+    end
+end
+
+local function Func_AutoOfflineLootStep()
+    if not Remotes.OfflineLootRequest then
+        return
+    end
+    local state = SafeInvoke(Remotes.OfflineLootRequest, nil, "Get")
+    if type(state) == "table" and state.Ready then
+        SafeInvoke(Remotes.OfflineLootRequest, true, "Claim")
+    end
+end
+
+local function Func_AutoOfflineLoot()
+    while Toggles.AutoOfflineLoot.Value do
+        local ok, err = pcall(Func_AutoOfflineLootStep)
+        if not ok then
+            Library:Notify("Error in [Auto Offline Loot]: " .. tostring(err), 10)
+        end
+        task.wait(60)
+    end
+end
+
+local function Func_AutoDontLeaveGiftStep()
+    if not Remotes.DontLeaveGiftRequest then
+        return
+    end
+    local state = SafeInvoke(Remotes.DontLeaveGiftRequest, nil, "Open")
+    if type(state) == "table" and state.Success and state.Available then
+        SafeInvoke(Remotes.DontLeaveGiftRequest, true, "Claim")
+    end
+end
+
+local function Func_AutoDontLeaveGift()
+    while Toggles.AutoDontLeaveGift.Value do
+        local ok, err = pcall(Func_AutoDontLeaveGiftStep)
+        if not ok then
+            Library:Notify("Error in [Auto DontLeave Gift]: " .. tostring(err), 10)
+        end
+        task.wait(60)
+    end
+end
+
+Thread("SACNet", function()
+    while not Library.Unloaded do
+        if ResolveRemotes() then
+            if Remotes.CurrencyUpdated and not Connections.SAC_Currency then
+                Connections.SAC_Currency = Remotes.CurrencyUpdated.OnClientEvent:Connect(function(state)
+                    if type(state) == "table" and state.Cash ~= nil then
+                        Shared.SAC.Cash = state.Cash
+                    end
+                end)
+            end
+            if Remotes.FuseUpdated and not Connections.SAC_Fuse then
+                Connections.SAC_Fuse = Remotes.FuseUpdated.OnClientEvent:Connect(function(state)
+                    if type(state) == "table" and type(state.Tiers) == "table" then
+                        Shared.SAC.FuseState = state
+                        if type(state.ServerTime) == "number" then
+                            Shared.SAC.TimeOffset = state.ServerTime - os.time()
+                        end
+                    end
+                end)
+            end
+            if Connections.SAC_Currency and Connections.SAC_Fuse then
+                break
+            end
+        end
+        task.wait(2)
+    end
+end, true)
+
+TB_Tabs.Autofarm.T1:AddToggle("AutoSteal", { Text = "Auto Steal", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoSell", { Text = "Auto Sell", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoBuyTrail", { Text = "Auto Buy Trail", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoUpgradeTreadmill", { Text = "Auto Upgrade Treadmill", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoUpgradePlot", { Text = "Auto Upgrade Plot", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoTreadmill", { Text = "Auto Treadmill", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoFuse", { Text = "Auto Fuse", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoIndexReward", { Text = "Auto Index Reward", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoRace", { Text = "Auto Race", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoFreeGift", { Text = "Auto Free Gift", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoOfflineLoot", { Text = "Auto Offline Loot", Default = false })
+TB_Tabs.Autofarm.T1:AddToggle("AutoDontLeaveGift", { Text = "Auto DontLeave Gift", Default = false })
+Toggles.AutoSteal:OnChanged(function(state)
+    Thread("AutoSteal", Func_AutoSteal, state)
+end)
+Toggles.AutoSell:OnChanged(function(state)
+    Thread("AutoSell", Func_AutoSell, state)
+end)
+Toggles.AutoBuyTrail:OnChanged(function(state)
+    Thread("AutoBuyTrail", Func_AutoBuyTrail, state)
+end)
+Toggles.AutoUpgradeTreadmill:OnChanged(function(state)
+    Thread("AutoUpgradeTreadmill", Func_AutoUpgradeTreadmill, state)
+end)
+Toggles.AutoUpgradePlot:OnChanged(function(state)
+    Thread("AutoUpgradePlot", Func_AutoUpgradePlot, state)
+end)
+Toggles.AutoTreadmill:OnChanged(function(state)
+    Thread("AutoTreadmill", Func_AutoTreadmill, state)
+end)
+Toggles.AutoFuse:OnChanged(function(state)
+    Thread("AutoFuse", Func_AutoFuse, state)
+end)
+Toggles.AutoIndexReward:OnChanged(function(state)
+    Thread("AutoIndexReward", Func_AutoIndexReward, state)
+end)
+Toggles.AutoRace:OnChanged(function(state)
+    Thread("AutoRace", Func_AutoRace, state)
+end)
+Toggles.AutoFreeGift:OnChanged(function(state)
+    Thread("AutoFreeGift", Func_AutoFreeGift, state)
+end)
+Toggles.AutoOfflineLoot:OnChanged(function(state)
+    Thread("AutoOfflineLoot", Func_AutoOfflineLoot, state)
+end)
+Toggles.AutoDontLeaveGift:OnChanged(function(state)
+    Thread("AutoDontLeaveGift", Func_AutoDontLeaveGift, state)
+end)
 local MenuGroup = Tabs.Config:AddLeftGroupbox("Menu")
 MenuGroup:AddToggle("AutoShowUI", {
     Text = "Auto Show UI",
@@ -942,7 +1437,7 @@ ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 ThemeManager:SetFolder("Yuri")
-SaveManager:SetFolder("Yuri/StealACar")
+SaveManager:SetFolder("Yuri/Steal A Car")
 SaveManager:BuildConfigSection(Tabs.Config)
 ThemeManager:ApplyToTab(Tabs.Config)
 task.defer(function()
