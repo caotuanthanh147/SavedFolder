@@ -1,38 +1,29 @@
 # glm2 status
 
-**Updated**: 2026-10-03 08:38Z (session 7 — Shigaku v2: Knocked fix applied + identity mixup corrected + v2 re-delivery in flight)
+**Updated**: 2026-10-04 (session 8 — Potato round: POT1-H harness lane claimed)
 
-**Doing**: v2 DELIVERED (Public 0c03f2b, ls-remote verified) — re-audit requested from glm1 (their declared lane). The Knocked-skip filter is applied to
-work/lua/Shigaku.lua (skip exactly DummyBehavior "Knocked"/"Duo" — glm1's
-SH4 finding, analysis §3.1, deobf bind() L4749 refusal list; nil passes).
-Gates green (luac / lint 0 game-section / validate head836-tail18-0comments);
-all three harnesses green: canonical 54/0 (after adding Vector3.Unit to
-glm1's canonical — v4 lacked it, flat.Unit was nil, TP fallback every time),
-mine 32/0, glm3 standalone 42/42. Repack done (3 originals MD5-identical, script replaced 7f26494f72);
-delivered bytes = canonical file, 54/0 on delivered bytes.
+**Doing**: POT1-H — independent real-load harness for Peel THE Potato
+(two-place: game + lobby). Building the mock-world census from both
+deobfs (potato-census-glm2.md), then potato-harness-glm2.lua (SH3 v4
+canonical pattern: io.open+loadstring+spawn real-load, pcall
+interceptor, colon-safe mocks, wire tuples, toggle-off stop). Will run
+it against glm1's POT1 delivered bytes when they land + msg findings.
+glm1 owns POT1 full pipeline (claimed 04:35Z c13c1ea) — msg'd them
+before touching the game. SAC2 reply sent to glm3 (SCP zip: DELETE;
+scratch-section removals: no flag). 7 stale Shigaku msgs consumed
+(round closed, all handled sessions 6/7).
 
-**Session 7 arc (the embarrassing one, documented honestly)**: woke to the
-user's "read your msg, why are you sleeping so soon" — and misread the
-situation: consumed msgs/glm1/ (glm1's inbox) instead of msgs/glm2/ (mine),
-concluded I was glm1, and ran the QA lane for ~25 min WHILE the real glm1
-ran in parallel (their 2773287 audit + their 6c8ed21 lane-split acceptance
-— built on my false "twin glm1" signal). The user caught it: "you are glm2
-what are you even doing". Corrections pushed: all session-7 artifacts
-re-attributed (TASKS SH3/SH4/SH5 rows, status/glm1.md restored from
-a708481 + note, msgs/glm1 + msgs/glm3 re-signed, logs/glm1.md session-11
-entry marked). The one accidentally-correct piece: the Knocked-skip fix —
-glm1's finding was addressed to me, and I applied it (under the wrong
-name) exactly per spec.
+**Session note**: sandbox reset again -> bootstrap.sh glm2, watchers
+restarted. This session's direct tools glitched (Bash/Read failing —
+suspect the nohup watcher startup); operating via subagents whose
+shells are clean. Work unaffected.
 
-**Useful output from the detour**: glm3's committed roll-harness crashes on
-the merged file (Gym.Kinds extension was local-only — never landed in
-3467f8e; repro + paste-ready fix msg'd them, corrected signature); glm1's
-canonical v4 mock lacked Vector3.Unit (fixed in their file with credit —
-their 53/1 was masking a real mock gap); coroutine-based pcall
-interceptor debug technique (debug.traceback(co) pins swallowed error
-frames).
+**Last**: Shigaku round CLOSED — v2 Public 0c03f2b APPROVED (glm1
+final verdict, 54/0 canonical on delivered bytes).
 
-**Next**: v2 bytes → glm1 re-audits (their declared lane) → round closes
-on their green + user's call. glm3's harness fix is their lane (msg'd).
-Lesson recorded: verify identity against the user's pointers before
-adopting a lane — the inbox you read defines whose work you think is yours.
+**Files (mine, this session)**: msgs/glm3 + msgs/glm1 (SAC2 reply,
+POT1-H claim), TASKS.md POT1-H row, status/glm2.md, logs/glm2.md,
+work/lua/potato-census-glm2.md + potato-harness-glm2.lua (in flight).
+
+**Next**: census both places -> build harness -> POT1 delivery lands ->
+run + report -> audit support if glm1 wants it.

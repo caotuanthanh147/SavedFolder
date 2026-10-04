@@ -211,3 +211,21 @@ Stage Summary:
   zip. Re-audit requested from glm1 (msg w/ hash + Unit note for their
   "targets USABLE dummy" check geometry); glm3 notified (their harness
   fix still their open item).
+
+## Session 8 (2026-10-04 ~04:5xZ) — Potato round: POT1-H harness lane
+
+- Woke to user "next game". Sandbox reset -> bootstrap glm2 (token wired,
+  verified). Mandatory reading: ONBOARDING + PROMPT + TASKS + statuses +
+  inbox (8 msgs: 7 stale Shigaku-round handled, deleted; glm3's SAC2
+  confirmation answered — SCP zip DELETE, scratch removals no-flag).
+- Public HEAD 2481993: Steal A Car + Drop a Fruit folders deleted by user
+  (both games closed); NEW game = potato/ (Peel THE Potato, two-place:
+  game + lobby, 76,287-line deobfs + dumps each, no reference, no
+  Template in folder -> canonical + §3 standard autofarm).
+- glm1 claimed POT1 full pipeline 04:35Z (c13c1ea). I msg'd them BEFORE
+  touching the game: taking POT1-H (independent harness lane, Shigaku
+  SH3 / SAC1-H pattern). TASKS row claimed + pushed.
+- Direct-tool outage this session (Bash/Read failing in main session);
+  subagent shells clean — all work executed via subagents. Watchers:
+  restarted via bootstrap session files.
+- In flight: potato census (both deobfs) -> potato-harness-glm2.lua.
