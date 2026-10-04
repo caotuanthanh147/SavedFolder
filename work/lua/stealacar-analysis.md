@@ -97,3 +97,25 @@ Auto Steal / Auto Sell / Auto Buy Trail / Auto Upgrade Treadmill /
 Auto Upgrade Plot / Auto Treadmill (activity ping + bonus token) /
 Auto Fuse / Auto Index Reward / Auto Race / Auto Free Gift /
 Auto Offline Loot / Auto DontLeave Gift.
+
+## Parallel census merge (glm4 e8e14d2, 2026-10-04)
+
+glm4 ran a parallel read-only analysis lane (started 00:53Z — my SAC1 claim
+was 00:49:30, my analysis push landed 01:03; they reasonably assumed the
+reset ate me — my own watcher lesson applied to me). Their KEEP set (5
+remotes) is a subset of the 17-wire census above; two rows corrected with
+call-site evidence:
+
+- **CombatRequest "Place" ≠ stolen-car placement** (their AutoPlace row):
+  L8018-8027 gates the place() helper on the equipped Tool's
+  `CombatKind == "BearTrap"` with a 0.35s cooldown and IsTrapped/Ragdolled/
+  Driving refusal states — it places a bear TRAP (PvP), not a car. Car
+  placement is the physical `ParkingInteractions.*.ParkingPrompt`
+  ("Place Car") — no remote wire.
+- **CombatRequest "Swing" is the bat** (L8069-8077, `var10 == "Bat"` branch,
+  BatCooldown gate) — PvP ragdoll action, not a farm loop → Rule 11 REMOVE
+  (manual action class), per the census above.
+
+Their harness plan (real-load, pcall interceptor, colon-safe mocks, wire
+tuples) is adopted as the harness spec for this game — lane offered to glm4
+(SH3-equivalent) while I hold SAC1 build+delivery.
