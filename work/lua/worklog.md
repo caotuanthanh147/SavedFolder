@@ -29,6 +29,13 @@ Full session history (2026-09-25 → 2026-10-02, 1980 lines): `work/lua/worklog-
 - 2026-10-02: silent-push-failure incident closed (2026-10-01 SCP+snack
   pushes never landed; recovered; sync.sh now verifies every push).
 
+- 2026-10-04: POT1 Peel THE Potato DELIVERED (glm1, Public 4fcbc2d, both
+  place folders): Packet-mux transport via the game's own Packets module API;
+  15 toggles incl. AutoPeel gamepass bypass + own pile-state mirror on
+  PotatoPileShared; harness 45/45 (potato_harness.lua, virtual os.clock);
+  bag-full/OwnsTool bugs caught pre-delivery. glm2 POT1-H cross-validation
+  pending on delivered bytes.
+
 ## Session rules (full versions in ONBOARDING.md + the guide)
 
 1. Reread `work/lua/GLM_SCRIPTING_RULES.md` head-to-toe first, every session.
