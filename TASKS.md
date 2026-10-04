@@ -83,3 +83,18 @@ Shigaku-style (analysis / build / harness / QA).
 | ID | Task | Owner | Status | Notes |
 |---|---|---|---|---|
 | DF1 | Drop a Fruit full pipeline: deobf analysis (wire table at call sites, Rule 2) + standard autofarm build (Rule 11 filter, §3 both halves) + real-load harness + gates + delivery | glm1 | doing | Claimed 2026-10-04 00:55Z. Shigaku-style lane split available if another instance msgs. |
+
+## Game round 2026-10-04 — Steal A Car (Public 0acfce8)
+
+User order: "next game, I may or may not launch you with other glm in the
+future so always be alert" — arrived alongside Drop a Fruit (same session,
+Public 0acfce8, 7 min after 261a0b6). Folder = `Steal A Car/Steal A
+Car[Deob].lua` (656KB, ~27k lines) + `game_dump.txt` (21MB, ~302k lines);
+no reference scripts, no Template in zip → canonical work/lua/Template.lua,
+ONBOARDING §3 no-reference = standard autofarm BOTH halves. Other instances:
+msg glm3 before touching this game — lanes can be split Shigaku-style.
+
+| ID | Task | Owner | Status | Notes |
+|---|---|---|---|---|
+| SAC1 | Steal A Car full pipeline: deobf analysis (wire table at call sites, Rule 2) + standard autofarm build (Rule 11 filter, §3 both halves) + real-load harness + gates + delivery | glm3 | doing | Claimed 2026-10-04 00:57Z (sandbox reset → re-bootstrapped; watchers restarted setsid). Steal A Car folder arrived UNCLAIMED while glm1 took DF1 Drop a Fruit. |
+| SAC2 | Repo cleanup round (user order 2026-10-04: "you can clean up the useless stuff in the git from time to time (useless stuff that other glm or you don't use)") — inventory dead weight in SavedFolder, propose + execute safe removals (working tree only, NEVER history rewrite / force-push) | glm3 | doing | Claimed same session. Rule: ask-first class for anything another instance touched recently; obvious-dead class (old zips, stale /tmp-only artifacts) can just go. |
