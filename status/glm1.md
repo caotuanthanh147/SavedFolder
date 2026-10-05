@@ -1,25 +1,22 @@
 # glm1 status
 
-**Updated**: 2026-10-04 ~17:10Z (session 13 — PL1 Plunder DELIVERED)
+**Updated**: 2026-10-05 ~16:10Z (session 14 — FW1 FNAF World DELIVERED)
 
 **Doing**: idle-alert — watchers running, msgs/glm1 + Public polling.
 
-**Last**: Plunder round (user order "next game, also help glm2"):
-- PL1-A analysis (plunder-analysis.md — TEvent/Postere census, 59 remotes
-  identical both places, wire table + Rule 11 verdicts + §8 addendum)
-- PL1-H harness (plunder_harness.lua — TEvent mock world, 25/25)
-- PL1 build via glm2-no-response fallback → **DELIVERED Public 4b0000a**
-  (both plunder/ folders, MD5 fad6b893, 5 toggles, gates all green)
-- PL1-QA self-audit done; independent cross-QA lanes OPEN for glm2/3/4/5
-  (msgs sent, known-unknowns listed)
-- Also: harness_lib upgraded (recursive FindFirstChildWhichIsA —
-  selftest 10/10), template-change intel (1df3865: AddSliderToggle
-  string-form GONE, AutoJump built-in, head 919) broadcast to all.
+**Last**: FNAF World Multiplayer round (user order "next game"):
+- FW1-A analysis (fnafworld-analysis.md — client-authoritative: local
+  tokens/purchases/chests/fishing; 16 remotes, script fires none directly;
+  battle = Move-button Activated firing with all guards in the game's attack())
+- FW1 build (FnafWorld.lua 1293 lines: AutoBattle smart-pick + switch +
+  game-over recovery, AutoBoss TP-proximity, AutoChest CanTouch claims,
+  AutoFish deterministic swim-attr aim, AutoBuyByte Purchase+AutoSave)
+- **DELIVERED Public 18b39a0** (MD5 47cd6e8d, ls-remote verified)
+- Gates all green; REAL-LOAD harness 43/43 on delivered bytes, 3x deterministic
+- glm4 FW1-H cross-validation pending (their census note: "Replica 348 hits"
+  = ReplicatedStorage substring, no ReplicaService in this game — nudge sent)
+- Impossible Animals (uploaded+deleted today) noted dead-on-arrival in TASKS
 
-**Files (mine, session 13)**: work/lua/{Plunder.lua, plunder_section.lua,
-plunder-analysis.md, plunder_harness.lua}; TASKS PL rows; msgs x2 rounds;
-status/this; shared/tools/harness_lib.lua (recursive fix).
-
-**Next**: watch msgs (glm2 first-review / cross-QA claims), Public for
-user response or next game. If user flags violations → full-audit loop
-(ST12/13 standard).
+**Files (mine, session 14)**: work/lua/{FnafWorld.lua, fnafworld_section.lua,
+fnafworld-analysis.md, fnafworld_harness.lua, fnafworld_game_layer.lua};
+TASKS FW rows; TASK_SOURCE row; msgs to all 4 instances.
