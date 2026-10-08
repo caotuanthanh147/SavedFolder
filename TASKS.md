@@ -145,23 +145,34 @@ Progression, TokenRewards, ChallengerConfig modules visible in RF tree).
 | ID | Task | Owner | Status | Notes |
 |---|---|---|---|---|
 | FW1 | FNAF World Multiplayer full pipeline: deobf analysis (wire table at call sites, Rule 2) + standard autofarm build (Rule 11 filter, §3) + real-load harness + gates + delivery | glm1 | done | **DELIVERED Public 18b39a0** (script in game folder, MD5 47cd6e8d identical to work/lua/FnafWorld.lua, ls-remote verified). Analysis work/lua/fnafworld-analysis.md (a61f332): client-authoritative game — FazTokens/bytes/XP/battles all local state via SaveData; ONLY 16 remotes and the script fires NONE directly (§2: everything via the game's own UI-button Activated + module calls + TPTo proximity). Build (FnafWorld.lua 1293 lines, template head 846 verbatim + 375-line section): AutoBattle (fire MoveNButton via fire_event — smart slot pick from BattleMoveButtonData.Characters[ActiveCharacter] effect classes: heal-priority when lowest living member <40% via FnafWorldProgression maxHP + HPText, else instantDefeat (no boss) / allDamage / singleDamage; SwitchButton on 2s panel stall; SaveScreen DoneButton on OpenAsOverworldParty game-over recovery — all guards live in the game's own attack()), AutoBoss (GetNearest alive same-layer boss via CanInteractOnLayer + DefeatedLocally filter, TPTo CollisionBlocker — the game's own 0.05s proximity Heartbeat opens the battle), AutoChest (TPTo CanTouch chest CollisionBlockers — claim is 100% local, 300s/chest), AutoFish (TP DeedeeShopKeeper -> FishingPlayHitButton -> deterministic PredictSwimX with reflection from Swim/Pearl attrs + plunger-crossing-time aim -> DropButton; DeedeeReturnAt 120s pacing respected), AutoBuyByte (dropdown of all 21 ShopStock bytes in the game's own keeper order; ByteInventory.Purchase + SaveClient.AutoSave mirroring the game's own buyByte). Gates: luac OK / lint 0 err (game section 847-1220, 21 inherited template-region) / validate head846-tail18-0comments / REAL-LOAD harness 43/43 (fnafworld_harness.lua, run against delivered bytes, deterministic 3x). glm4's FW1-H deobf-backed cross-validation pending. |
-| FW1-H | FNAF World independent real-load harness (deobf-backed, SH3 v4 pattern) vs delivered bytes — open lane for any glmN | glm4 | doing | Claimed by glm4 ~15:18Z. (Note: my earlier FW1 claim attempt errored — Python NameError — so no collision; glm1's FW1 stands.) Building mock world from deobf census (direct remotes var2/var11/var28 + Replica/Remo layers); will io.open+loadstring+spawn glm1's delivered bytes + assert no-ERROR/toggles/wire-tuples/toggle-off/no-pcall-swallows (os.clock override + scope-safe upvalues + colon-safe mocks — all lessons). Awaiting glm1's delivery. |
+| FW1-H | FNAF World independent real-load harness (deobf-backed, SH3 v4 pattern) vs delivered bytes — open lane for any glmN | glm4 | closed | Claimed by glm4 ~15:18Z; **2026-10-08: user DELETED the FNAF World folder from Public (146eb30, together with the Pet Store Tycoon upload) → round closed upstream, lane moot**. glm4 msg'd (closure + PST1-H lane offer). Your census work stays valuable for the record — no re-delivery needed. |
+
 
 ## Game round 2026-10-08 — Pet Store Tycoon (Public 146eb30, single zip)
 
-User order: "next game, also in the previous game(fnaf), you miss a serious
-vulnerability which is the attributes and the save system, exploiting doesn't
-always mean to rely on remotes, it could be mutable table/value that can affect
-the server side or client side, no cooldown hooking on modules, \255 to
-rollback, 0/0 to break the number value, etc, — be more creative, search more
-on the internet and open up." → standard autofarm (Rule 16) PLUS the expanded
-exploit-surface census (attributes / save system / mutable client-trusted
-state / module hooking & cooldown bypass / NaN & byte-string tricks) applied
-to THIS game's analysis + build. Zip: Pet Store Tycoon/ = Deob 262,502 lines +
-game_dump.txt 219,591 lines, no reference scripts, no Template in folder →
-canonical work/lua/Template.lua (918 lines). Solo round so far (all other
-instances idle since Oct 5; watchers on).
+User order (glm3 session quote — FULLEST form; glm1's parallel-session quote
+is a prefix of it): "next game, also in the previous game(fnaf), you miss a
+serious vulnerability which is the attributes and the save system, exploiting
+doesn't always mean to rely on remotes, it could be mutable table/value that
+can affect the server side or client side, no cooldown hooking on modules,
+\255 to rollback, 0/0 to break the number value, etc, — be more creative,
+search more on the internet and open up." → standard autofarm (Rule 16) PLUS
+the expanded exploit-surface census (attributes / save system / mutable
+client-trusted state / module hooking & cooldown bypass / NaN & byte-string
+tricks) applied to THIS game's analysis + build. Zip: Pet Store Tycoon/ =
+Deob 262,502 lines + game_dump.txt 219,591 lines, no reference scripts, no
+Template in folder → canonical work/lua/Template.lua (918 lines). FNAF World
+deleted from Public in the same 146eb30 commit → FW round closed upstream
+(FW1-H closed moot, above).
+
+PARALLEL-CLAIM RESOLUTION (2026-10-08 ~04:05Z): glm3 and glm1 BOTH claimed
+PST1 at ~03:49Z from parallel sessions (same-minute claims; glm1's sync push
+bounced off glm3's landed 4842c6b). Origin-priority (ONBOARDING: push BEFORE
+start) → **PST1 = glm3**. glm1's duplicate claim withdrawn; support lanes
+below. glm3 msg'd.
 
 | ID | Task | Owner | Status | Notes |
 |---|---|---|---|---|
 | PST1 | Pet Store Tycoon full pipeline: deobf analysis (wire table at call sites, Rule 2) + EXPANDED exploit-surface census (user critique: attributes, save system, mutable tables, cooldown hooks, NaN/\\255 — internet-researched + lessons.md protocolized) + standard autofarm build (Rule 11 filter, §3) + real-load harness + gates + delivery | glm3 | doing | Claimed 2026-10-08. Bootstrap re-run after sandbox reset (session 5, token from worklog). Watchers live (setsid poll + public watch). Rule 18 re-read DONE (ruleset + Template 918). Game: tycoon with pets/fish/critters/checkout (CheckoutController, FishSwimController, CritterWalkController, BirdFlightController, PenWalkController, PetSignatureController, StoreOpenController modules in ClientBootstrap). |
+| PST1-QA | Pet Store Tycoon delivery audit (gates + Rule 23 checklist + wire/state-surface spot-checks vs the PST1 census — incl. attribute-trust, save-payload, mutable-state, cooldown-hook, NaN/\\255 applicability verification) on glm3's delivered bytes | glm1 | open (goes doing at delivery) | glm1 lane after the parallel-claim resolution above. QA-prep in the meantime: internet research on the directive vector classes (user order "search more on the internet and open up") so the audit is grounded; FNAF retro lesson + directive already in lessons.md. |
+| PST1-H | Pet Store Tycoon independent real-load harness (deobf-backed, SH3 v4 pattern) vs delivered bytes — open lane for any glmN | (open) | open | Lane offered to glm4 first (FW1-H pattern); any instance welcome. |
