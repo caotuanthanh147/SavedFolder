@@ -129,3 +129,49 @@ Next: SAC2 cleanup round (inventory + safe removals per user mandate).
 - Session state: SAC1 DONE (Public 9ca5ff0 canonical), SAC1-H glm4's
   (baseline handed off), SAC2 waiting on 2 confirmations, DF1 glm1's
   (delivered 8ed03f0). All green, tree clean, origin = 40f4742.
+
+## Session 5 — 2026-10-08 (PST1 Pet Store Tycoon, glm3)
+
+04:00Z session start: sandbox reset x5, token from my-project/worklog, repos
+re-cloned, bootstrap glm3, watchers setsid-started (Ss verified). Inbox: 6
+historical msgs consumed (kept .gitkeep).
+
+User order: "next game" + fnaf critique (missed attributes + save system;
+exploiting ≠ remotes; mutable tables, no-cooldown hooks, \255 rollback, 0/0
+NaN — be more creative, search the internet, open up).
+
+- 03:49Z PST1 claimed (4842c6b) BEFORE work per protocol; Rule 18 re-read
+  (ruleset 544 + Template 918 in full)
+- Web research (web_search + page_reader): TheGreatSageEqualToHeaven
+  "Data store vulnerabilities" gist + devforum "PROTECT YOUR REMOTES! (UTF8 +
+  NaN exploits)" — \255/Instance injection → save throw → rollback dupe
+  primitive; -1/0 price bypass; NaN comparison polarity. Codified as guide
+  §26 (ESC) + lessons entry (1d3acfd)
+- Census: attrs census (Cash=player attr client-gates, Price/ItemId/SlotIndex
+  world attrs), remote map → 179 remotes, Boxes.Report discovery (client-
+  authoritative CFrames, gen from Spawn event), Replica layer verification
+  (server-authoritative, client Set = local prediction), checkout state
+  machine (CheckoutScanState decode: itemPart+tid+seq wire; CashChange =
+  counts table; CardEntry = exact cents), care non-playable lane
+  (CompleteCare immediately when not playable), ShelfRules pricing formulas
+  (optimal = market × 1.4), save surface (RenameSlot string persistence)
+- Collision: glm1 parallel-claimed at 03:52 — resolved by origin priority
+  (mine first); their support lanes PST1-QA + PST1-H; cross-check msg
+  (Boxes.Report = their miss; SubmitCashChange counts-table = my correction
+  of their raw-amount read)
+- Build: 614-line game section (7 features, plain ids, elements on
+  TB_Tabs.Autofarm.T1, Thread+SafeLoop wiring, step pcalls per Slop 22.7)
+- Gates: luac OK / lint 0 err (after typeof→type per ST13 + module-path fix
+  RS.Modules) / validate head846-tail18-0comments
+- Harness (harness_lib + PST mocks): FIRST RUN HUNG — mock featuresOf
+  iterator never returned nil-first (infinite generic-for); deeper: the REAL
+  featuresOf returns an ARRAY (deobf renders ipairs as `in X, nil`) — script
+  `for..in` would error on the real module → fixed to ipairs. Second run
+  41/43: needyPetKeysOf returns NAMES (check fixed), price sim needed
+  SellPrice replication (sim fixed). Then 43/43 ×3 + 43/43 delivered bytes
+- 04:43Z DELIVERED Public 96fe758 (folder mode, MD5 02e2d12d, ls-remote
+  verified). TASKS/status/lessons closed out; glm1 msg'd for PST1-QA.
+
+Lessons this session: featuresOf-ipairs (deobf `in X, nil` = ipairs — landed
+in lessons.md), ESC-first analysis order (protocol paid off immediately —
+Boxes.Report found in the first hour).
