@@ -757,63 +757,574 @@ local function summary()
     end
 end
 
+
+-- ####################################################################
+-- Smash the City (STC1) real-load harness — game world + checks.
+-- World model per work/lua/smashecity-analysis.md: client-authoritative
+-- Economy + module-scope adapter (Core.Input.start upvalue) + callbacks
+-- (Core.UI.build upvalue) + Cooldowns spec table (spec upvalue).
+
+local ScriptPath = arg and arg[1]
+local ScriptSrc = nil
 do
-    local src = [[
-local g = getgenv()
-local lib = g.__LinoriaLibrary()
-local win = lib:CreateWindow({ Title = "Smoke" })
-local tab = win:AddTab("Main")
-local gb = tab:AddLeftGroupbox("Farm")
-local t = gb:AddToggle("SmokeToggle", { Text = "Do thing", Default = false })
-local hits = 0
-local started = false
-t:OnChanged(function(v)
-    hits = hits + 1
-    if v and not started then
-        started = true
-        task.spawn(function()
-            while not lib.Unloaded and lib.Toggles.SmokeToggle.Value do
-                hits = hits + 10
-                task.wait(0.5)
-            end
-        end)
+    local fallbacks = {
+        (os.getenv("SF_DIR") or "/home/z/SavedFolder") .. "/work/lua/SmashTheCity.lua",
+        (os.getenv("PUBLIC_DIR") or "/home/z/Public") .. "/Smash the City/Smash the City.lua",
+    }
+    if ScriptPath then
+        table.insert(fallbacks, 1, ScriptPath)
     end
-end)
-local sm = g.__SaveManagerLoader()
-sm:SetFolder("Yuri/Smoke")
-local v = Vector3.new(1, 2, 3)
-local d = (v - Vector3.zero).Magnitude
-local s = ("a,b,c"):split(",")
-g.__GetHits = function()
-    return hits
+    for _, p in ipairs(fallbacks) do
+        local f = io.open(p, "r")
+        if f then
+            ScriptSrc = f:read("*a")
+            f:close()
+            ScriptPath = p
+            break
+        end
+    end
 end
-g.__SmokeResult = { dist = d, parts = #s, folder = sm.Folder }
-]]
-    local fn = G.loadstring(src, "=(smoke script)")
-    G.task.spawn(fn)
-    pump(0.1)
-    check("smoke script ran", G.__SmokeResult ~= nil)
-    local r = G.__SmokeResult
-    check("save manager folder captured", r and r.folder == "Yuri/Smoke")
-    check("string.split shim (3 parts)", r and r.parts == 3)
-    check("Vector3 magnitude", r and math.abs(r.dist - math.sqrt(14)) < 0.0001)
-    local tgl = Library.Toggles.SmokeToggle
-    check("toggle registered", tgl ~= nil)
-    tgl:SetValue(true)
-    check("OnChanged fired + immediate first loop pass", G.__GetHits() >= 11)
-    pump(1.2)
-    check("loop ticked while toggle on (>=20 extra hits)", G.__GetHits() >= 21)
-    tgl:SetValue(false)
-    pump(0.4)
-    local after = G.__GetHits()
+assert(ScriptSrc, "script under test not found (pass path as arg[1])")
+
+G.os = setmetatable({ clock = function() return Sched.now end }, { __index = os })
+
+local UpvalueRegistry = {}
+G.getupvalues = function(f)
+    return UpvalueRegistry[f]
+end
+G.get_up_values = nil
+
+-- ===== Config mock (real data subset) =====
+local ConfigMock = {
+    CITY_HALF = 440,
+    GROUND_Y = 0,
+    SHOP = {
+        EARN = { cell = 1, prop = 10, other = 5 },
+        DEFAULT_PRICE = 10000,
+        WEAPONS = { Missile = 0, Meteor = 12000, Nuke = 150000 },
+        MAPS = { Downtown = 0, Coast = 12000 },
+    },
+    COOLDOWNS = {
+        Nuke = 30,
+        Meteor = 6,
+    },
+}
+
+-- ===== Economy mock (real client-authoritative logic) =====
+local FlushLog = {}
+local EcoListeners = {}
+local EcoMock
+do
+    local cash = 0
+    local owned = { weapon = {}, map = {} }
+    local passes = {}
+    local loadedData = { cash = 0, tester = false, infinite = false, canWipe = false }
+    local dirty = false
+    local function flush()
+        local list = {}
+        for kind, ids in pairs(owned) do
+            for id in pairs(ids) do
+                table.insert(list, kind .. ":" .. id)
+            end
+        end
+        table.insert(FlushLog, { cash = math.floor(cash), owned = list })
+        dirty = false
+    end
+    EcoMock = {
+        cash = function() return cash end,
+        owns = function(kind, id)
+            local price = EcoMock.price(kind, id)
+            if price <= 0 then return true end
+            return owned[kind] and owned[kind][id] == true
+        end,
+        price = function(kind, id)
+            local source = kind == "map" and ConfigMock.SHOP.MAPS or ConfigMock.SHOP.WEAPONS
+            return source[id] or ConfigMock.SHOP.DEFAULT_PRICE
+        end,
+        canAfford = function(kind, id)
+            return EcoMock.price(kind, id) <= cash
+        end,
+        buy = function(kind, id)
+            if EcoMock.owns(kind, id) then return true end
+            local price = EcoMock.price(kind, id)
+            if cash < price then return false end
+            cash = cash - price
+            owned[kind][id] = true
+            dirty = true
+            flush()
+            for _, fn in ipairs(EcoListeners) do
+                pcall(fn, cash, -price, "buy", { kind = kind, id = id })
+            end
+            return true
+        end,
+        earn = function(n)
+            if n <= 0 then return end
+            cash = cash + n
+            dirty = true
+            for _, fn in ipairs(EcoListeners) do
+                pcall(fn, cash, n, "break", nil)
+            end
+        end,
+        setCash = function(n)
+            cash = math.max(math.floor(n), 0)
+            dirty = true
+            flush()
+            for _, fn in ipairs(EcoListeners) do
+                pcall(fn, cash, 0, "set", nil)
+            end
+        end,
+        unlockAll = function()
+            for id in pairs(ConfigMock.SHOP.WEAPONS) do
+                owned.weapon[id] = true
+            end
+            for id in pairs(ConfigMock.SHOP.MAPS) do
+                owned.map[id] = true
+            end
+            dirty = true
+            flush()
+        end,
+        onChanged = function(fn)
+            table.insert(EcoListeners, fn)
+        end,
+        loaded = function()
+            return loadedData
+        end,
+        markDirty = function()
+            dirty = true
+        end,
+    }
+    EcoMock.__owned = owned
+    EcoMock.__flushCount = function() return #FlushLog end
+end
+
+-- ===== Cooldowns mock (real require-time spec copy) =====
+local CooldownsMock
+do
+    local specs = {}
+    for id, v in pairs(ConfigMock.COOLDOWNS) do
+        local t = type(v) == "number" and v or v[1]
+        specs[id] = { t = t, key = id, held = false, action = false, owner = false }
+    end
+    CooldownsMock = {
+        spec = function(id)
+            return specs[id]
+        end,
+        __specs = specs,
+    }
+    UpvalueRegistry[CooldownsMock.spec] = { specs }
+end
+
+-- ===== Destruction mock (stats under harness control) =====
+local StatsState = { total = 1000, intact = 1000, debris = 0, chunks = 0, active = 0, pressure = 0, destroyed = 0 }
+local DestructionMock = {
+    getStats = function()
+        return StatsState
+    end,
+}
+
+-- ===== Challenges mock =====
+local DailyState = { claimed = false, streak = 1, slot = 1 }
+local ChallengeList = {
+    { i = 1, id = "city75", text = "Destroy 75%", kind = "cityPct", goal = 0.75, prog = 0.8, reward = 1500, claimed = false, done = true },
+    { i = 2, id = "cells100", text = "Break 100 cells", kind = "cells", goal = 100, prog = 10, reward = 500, claimed = false, done = false },
+    { i = 3, id = "city95", text = "Destroy 95%", kind = "cityPct", goal = 0.95, prog = 1, reward = 2000, claimed = true, done = true },
+}
+local ClaimDailyCalls = 0
+local ClaimChallengeCalls = {}
+local ChallengesMock = {
+    daily = function()
+        return { slot = DailyState.slot, claimed = DailyState.claimed, streak = DailyState.streak, rewards = {}, nextIn = 0 }
+    end,
+    challenges = function()
+        return { list = ChallengeList, nextIn = 0 }
+    end,
+    claimDaily = function()
+        ClaimDailyCalls = ClaimDailyCalls + 1
+        DailyState.claimed = true
+        return { ok = true, coins = 500 }
+    end,
+    claimChallenge = function(i)
+        table.insert(ClaimChallengeCalls, i)
+        ChallengeList[i].claimed = true
+        return { ok = true, coins = ChallengeList[i].reward }
+    end,
+}
+
+-- ===== adapter + callbacks mocks (upvalue surfaces) =====
+local AdapterCalls = {}
+local AdapterMock = {
+    call = function(method, pos)
+        table.insert(AdapterCalls, { method = method, pos = pos, at = Sched.now })
+    end,
+    getWeapon = function() return nil end,
+    pick = function(x, y) return Vector3.zero end,
+    key = function() end,
+}
+local OnSelectCalls = {}
+local OnResetCalls = {}
+local CallbacksMock = {
+    onSelect = function(id)
+        table.insert(OnSelectCalls, id)
+    end,
+    onReset = function()
+        OnResetCalls[#OnResetCalls + 1] = Sched.now
+    end,
+    onNextCity = function() end,
+    onResults = function() end,
+}
+
+-- ===== UI / Input module mocks =====
+local UIMock
+do
+    local stored = nil
+    UIMock = {
+        build = function(arg)
+            stored = arg.callbacks
+        end,
+        __stored = function() return stored end,
+    }
+    UpvalueRegistry[UIMock.build] = { CallbacksMock }
+end
+local InputMock
+do
+    local stored = nil
+    InputMock = {
+        start = function(_, adapter)
+            stored = adapter
+        end,
+        __stored = function() return stored end,
+    }
+    UpvalueRegistry[InputMock.start] = { AdapterMock }
+end
+
+-- simulate the game having wired UI/Input already
+UIMock.build({ callbacks = CallbacksMock })
+InputMock.start(nil, AdapterMock)
+
+-- ===== RS tree + require registry =====
+local RS = Instance.new("Folder", "ReplicatedStorage")
+local WS = Instance.new("Folder", "Workspace")
+
+local ModuleRegistry = {}
+G.require = function(obj)
+    if ModuleRegistry[obj] then return ModuleRegistry[obj] end
+    error("mock require: unregistered module " .. tostring(obj and obj.Name))
+end
+local function addModule(parent, name, tbl)
+    local m = Instance.new("ModuleScript", name)
+    parent:AddChild(m)
+    ModuleRegistry[m] = tbl
+    return m
+end
+local function mkFolder(parent, name)
+    local f = Instance.new("Folder", name)
+    parent:AddChild(f)
+    return f
+end
+
+local smashFolder = mkFolder(RS, "Smash")
+local coreFolder = mkFolder(smashFolder, "Core")
+addModule(smashFolder, "Config", ConfigMock)
+addModule(coreFolder, "Economy", EcoMock)
+addModule(coreFolder, "Cooldowns", CooldownsMock)
+addModule(coreFolder, "Destruction", DestructionMock)
+addModule(coreFolder, "Challenges", ChallengesMock)
+addModule(coreFolder, "UI", UIMock)
+addModule(coreFolder, "Input", InputMock)
+
+-- ===== SmashRemotes banned-wire recorders =====
+local RemoteFires = {}
+local function addRemote(parent, name)
+    local r = Instance.new("RemoteEvent", name)
+    parent:AddChild(r)
+    r.__fires = {}
+    r.FireServer = function(_, ...)
+        table.insert(RemoteFires, { name = name, args = { ... } })
+    end
+    return r
+end
+local remotesFolder = mkFolder(RS, "SmashRemotes")
+local BannedRemotes = { "Save", "BuyRobux", "BuyPass", "BuyPack", "TestWipe", "TestDay", "SkipCooldown", "MiniNuke", "ServerNuke", "Likes", "Street" }
+for _, name in ipairs(BannedRemotes) do
+    addRemote(remotesFolder, name)
+end
+
+-- ===== services / game / player =====
+local PLR = {
+    UserId = 42,
+    Name = "Tester",
+    DisplayName = "",
+    Character = nil,
+    CameraMaxZoomDistance = 128,
+    Idled = Signal.new(),
+    GetAttribute = function() return nil end,
+    GetAttributeChangedSignal = function() return Signal.new() end,
+    SetAttribute = function() end,
+}
+local Services = {}
+Services.Players = { LocalPlayer = PLR, GetPlayers = function() return { PLR } end }
+Services.ReplicatedStorage = RS
+Services.RunService = {
+    Stepped = Signal.new(), RenderStepped = Signal.new(), Heartbeat = Signal.new(),
+    PostSimulation = Signal.new(),
+    IsServer = function() return false end, IsStudio = function() return false end,
+    IsClient = function() return true end,
+}
+Services.TeleportService = { Teleport = function() end, TeleportToPlaceInstance = function() end }
+Services.UserInputService = { TouchEnabled = false, KeyboardEnabled = true, InputBegan = Signal.new() }
+Services.HttpService = { JSONEncode = function(_, t) return "{}" end, JSONDecode = function(_, s) return {} end, GenerateGUID = function() return "g" end }
+Services.TweenService = { Create = function() return { Play = function() end } end, GetValue = function() return 0 end }
+Services.Lighting = {}
+Services.GuiService = { GetResolution = function() return Vector3.new(1920, 1080, 0) end, ErrorMessageChanged = Signal.new() }
+Services.MarketplaceService = { GetProductInfo = function() return { Name = "Smash the City" } end }
+Services.VirtualInputManager = { SendMouseButtonEvent = function() end, SendKeyEvent = function() end }
+Services.ProximityPromptService = { PromptButtonHoldBegan = Signal.new() }
+Services.VirtualUser = { CaptureController = function() end, ClickButton2 = function() end }
+
+G.game = {
+    PlaceId = 0,
+    JobId = "job-1",
+    GetService = function(self, name)
+        return Services[name] or error("Invalid Service: " .. name)
+    end,
+    HttpGet = function(self, url)
+        if string.find(url, "Library.lua", 1, true) then return "LIB" end
+        if string.find(url, "ThemeManager", 1, true) then return "THEME" end
+        if string.find(url, "SaveManager", 1, true) then return "SAVE" end
+        return ""
+    end,
+    IsLoaded = function() return true end,
+}
+G.workspace = WS
+G.OverlapParams = { new = function() return { FilterType = nil, FilterDescendantsInstances = {} } end }
+local enumChildren = setmetatable({}, { __index = function(t, k)
+    local c = setmetatable({}, { __index = function(_, k2) return k2 end })
+    rawset(t, k, c)
+    return c
+end })
+G.Enum = enumChildren
+G.getconnections = nil
+
+-- ===== load the script under test =====
+print("script under test: " .. tostring(ScriptPath))
+
+pump(0.2)
+local PcallSwallows = 0
+local rawpcall = pcall
+G.pcall = function(fn, ...)
+    local args = table.pack(...)
+    local ok, err = xpcall(fn, function(e)
+        return tostring(e) .. " @ " .. debug.traceback("", 2)
+    end, table.unpack(args, 1, args.n))
+    if not ok then
+        PcallSwallows = PcallSwallows + 1
+        print("  [pcall-caught] " .. tostring(err))
+    end
+    return ok, err
+end
+local oldLoadstring = G.loadstring
+G.loadstring = function(src, name)
+    if src == "LIB" then return function() return Library end end
+    if src == "THEME" then return function() return ThemeManager end end
+    if src == "SAVE" then return function() return SaveManager end end
+    return oldLoadstring(src, name)
+end
+local fn = G.loadstring(ScriptSrc, "=(SmashTheCity)")
+G.task.spawn(fn)
+pump(2.0)
+
+local function noErrorNotify()
+    for _, n in ipairs(MockState.Notifies) do
+        if string.find(n, "ERROR", 1, true) then return false, n end
+    end
+    return true
+end
+
+check("script loaded without ERROR notify", (function()
+    local ok, n = noErrorNotify()
+    if not ok then print("  notify was: " .. tostring(n)) end
+    return ok
+end)())
+check("guard set", G.ayasemiyatongekissazumirisa == true)
+check("pcall interceptor: 0 silent swallows at load", PcallSwallows == 0)
+
+-- ===== structural =====
+check("core toggles registered with plain ids", Library.Toggles.AutoFire ~= nil
+    and Library.Toggles.AutoCityReset ~= nil
+    and Library.Toggles.NoCooldown ~= nil
+    and Library.Toggles.AutoBuy ~= nil
+    and Library.Toggles.AutoClaim ~= nil)
+check("core options registered", Library.Options.AutoFireWeapon ~= nil
+    and Library.Options.AutoFireDelay ~= nil
+    and Library.Options.AutoCityPct ~= nil
+    and Library.Options.CheatCashAmount ~= nil)
+check("weapon dropdown = Config.SHOP.WEAPONS sorted, default Nuke", (function()
+    local d = Library.Options.AutoFireWeapon
+    return type(d.Values) == "table"
+        and d.Values[1] == "Meteor"
+        and d.Values[2] == "Missile"
+        and d.Values[3] == "Nuke"
+        and d.Value == "Nuke"
+end)())
+check("cheat buttons registered", (function()
+    local addCash, unlockAll = false, false
+    for _, b in ipairs(MockState.Buttons) do
+        if b.Text == "Add Cash" then addCash = true end
+        if b.Text == "Unlock All" then unlockAll = true end
+    end
+    return addCash and unlockAll
+end)())
+
+-- ===== AutoFire: waiting (Nuke unowned) then firing after unlock =====
+do
+    Library.Toggles.AutoFire:SetValue(true)
     pump(1.0)
-    check("loop stopped after toggle off", G.__GetHits() == after)
-    local inst = Instance.new("Part", "Dummy")
-    inst:SetAttribute("Tier", 3)
-    local child = inst:AddChild(Instance.new("Part", "Inner"))
-    check("attr roundtrip", inst:GetAttribute("Tier") == 3)
-    check("FindFirstChildOfClass", inst:FindFirstChildOfClass("Part") == child)
-    check("FindFirstChildWhichIsA", inst:FindFirstChildWhichIsA("Part") == child)
-    check("children list", #inst:GetChildren() == 1 and inst:GetChildren()[1] == child)
-    summary()
+    check("AutoFire: no fires while weapon unowned", #AdapterCalls == 0)
+    check("AutoFire: waiting notify shown once", (function()
+        local n = 0
+        for _, msg in ipairs(MockState.Notifies) do
+            if string.find(msg, "Waiting for weapon", 1, true) then n = n + 1 end
+        end
+        return n == 1
+    end)())
+    local buttons = {}
+    for _, b in ipairs(MockState.Buttons) do
+        buttons[b.Text] = b
+    end
+    buttons["Unlock All"].Func()
+    check("UnlockAll: all weapons + maps owned", EcoMock.owns("weapon", "Nuke")
+        and EcoMock.owns("weapon", "Meteor")
+        and EcoMock.owns("map", "Coast"))
+    check("UnlockAll: flush recorded with owned list", (function()
+        local last = FlushLog[#FlushLog]
+        return last ~= nil and #last.owned >= 5
+    end)())
+    pump(2.0)
+    check("AutoFire: fires after unlock (adapter calls)", #AdapterCalls >= 3)
+    check("AutoFire: onSelect called with weapon", #OnSelectCalls >= 1 and OnSelectCalls[1] == "Nuke")
+    check("AutoFire: tuple shape (onTap, Vector3)", (function()
+        local c = AdapterCalls[1]
+        return c ~= nil and c.method == "onTap" and type(c.pos) == "table" and c.pos.X ~= nil
+    end)())
+    check("AutoFire: grid order (-375,-120) then (-250,-120) then (-125,-120)", (function()
+        local a = AdapterCalls[1].pos
+        local b = AdapterCalls[2].pos
+        local c = AdapterCalls[3].pos
+        return a.X == -375 and a.Z == -120
+            and b.X == -250 and b.Z == -120
+            and c.X == -125 and c.Z == -120
+    end)())
+    check("AutoFire: interval respected (~0.35s between shots)", (function()
+        local a = AdapterCalls[2].at - AdapterCalls[1].at
+        return a >= 0.3 and a <= 0.5
+    end)())
+    local fired = #AdapterCalls
+    Library.Toggles.AutoFire:SetValue(false)
+    pump(1.5)
+    check("AutoFire: toggle off stops firing", #AdapterCalls == fired)
 end
+
+-- ===== NoCooldown: spec zero + restore + unload restore =====
+do
+    local specs = CooldownsMock.__specs
+    check("NoCooldown initial specs intact", specs.Nuke.t == 30 and specs.Meteor.t == 6)
+    Library.Toggles.NoCooldown:SetValue(true)
+    check("NoCooldown: all spec t zeroed", specs.Nuke.t == 0 and specs.Meteor.t == 0)
+    Library.Toggles.NoCooldown:SetValue(false)
+    check("NoCooldown: toggle off restores", specs.Nuke.t == 30 and specs.Meteor.t == 6)
+    Library.Toggles.NoCooldown:SetValue(true)
+    Library:Unload()
+    check("NoCooldown: unload restores", specs.Nuke.t == 30 and specs.Meteor.t == 6)
+end
+
+-- ===== AutoCityReset: threshold + window + stall =====
+do
+    StatsState.destroyed = 0.9
+    Library.Toggles.AutoCityReset:SetValue(true)
+    pump(2.0)
+    check("AutoCityReset: threshold triggers onReset", #OnResetCalls >= 1)
+    local resets = #OnResetCalls
+    pump(3.0)
+    check("AutoCityReset: 5s window holds (no second reset)", #OnResetCalls == resets)
+    pump(3.0)
+    check("AutoCityReset: window passes, resets again", #OnResetCalls > resets)
+    StatsState.destroyed = 0.5
+    local resets2 = #OnResetCalls
+    EcoMock.earn(5)
+    pump(3.0)
+    check("AutoCityReset: no reset below threshold while earning", #OnResetCalls == resets2)
+    pump(10.5)
+    check("AutoCityReset: earn stall (13s no earn) triggers reset", #OnResetCalls > resets2)
+    Library.Toggles.AutoCityReset:SetValue(false)
+    StatsState.destroyed = 0.95
+    local resets3 = #OnResetCalls
+    pump(2.0)
+    check("AutoCityReset: toggle off stops resetting", #OnResetCalls == resets3)
+    StatsState.destroyed = 0
+end
+
+-- ===== AutoBuy: cheapest first, affordability gated =====
+do
+    for k in pairs(EcoMock.__owned.weapon) do
+        EcoMock.__owned.weapon[k] = nil
+    end
+    for k in pairs(EcoMock.__owned.map) do
+        EcoMock.__owned.map[k] = nil
+    end
+    EcoMock.setCash(0)
+    local flushes0 = #FlushLog
+    Library.Toggles.AutoBuy:SetValue(true)
+    pump(6.0)
+    check("AutoBuy: nothing bought while broke", not EcoMock.owns("weapon", "Meteor") and not EcoMock.owns("map", "Coast"))
+    EcoMock.setCash(20000)
+    pump(6.0)
+    check("AutoBuy: cheapest weapon bought first (Meteor 12000)", EcoMock.owns("weapon", "Meteor"))
+    check("AutoBuy: map not bought (8000 < 12000)", not EcoMock.owns("map", "Coast"))
+    check("AutoBuy: free items never re-bought (Missile price 0)", (function()
+        for i = flushes0 + 1, #FlushLog do
+            for _, entry in ipairs(FlushLog[i].owned) do
+                if entry == "weapon:Missile" then return false end
+            end
+        end
+        return true
+    end)())
+    EcoMock.setCash(12000)
+    pump(6.0)
+    check("AutoBuy: map bought once affordable", EcoMock.owns("map", "Coast"))
+    Library.Toggles.AutoBuy:SetValue(false)
+end
+
+-- ===== AutoClaim: daily + done challenges only =====
+do
+    Library.Toggles.AutoClaim:SetValue(true)
+    pump(1.0)
+    check("AutoClaim: daily claimed", ClaimDailyCalls == 1)
+    check("AutoClaim: only done+unclaimed challenges claimed", (function()
+        return #ClaimChallengeCalls == 1 and ClaimChallengeCalls[1] == 1
+    end)())
+    pump(35.0)
+    check("AutoClaim: no repeat claims after state flips", ClaimDailyCalls == 1 and #ClaimChallengeCalls == 1)
+    Library.Toggles.AutoClaim:SetValue(false)
+end
+
+-- ===== CheatCash =====
+do
+    local cash0 = EcoMock.cash()
+    local buttons = {}
+    for _, b in ipairs(MockState.Buttons) do
+        buttons[b.Text] = b
+    end
+    buttons["Add Cash"].Func()
+    check("CheatCash: cash + default 1000000", EcoMock.cash() == cash0 + 1000000)
+    check("CheatCash: flush carries new cash to the save wire", FlushLog[#FlushLog].cash == EcoMock.cash())
+end
+
+-- ===== banned-wire sweep =====
+check("banned-wire sweep: zero fires on REMOVE remotes", #RemoteFires == 0)
+
+-- ===== save manager folder =====
+check("SaveManager folder Yuri/SmashTheCity", SaveManager.Folder == "Yuri/SmashTheCity")
+
+check("pcall interceptor: 0 silent swallows total", PcallSwallows == 0)
+
+summary()
