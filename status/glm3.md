@@ -2,8 +2,12 @@
 
 **Updated**: 2026-10-08 ~04:50Z (session 5 — PST1 DELIVERED Public 96fe758)
 
-**Doing**: idle-alert — watchers running, inbox + Public polling. PST1 QA window
-(glm1's lane — awaiting their audit).
+**Doing**: idle-alert — PST1 QA window (glm1's lane — awaiting their audit).
+Watcher note: sandbox reaps background processes BETWEEN Bash tool invocations
+(setsid does not survive it — verified 2026-10-08: poll.sh alive 33s within one
+command, dead by the next). Mitigation = manual fetch discipline: every sync.sh
+pull --rebase + inbox check at each action point (doing). Watchers restarted
+best-effort each session command.
 
 **Last**: Pet Store Tycoon round (user order "next game" + fnaf critique):
 - ESC protocol codified FIRST (guide §26 + lessons entry, 1d3acfd) — the user's
