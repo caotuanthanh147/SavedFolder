@@ -542,3 +542,49 @@ again; all tools honor SF_DIR / PUBLIC_DIR / $HOME env overrides).
 - Guide + harness kit: shared/ONBOARDING.md (new-instance fast start),
   shared/HARNESS_KIT.md (mock primitive inventory), shared/SEARCH.md (when +
   how to search the internet; verified source table).
+
+---
+
+## 26. Expanded Exploit-Surface Census (ESC) — beyond remotes (2026-10-08, user-ordered after the FNAF World miss)
+
+User critique, verbatim intent: *"you miss a serious vulnerability which is the attributes and the save system, exploiting doesn't always mean to rely on remotes, it could be mutable table/value that can affect the server side or client side, no cooldown hooking on modules, \255 to rollback, 0/0 to break the number value, etc — be more creative, search more on the internet and open up."* FW1 (FNAF World) correctly identified a client-authoritative game but stopped at UI-button/module-call automation — the ATTRIBUTE surface and the SAVE pipeline were never censused. Every game analysis now carries an ESC section covering ALL of the following, each verified in the deobf at call sites (Rule 2 discipline still applies to every vector — no assumed shapes):
+
+### 26.1 Attributes surface
+- Census every `GetAttribute`/`SetAttribute` in the deobf (`deobf_search.py` `attrs`). For each: WHO reads it (server script in the dump? client module? proximity/heartbeat handler?) and WHO can write it.
+- Client-writable attributes that gate server-visible or reward-bearing logic = client-trusted inputs (the FNAF Swim/Pearl attrs were already used for determinism — the missed play was FORGING them).
+- Attributes on instances the client OWNS (character parts, tools, client-created instances) replicate within ownership rules — a server handler reading them is reading attacker data.
+- Forge pattern: `inst:SetAttribute("Attr", value)` right before the game's own reader consumes it (same timing discipline as FirePP before prompt reads).
+
+### 26.2 Save/persistence system surface
+- Find the save pipeline: grep the dump for `SetAsync`/`UpdateAsync`/`IncrementAsync` in server scripts; walk BACKWARD to what feeds those tables.
+- Any client-supplied field that persists VERBATIM (pet names, store names, colors, custom strings) is a save-corruption injection point (see 26.6).
+- Client-authoritative stat-sync remotes (tycoon games love "SyncStats"/"UpdateData" style wires where the client reports its own state) = arbitrary currency/items when trusted — test what the server validates before treating it as such, but the wire itself is high-value.
+- Session-shaping: when does the game save (interval? leave? BindToClose?) — leave-during-save races are a classic dupe timing window.
+
+### 26.3 Mutable client-trusted tables
+- Shared config tables in ReplicatedStorage modules (Prices, Cooldowns, Rates, Weights) that the game's own CLIENT code gates on: mutate them locally (`Mod.Prices.X = 0`, `Mod.Cooldowns.Y = 0`) and the game's own flow executes with our values — no remote ever fired.
+- leaderstats-style local displays / client-side NumberValues that later sync serverward — check which side owns the truth before touching (server-owned = display-only, do not bother).
+- Cached singleton tables reachable via `getupvalues`/`require` — same mutation play.
+- Rule 2 applies: read the module's actual table shape in the deobf first; a wrong key silently no-ops.
+
+### 26.4 Module hooking — no-cooldown
+- Client-side cooldown/rate gates (devforum-confirmed antipattern: "I check for cooldown on the client before firing the remote") are bypassable two ways: (a) `hookfunction`/`replaceclosure` on the gate function returning true, (b) `getupvalues` the cooldown TABLE and zero/reset it in place.
+- The game's own client modules can also be hooked to call gated functions directly (cooldown lives in a wrapper; the inner function is unprotected).
+- §20.2 discipline: hook the right call path; verify the hook fires with a probe. newcclosure-wrap exploit hooks.
+
+### 26.5 Numeric injection — 0/0, ±inf, math.huge
+- Any remote arg that is a NUMBER flowing into arithmetic or comparison (amounts, prices, quantities, diffs) is a NaN/inf candidate (already §7 for remote args — this extends it to attrs, save fields, and text inputs).
+- Polarity analysis before firing: `if price <= coins` passes with -inf price; `coins -= price` with -inf price = `coins += inf`; NaN makes EVERY comparison false — so `if not (coins < price)` gates OPEN while `if coins >= price` gates CLOSE. Read the server handler in the dump and pick the polarity-breaking value.
+- Text inputs converted with `tonumber` accept "nan"/"inf" strings (Paranormica case: typing "nan" in a difficulty field → infinite money).
+
+### 26.6 Byte/Instance injection — \255 rollback (the dupe primitive)
+- Strings containing invalid UTF-8 (`"\255"`, `"\255\231"`) or raw Instances/userdata (workspace instead of Color3/number) that persist to DataStore make the save THROW → session data never persists → next login rolls back to the last good save.
+- The DUPE SHAPE (researched: TheGreatSageEqualToHeaven gist + devforum UTF8/NaN thread; hit Adopt Me/Jailbreak-class economies): (1) obtain/hold value V, (2) transfer V out (trade/sell/mail to alt), (3) inject \255 into a persisting string field of your own data, (4) leave to trigger the save → error → rollback → both sides now hold V.
+- On the script side this is usually a MANUAL or clearly-labeled tool (one-shot "corrupt my save" action on a field the census proved persists unsanitized), not a background loop — verify the field persists verbatim in the deobf first; a server that `utf8.len`-validates or type-checks kills the vector (§2: confirm, never assume).
+
+### 26.7 Ownership/replication exceptions
+- The client replicates some things serverward by engine rules: character CFrame/physics (owned parts), properties/attributes on client-owned instances, tool equip state, Humanoid state changes. A server that trusts these (proximity checks off owned parts, speed checks off character CFrame) is reading attacker data.
+- These are usually already covered by TPTo/TweenTo mechanics — the ESC's job is to CHECK whether the game gates anything on them that the script should forge deliberately (e.g., a "StoodOnPad" attribute the server reads to grant a reward).
+
+### 26.8 ESC output format (goes in every game analysis file)
+`## ESC — exploit surface beyond remotes`: one line per vector class with the game-specific findings (or "none found — checked X, Y, Z"), each with deobf line cites. A vector with no finding is a CHECKED vector — write the negative down too. Wire into the build ONLY what passes the Rule 11 filter (real automation or real exploit value); the census documents the surface, the filter disciplines the build.
