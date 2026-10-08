@@ -138,6 +138,7 @@ local Connections = {
     Player_General = nil,
     Knockback = {},
     Reconnect = nil,
+    ActiveTween = nil,
 }
 function AddMultiDropdown(group, id, config)
     if type(group) == "string" then
@@ -319,67 +320,20 @@ local function GetCharacter()
     local c = Plr.Character
     return (c and c:FindFirstChild("HumanoidRootPart") and c:FindFirstChildOfClass("Humanoid")) and c or nil
 end
-local function TPTo(target, offset)
-    local char = GetCharacter()
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local cframe
-    if typeof(target) == "CFrame" then
-        cframe = target
-    elseif typeof(target) == "Vector3" then
-        cframe = CFrame.new(target)
-    elseif typeof(target) == "Instance" then
+local function GetPosition(target)
+    local kind = typeof(target)
+    if kind == "CFrame" then
+        return target
+    elseif kind == "Vector3" then
+        return CFrame.new(target)
+    elseif kind == "Instance" then
         if target:IsA("BasePart") then
-            cframe = target.CFrame
+            return target.CFrame
         elseif target:IsA("Model") then
-            cframe = target:GetPivot()
+            return target:GetPivot()
         end
     end
-    if not cframe then return false end
-    if offset then
-        cframe = cframe * CFrame.new(offset)
-    end
-    hrp.CFrame = cframe
-    return true
-end
-local function TweenTo(speed, target, offset, arive)
-    local char = GetCharacter()
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local cframe
-    if typeof(target) == "CFrame" then
-        cframe = target
-    elseif typeof(target) == "Vector3" then
-        cframe = CFrame.new(target)
-    elseif typeof(target) == "Instance" then
-        if target:IsA("BasePart") then
-            cframe = target.CFrame
-        elseif target:IsA("Model") then
-            cframe = target:GetPivot()
-        end
-    end
-    if not cframe then return false end
-    if offset then
-        cframe = cframe * CFrame.new(offset)
-    end
-    local goal = cframe.Position
-    while true do
-        local _, delta = RunService.Stepped:Wait()
-        char = GetCharacter()
-        hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return false end
-        local diff = goal - hrp.Position
-        local dist = diff.Magnitude
-        if arive and dist <= arive then
-            return true
-        end
-        local stepDist = speed * delta
-        if dist <= stepDist then
-            hrp.CFrame = cframe
-            return true
-        end
-        hrp.CFrame = CFrame.new(hrp.Position + diff.Unit * stepDist) * (hrp.CFrame - hrp.CFrame.Position)
-    end
+    return nil
 end
 local function GetNearest(list, filterFn)
     local char = GetCharacter()
@@ -399,6 +353,79 @@ local function GetNearest(list, filterFn)
         end
     end
     return best, bestDist
+end
+local function TPTo(target, offset)
+    local char = GetCharacter()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local cframe = GetPosition(target)
+    if not cframe then return false end
+    if offset then
+        cframe = cframe * CFrame.new(offset)
+    end
+    hrp.CFrame = cframe
+    return true
+end
+local function TweenTo(speed, target, offset, arive)
+    local char = GetCharacter()
+    if not char then return false end
+    local cframe = GetPosition(target)
+    if not cframe then return false end
+    if offset then
+        cframe = cframe * CFrame.new(offset)
+    end
+    local goal = cframe.Position
+    if Connections.ActiveTween then
+        local previous = Connections.ActiveTween
+        Connections.ActiveTween = nil
+        Thread("Tween", nil, false)
+        previous.Hum.PlatformStand = previous.WasPlatformStand
+        task.spawn(previous.Caller, false)
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local wasPlatformStand = hum.PlatformStand
+    local caller = coroutine.running()
+    local state = {
+        Caller = caller,
+        Hum = hum,
+        WasPlatformStand = wasPlatformStand,
+    }
+    Connections.ActiveTween = state
+    hum.PlatformStand = true
+    Thread("Tween", function()
+        local reached = false
+        while true do
+            local _, delta = RunService.Stepped:Wait()
+            local current = GetCharacter()
+            if not current then break end
+            for _, part in ipairs(current:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+            local hrp = current.HumanoidRootPart
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            local diff = goal - hrp.Position
+            local dist = diff.Magnitude
+            if arive and dist <= arive then
+                reached = true
+                break
+            end
+            local stepDist = speed * delta
+            if dist <= stepDist then
+                hrp.CFrame = cframe
+                reached = true
+                break
+            end
+            hrp.CFrame = hrp.CFrame + diff.Unit * stepDist
+        end
+        if Connections.ActiveTween == state then
+            Connections.ActiveTween = nil
+        end
+        hum.PlatformStand = wasPlatformStand
+        task.spawn(caller, reached)
+    end, true)
+    return coroutine.yield()
 end
 local function FuncTPW()
     while true do
