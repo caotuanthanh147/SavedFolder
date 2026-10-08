@@ -1,30 +1,34 @@
 # glm1 status
 
-**Updated**: 2026-10-08 ~04:10Z (session 15 — PST round: parallel claim RESOLVED, PST1-QA lane + QA-prep)
+**Updated**: 2026-10-08 ~04:50Z (session 15 — PST1-QA lane LIVE: independent ESC census delivered)
 
-**Doing**: PST1-QA prep — internet research on the user's new
-exploit-surface directive vector classes (\255 rollback, 0/0 NaN
-number-break, attribute trust, save-payload tamper, module cooldown
-hooks) so the delivery audit is grounded. Audit itself goes live when
-glm3 delivers PST1.
+**Doing**: PST1-QA (Pet Store Tycoon delivery audit lane). Independent
+§26 ESC census COMPLETE + pushed: work/lua/pst-esc-census-glm1.md
+(~40 deobf_search/grep probes; client-number wires + save-system \255
+candidate + attrs negatives + cooldown-gate findings + Rule 11 lens +
+QA cross-check plan). glm3 msg'd with the intel. Awaiting glm3's PST1
+delivery → same-cycle audit (gates + Rule 23 + wire/state-surface
+spot-checks vs BOTH censuses).
 
 **Round context**:
-- User order: "next game" + FNAF feedback → NEW STANDING DIRECTIVE
-  (remotes + attributes + save system + mutable module state + cooldown
-  hooks + \255 + 0/0 NaN + internet-research order) — lessons.md "User
-  round 2026-10-08" (+ addendum). glm3's session got the fuller quote.
-- PARALLEL CLAIM: glm3 + glm1 both claimed PST1 at ~03:49Z; glm3's push
-  landed (4842c6b) → origin-priority → PST1 = glm3. My duplicate
-  withdrawn; TASKS carries the resolution + PST1-QA (mine) + PST1-H
-  (open, glm4 first refusal). glm3 msg'd (collision + intel offer).
+- User order: "next game" + FNAF feedback → STANDING DIRECTIVE (remotes +
+  attributes + save system + mutable module state + cooldown hooks + \255 +
+  0/0 NaN + internet-research order) — lessons.md "User round 2026-10-08"
+  (+ addendum); glm3 codified guide §26 (ESC) + researched sources
+  (TheGreatSage \255 rollback, devforum UTF8/NaN) in 1d3acfd.
+- PARALLEL CLAIM resolved: glm3 + glm1 both claimed PST1 at ~03:49Z; glm3's
+  push landed first (4842c6b) → PST1 = glm3 (origin-priority); my duplicate
+  withdrawn; lanes = PST1 (glm3) / PST1-QA (glm1) / PST1-H (open, glm4
+  first refusal). Two rebase conflicts (TASKS + lessons) hand-merged
+  keeping BOTH sides' content (AA rule); push verified 93cb051.
 - FNAF World deleted from Public (146eb30) → FW round closed upstream;
-  FW1-H (glm4) closed moot, msg'd; glm2 POT1-H verdict was 58/58 green.
-- Sandbox was reset again before all this: repos re-cloned, bootstrap,
-  lua5.4, watchers on, Rule 18 re-read DONE (guide 545 + Template 919).
+  FW1-H (glm4) closed moot, msg'd.
+- Watchers live (poll + watch_public); inbox cleaned (7 handled msgs
+  deleted, .gitkeep kept).
 
-**Next**: push the resolution; QA-prep research; watch msgs/glm1 +
-Public; audit at glm3's delivery (gates + Rule 23 + wire + state-surface
-spot-checks incl. NaN/\255 applicability).
+**Next**: monitor msgs/glm1 + Public + glm3's PST1 progress; audit at
+delivery per the census QA plan.
 
-**Files (mine, session 15)**: TASKS PST rows + resolution; lessons.md
-directive + addendum; msgs to glm2/3/4/5; this status.
+**Files (mine, session 15)**: work/lua/pst-esc-census-glm1.md; TASKS PST
+rows + resolution; lessons.md directive + addendum (merged glm3's); msgs
+to glm2/3/4/5 (x5 + census intel); this status.
