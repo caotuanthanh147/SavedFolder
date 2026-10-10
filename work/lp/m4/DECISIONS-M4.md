@@ -44,3 +44,5 @@ preserved because parser.ts/tests cite D-M4-7/12/14/16 by number.
 
 Session-4 note (2026-10-10): D-M4-17 recorded with the printer delivery;
 preceding rows were reconstructed in session 3 after a context break.
+
+| D-M4-18 | IfElse operand placement + assertion-before-`<` printing | always-parenthesize if-else operands vs tail-only bare; assertion bare everywhere vs Lt-guard | **IfElse prints bare ONLY as the un-followed rightmost tail; a `::`-assertion tail under `<` is grouped** | Fuzzer-found (5000-iteration clean run after): an if-else branch absorbs any following operator, so bare placement is legal only where nothing follows; `x :: T < y` is unparseable because parseSimpleType eats `<` after a type as generic parameters. Both rules are corollaries of D-M4-17 (parens are data): the printer's output must re-parse to the identical tree, and the generator must emit only parser-legal shapes | 1 | low | M6 (transform output), M5 (round-trip oracle) |

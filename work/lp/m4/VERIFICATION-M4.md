@@ -307,3 +307,63 @@ with the fuzzer.
 After the Public delivery commit: re-run `bun install && bun test && bun run
 typecheck` from the delivered obfuscator/ tree (merged package with M5) —
 same results on delivered bytes (recorded in the session log).
+
+---
+
+# Session 5 part 1 (2026-10-10): §10.3 fuzzer
+
+## What I ran, and the output
+
+### 1. Test suite (tests/fuzz.test.ts — 3 deterministic cases: 300 + 200
+generated-AST round-trips, 60 mutation-oracle splices)
+
+```
+ 206 pass
+ 0 fail
+ 971 expect() calls
+Ran 206 tests across 5 files. [255ms]
+```
+
+### 2. Soak runs (standalone: `bun run tests/fuzz.ts <iters> <seed>`)
+
+```
+5000 iters seed 0x5EED: 0 failures (1036 ms)
+1000 iters seed 0xC0FFEE: 0 failures (341 ms)
+200 corpus mutants (20 private files × 10): 0 failures (631 ms)
+```
+
+### 3. Corpus round-trip regression: unchanged (49/50; 131-corpus 127/130).
+
+### 4. Bugs found + fixed + regression-tested (fuzzer-driven)
+
+The fuzzer immediately caught printer/generator shape classes the corpus
+could not (real scripts never exercise them):
+
+1. **Bare IfElse operand absorption** (printer, REAL bug): an if-else
+   expr's branches absorb any following operator — `a .. if c then x
+   else y .. b` parses `.. b` INTO the else-branch. Rule (D-M4-17
+   corollary): an IfElse prints bare ONLY as the un-followed rightmost
+   tail; the operand printer threads a `followed` flag through the right
+   spine. Legal shapes (`a + if c then 1 else 2` as a complete RHS) stay
+   bare; left-position/followed positions parenthesize.
+2. **`x :: T < y` unparseable bare** (both sides): parseSimpleType treats
+   `<` after a type as generic parameters, so a type assertion in the
+   left operand of `<` must be grouped — Lt-guard added to the printer
+   (defensive; the parser never produces the bare shape) and the
+   generator (never emits it).
+3. Generator correctness classes (test-harness bugs, each found by the
+   signature-diff triage): compound-assign op pool included comparisons
+   (invalid Lua); number atoms rolled the RNG twice (value ≠ raw);
+   locals bound before RHS/bounds (violates L5.1 bind-after-RHS);
+   while/if-else/if-branch scope leaks; shadowed-local picks (now
+   resolve to the innermost binding); debugname gaps (LocalFunction +
+   table-record functions).
+
+## NOT run (honest gaps)
+
+1. Mutation oracle over the FULL 131-corpus (ran 20-file sample; the
+   embedded-suite sources keep CI hermetic).
+2. Coverage-guided generation (plain structural random walk; a
+   coverage-feedback loop is possible future work).
+3. Semantic differential vs a real Lua runtime (out of M4 scope — M5/M6
+   own execution oracles).

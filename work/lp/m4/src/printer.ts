@@ -296,49 +296,98 @@ function callText(e: Extract<Expr, { kind: 'Call' }>, indent: number): string {
 }
 
 function unaryText(e: Extract<Expr, { kind: 'Unary' }>, indent: number, limit: number): string {
+  // the unary's operand is complete (nothing follows inside it); the
+  // unary's own exposure to `followed` is handled by operand()
   const text = `${UNARY_OP_TEXT[e.op]}${expr(e.expr, indent, UNARY_PRIORITY)}`;
   return limit < UNARY_PRIORITY ? text : `(${text})`;
 }
 
 function binaryText(e: Extract<Expr, { kind: 'Binary' }>, indent: number, limit: number): string {
-  const inner = binaryInner(e, indent);
   const [l] = BINARY_PRIORITY[e.op];
-  return l <= limit ? `(${inner})` : inner;
+  return l <= limit ? `(${binaryInner(e, indent, false)})` : binaryInner(e, indent, false);
 }
 
-/** The un-wrapped `left op right` — children always get parent-relative
- *  operand limits (the outer limit only decides THIS node's parens). */
-function binaryInner(e: Extract<Expr, { kind: 'Binary' }>, indent: number): string {
+/** The un-wrapped `left op right`. `followed` = an operator token will
+ *  follow this text (outside any parens) — propagates to the RIGHT spine
+ *  only (the left child is always followed by this node's own operator). */
+function binaryInner(e: Extract<Expr, { kind: 'Binary' }>, indent: number, followed: boolean): string {
   const [l, r] = BINARY_PRIORITY[e.op];
-  return `${operand(e.left, l, true, indent)} ${BINARY_OP_TEXT[e.op]} ${operand(e.right, r, false, indent)}`;
+  // `x :: T < y` is unparseable bare (parseSimpleType eats `<` after a
+  // type as generic parameters) — parenthesize the Lt's left when its
+  // tail is an assertion [parser.cpp parseSimpleType Less check]
+  const ltGuard = e.op === 'CompareLt' && tailIsAssertion(e.left);
+  const leftText = ltGuard ? `(${expr(e.left, indent)})` : operand(e.left, l, true, indent, true);
+  return `${leftText} ${BINARY_OP_TEXT[e.op]} ${operand(e.right, r, false, indent, followed)}`;
 }
 
-/** Binary/unary/other child in operand position. */
-function operand(e: Expr, limit: number, isLeft: boolean, indent: number): string {
+/** Rightmost-printed path ends in a `::` assertion. */
+function tailIsAssertion(e: Expr): boolean {
+  if (e.kind === 'TypeAssertion') return true;
+  if (e.kind === 'Binary') return tailIsAssertion(e.right);
+  if (e.kind === 'Unary') return tailIsAssertion(e.expr);
+  return false;
+}
+
+/** Rightmost-printed path of an expression: the only place a bare IfElse
+ *  is legal (a branch would otherwise absorb whatever follows). */
+function tailHasIfElse(e: Expr): boolean {
+  switch (e.kind) {
+    case 'IfElse':
+      return true;
+    case 'Binary':
+      return tailHasIfElse(e.right);
+    case 'Unary':
+      return tailHasIfElse(e.expr);
+    default:
+      return false; // Group isolates; atoms cannot contain an IfElse
+  }
+}
+
+/** Binary/unary/other child in operand position. `followed` = an
+ *  operator token will follow this operand's text outside any parens. */
+function operand(e: Expr, limit: number, isLeft: boolean, indent: number, followed: boolean): string {
+  if (e.kind === 'IfElse') {
+    // An if-else expr's branches absorb any following operator
+    // (`if c then x else y .. b` puts `.. b` INSIDE the else-branch), so
+    // it may print bare ONLY as the un-followed rightmost tail.
+    return isLeft || followed ? `(${expr(e, indent)})` : expr(e, indent);
+  }
   if (e.kind === 'Binary') {
     const [cl, cr] = BINARY_PRIORITY[e.op];
     // no parens when the child binds tighter, OR it is an equal-priority
     // LEFT-ASSOCIATIVE chain in the left slot (re-parse re-associates
     // identically — adding parens would inject a Group node and BREAK the
-    // round-trip: `a - b - c` must not print as `(a - b) - c`).
-    const ok = cl > limit || (cl === limit && isLeft && cl === cr);
-    return ok ? binaryInner(e, indent) : `(${binaryInner(e, indent)})`;
+    // round-trip: `a - b - c` must not print as `(a - b) - c`). EXCEPTION:
+    // when followed, a bare IfElse on the right spine defeats the
+    // re-association identity (the branch absorbs what follows).
+    const ok =
+      (cl > limit || (cl === limit && isLeft && cl === cr)) &&
+      !(followed && tailHasIfElse(e));
+    return ok ? binaryInner(e, indent, followed) : `(${binaryInner(e, indent, false)})`;
   }
-  // Function literals and if-else exprs are valid BARE operands
-  // (`f or function() end`, `a + if c then 1 else 2` — parseSimpleExpr):
+  if (e.kind === 'Unary' && followed && tailHasIfElse(e)) {
+    return `(${expr(e, indent, limit)})`;
+  }
+  // Function literals and if-else exprs are valid BARE operands in the
+  // un-followed tail (`f or function() end`, `a + if c then 1 else 2`):
   // parenthesizing them would inject a Group node and break the round-trip.
-  // Postfix BASES still parenthesize them (postfixBase) — a call/index
-  // base genuinely needs the parens, and there the original AST carries
-  // the Group already.
+  // Postfix BASES still parenthesize them (postfixBase) — there the
+  // original AST carries the Group already.
   return expr(e, indent, limit);
 }
 
-function ifElseText(e: Extract<Expr, { kind: 'IfElse' }>, indent: number, limit: number): string {
+function ifElseText(e: Extract<Expr, { kind: 'IfElse' }>, _limit: number, indent: number): string {
+  // NEVER self-parenthesize: if-else exprs are valid bare operands of
+  // binary AND unary operators (`a + if c then 1 else 2`, `#if c then t
+  // else u` — parseSimpleExpr) and bare nest unambiguously (an `else`
+  // binds to the nearest unmatched `then`). Wrapping at nonzero limits
+  // injects Group nodes on re-parse and breaks the round-trip — the
+  // assertion/postfix contexts that DO need parens wrap explicitly
+  // (assertionOperand / postfixBase).
   const cond = e.conditionLocal
     ? `local ${e.conditionLocal.name} = ${expr(e.condition, indent)}`
     : expr(e.condition, indent);
-  const text = `if ${cond} then ${expr(e.trueExpr, indent)} else ${expr(e.falseExpr, indent)}`;
-  return limit > 0 ? `(${text})` : text;
+  return `if ${cond} then ${expr(e.trueExpr, indent)} else ${expr(e.falseExpr, indent)}`;
 }
 
 function functionText(f: FunctionExpr, indent: number): string {
