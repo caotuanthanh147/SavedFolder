@@ -1,13 +1,17 @@
 # M4 — Obfuscator front end (Luau parser, analysis, constant protection)
 
 Module card for LP1-M4 (doc.md §10.2 items 1, 2, 6; repo layout
-`obfuscator/parser/`). Owner: glm3. Status: **in progress**.
+`obfuscator/parser/`). Owner: glm3. Status: **in progress** (s1 lexer + s2 AST
++ s3 parser + s4 printer/round-trip delivered).
 
 ## What this module owns
 
 1. **Parser** — strict Luau syntax: Lua 5.1 base grammar + Luau additions
    (type annotations, `continue`, compound assignment, string interpolation,
    if-expressions, generics, `::` casts, `//` floor division, attributes).
+   **Printer** (s4) — AST → source, round-trip faithful: `print(parse(src))`
+   re-parses to a structurally identical AST (tests/roundtrip.ts comparator;
+   corpus differential ~1.63M nodes clean). Parens-are-data policy: D-M4-17.
 2. **Semantic analysis** — scope resolution, upvalue capture, vararg
    handling, method calls, multiple assignment/returns (§10.2 item 2).
 3. **Constant and string protection** — build-time extraction into

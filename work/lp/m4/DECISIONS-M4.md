@@ -39,3 +39,8 @@ Session-3 note (2026-10-10): rows D-M4-8..16 were reconstructed from the
 parser/AST sources' citations and documented behaviors — the log update was
 lost with a session context interruption before committing; numbering is
 preserved because parser.ts/tests cite D-M4-7/12/14/16 by number.
+
+| D-M4-17 | Printer parenthesization policy | parens for readability vs parens-only-where-structurally-required | **parens are DATA: emit only (a) where the AST carries a Group node, or (b) where re-parse validity strictly requires them** | Found by the s4 round-trip differential: defensive parens around function literals/if-else operands and equal-priority left-assoc chains re-parse as EXTRA Group nodes — parse→print→parse diverged (catsitting_harness.lua, ~1.63M-node corpus now clean). Corollaries baked into the printer: `a - b - c` prints WITHOUT parens (left-assoc re-association is identity); `f or function() end` prints bare (parseSimpleExpr accepts it); postfix bases and ambiguity guards still parenthesize (there the source AST carries the Group, or validity demands it); the `;` guard before `(`-leading statements may over-fire (always-valid separator) | 1 | low | M6 (consumes printer output), M5 (round-trip oracle reused for fuzzing) |
+
+Session-4 note (2026-10-10): D-M4-17 recorded with the printer delivery;
+preceding rows were reconstructed in session 3 after a context break.

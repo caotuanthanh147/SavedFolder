@@ -4,16 +4,19 @@
  * accept/reject per file with error positions for rejects.
  *
  * Modes:
- *   bun run corpus.ts <corpus-root>          — lexer pass (token counts)
- *   bun run corpus.ts <corpus-root> --parse  — FULL parse pass (tokens→AST),
- *                                              counts nodes per file; every
- *                                              lex-accept that parse-rejects
- *                                              is a parser gap to triage
+ *   bun run corpus.ts <corpus-root>               — lexer pass (token counts)
+ *   bun run corpus.ts <corpus-root> --parse       — FULL parse pass (tokens→AST),
+ *                                                   counts nodes per file
+ *   bun run corpus.ts <corpus-root> --roundtrip   — parse → print → parse →
+ *                                                   astEqual (the §10.3-style
+ *                                                   differential oracle)
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Lexer } from '../src/lexer';
 import { parse } from '../src/parser';
+import { print } from '../src/printer';
+import { astEqual } from './roundtrip';
 import type { Chunk } from '../src/ast';
 
 function* walk(dir: string): Generator<string> {
@@ -39,10 +42,11 @@ function countNodes(node: unknown): number {
 
 const root = process.argv[2];
 if (!root) {
-  console.error('usage: bun run corpus.ts <corpus-root> [--parse]');
+  console.error('usage: bun run corpus.ts <corpus-root> [--parse|--roundtrip]');
   process.exit(2);
 }
 const parseMode = process.argv.includes('--parse');
+const roundtripMode = process.argv.includes('--roundtrip');
 
 let total = 0;
 let accepted = 0;
@@ -60,9 +64,16 @@ for (const file of walk(root)) {
   try {
     const tokens = new Lexer(source).tokenize();
     totalTokens += tokens.length;
-    if (parseMode) {
+    if (parseMode || roundtripMode) {
       const chunk: Chunk = parse(source);
       totalNodes += countNodes(chunk);
+      if (roundtripMode) {
+        const printed = print(chunk);
+        const reparsed = parse(printed);
+        if (!astEqual(chunk, reparsed)) {
+          throw new Error('ROUND-TRIP MISMATCH: parse → print → parse diverged');
+        }
+      }
     }
     accepted++;
   } catch (e) {
@@ -70,7 +81,7 @@ for (const file of walk(root)) {
   }
 }
 
-console.log(`mode:          ${parseMode ? 'parse (tokens→AST)' : 'lex'}`);
+console.log(`mode:          ${roundtripMode ? 'roundtrip (parse→print→parse→astEqual)' : parseMode ? 'parse (tokens→AST)' : 'lex'}`);
 console.log(`corpus files:  ${total}`);
 console.log(`accepted:      ${accepted}`);
 console.log(`rejected:      ${rejects.length}`);

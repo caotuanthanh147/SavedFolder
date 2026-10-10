@@ -1,4 +1,4 @@
-# VERIFICATION-M4 — §22.1 compliance record (sessions 1-3: lexer + AST + parser)
+# VERIFICATION-M4 — §22.1 compliance record (sessions 1-4: lexer + AST + parser + printer)
 
 Scope: proves the session-1 (lexer) and session-2-start (AST module) claims
 with commands and outputs; lists what was NOT run. Per doc.md §22.1 (added
@@ -221,3 +221,89 @@ After the Public delivery commit: `git show HEAD:obfuscator/parser/src/parser.ts
 diffed against the canonical copy, and `bun install && bun test && bun run
 typecheck` re-run from a clean checkout of the delivered tree — same
 175/175 + tsc exit 0 (recorded in the session log).
+
+---
+
+# Session 4 (2026-10-10): printer + round-trip differential
+
+## What I ran, and the output
+
+### 1. Test suite (now includes tests/printer.test.ts — 28 round-trip cases)
+
+Command: `bun test`
+
+```
+ 203 pass
+ 0 fail
+ 968 expect() calls
+Ran 203 tests across 4 files. [59.00ms]
+```
+
+Every printer case cites L5.1 §2.4/§2.5.1 (expected parenthesization derived
+from the priority table), LuauSyntax (compound/continue/if-else/::/interp),
+luau.org/types (function types with arg names, generic packs `U...`,
+variadic returns), Parser.cpp + Luau::transpile (the `;` ambiguity guard
+before `(`-leading statements), Lexer.cpp (canonical escape re-encoding).
+tests/roundtrip.ts = the structural comparator (locations ignored; Local
+identity paired positionally; Repeat walks body-before-condition).
+
+### 2. Type check: `bun run typecheck` → exit 0.
+
+### 3. Corpus ROUND-TRIP (new `--roundtrip` mode: parse → print → parse → astEqual)
+
+Private corpus (50 files, 2,240,420 B / 424,026 tokens / 362,862 nodes):
+
+```
+accepted:  49  (sole reject = the known Lua 5.3-bitwise file, out of spec)
+```
+
+131-file corpus (8,646,341 B / 1,524,435 tokens / 1,270,409 nodes):
+
+```
+accepted:  127 (same 3 known-broken files as the parse pass)
+```
+
+**Zero round-trip mismatches across ~1.63M AST nodes** — every real-world
+script that parses also survives print→re-parse with a structurally
+identical AST. This is the §10.3-style differential oracle, ready to pair
+with the fuzzer.
+
+### 4. Session bugs found + fixed + regression-tested
+
+1. **Group-injection class (the session's headline)**: the printer's
+   defensive operand parens BROKE the round-trip — parens around
+   `function` literals / if-else exprs in operand position, and around
+   equal-priority left-assoc chains (`a - b - c` printed as `(a - b) - c`),
+   re-parse as EXTRA Group nodes. Root cause: in this AST, PARENS ARE DATA
+   (a Group node), not formatting. Rule (now D-M4-17): the printer may
+   emit parens ONLY where the AST carries a Group or where re-parse
+   validity strictly requires them — never "for readability". Found by the
+   catsitting_harness.lua corpus mismatch ($.block.body[86].values[0].right
+   Function vs Group) and by the left-assoc shape test.
+2. Block-STATEMENT `body` is a bare Stat[] (not a nested Block) — crashed
+   the printer on every `do...end` (found by smoke suite).
+3. Function-name chains dropped their `:` ops and materialized `self` as a
+   real parameter — would have doubled self on re-parse (functionStatText
+   + functionNameText rewrite).
+4. Attribute placement on `local function`: `local @checked function` is
+   invalid — attributes precede the `local` keyword.
+5. Vararg annotation printed `...: ...number` (double ellipsis) — the
+   variadic pack's INNER type is the annotation; generic packs keep their
+   own `...`.
+6. postfixBase/assertionOperand double-wrapped Group nodes (`((g))`).
+
+## NOT run (honest gaps — session 4 scope)
+
+1. **No §10.3 fuzzer yet** — the round-trip oracle now exists; the random
+   program generator is the remaining piece (next sessions).
+2. **No byte-level source diffing** — round-trip is AST-level by design
+   (comments/whitespace are not in the AST); number raws ARE byte-exact.
+3. **No differential against the official Luau binary** (unchanged).
+4. **Performance not benchmarked** — indicative: both corpora (~11 MB)
+   lex+parse+print+re-parse+compare in seconds under `bun run`.
+
+## Fresh-clone verification of delivered bytes
+
+After the Public delivery commit: re-run `bun install && bun test && bun run
+typecheck` from the delivered obfuscator/ tree (merged package with M5) —
+same results on delivered bytes (recorded in the session log).
