@@ -1,0 +1,30 @@
+{
+  "name": "licensing-platform-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": {
+    "bindings": [
+      { "name": "RATE_COUNTER", "class_name": "RateCounterDO" },
+      { "name": "NONCE", "class_name": "NonceDO" }
+    ]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "licensing-platform", "database_id": "REPLACE_AT_DEPLOY" }
+  ],
+  "r2_buckets": [
+    { "binding": "BUNDLES", "bucket_name": "licensing-platform-bundles" }
+  ],
+  "vars": {
+    "STATUS_ACTIVE": "true",
+    "EXECUTOR_HWID_HEADERS": "Delta-User-Identifier,Delta-Fingerprint",
+    "SESSION_TTL_SEC": "3600"
+  }
+  // Secrets (wrangler secret put, never in this file):
+  //   SERVER_PEPPER            — server-wide pepper for key/hwid/ip hashes
+  //   SIGNING_PRIVATE_KEY_B64URL — Ed25519 PKCS8 private key, x-sig responses
+  //   PROOF_KEY_B64URL         — HMAC key for x-proof checking
+  //   SESSION_SEAL_KEY         — seals the opaque payload_ref (auth sessions)
+  //   PROJECT_SIGNING_KEYS     — optional JSON map {signing_key_id: PKCS8 b64url}
+  //                              for per-project bundle_sig keys (doc §18);
+  //                              absent → the default signing key is used
+}

@@ -1,0 +1,61 @@
+# DECISIONS-M1 — Decision Log (doc.md "Decision authority", required format)
+
+Module M1 "API core". Session 1 decisions are backfilled from the delivery
+notes and RESEARCH-M1.md; session 2 decisions are added as they are made.
+Format per doc.md: Options / Choice / Why (with evidence) / Tier /
+Reversibility / Affects.
+
+| Decision | Options considered | Choice | Why (with evidence) | Tier | Reversibility | Affects modules |
+|----------|--------------------|--------|---------------------|------|---------------|-----------------|
+| Database (D3) | D1 vs Postgres | D1 | Native Workers binding; `db.batch()` gives transactional multi-statement for the HWID-bind race; M2 (glm3) reached the same choice independently (SavedFolder TASKS.md, LP1-M2 row) | 1 | Low cost (SQL text identical, adapter interface already abstracts) | M2 |
+| Rate limiting storage | Workers Rate Limiting binding vs DO counters vs in-memory | DO counters (RateCounterDO) behind a `RateLimiter` interface; in-memory impl for tests | Binding docs URL returned 404 during research (RESEARCH-M1.md, unverified note); DOs are strongly consistent; interface keeps the swap cheap | 1 | Trivial (interface + env wiring) | M12 |
+| Nonce store | D1 table vs DO vs KV | NonceDO (Durable Object), interface `NonceStore` | KV is eventually consistent (stale reads would let replays through); D1 table would add a write per request; DO gives atomic single-key semantics | 1 | Trivial | M3 |
+| Response signing | WebCrypto Ed25519 vs pure-TS Ed25519 | WebCrypto (`crypto.subtle`) | Native on Workers (RESEARCH-M1.md, Cloudflare docs, opened 2026-10-10); works identically in Bun (59/59 tests exercise it); zero code to audit | 1 | Easy (single sign/verify module) | M3 (verify side stays WebCrypto-agnostic: it sees raw bytes) |
+| Admin token verify path | Whole-token SHA-256 lookup vs id-prefixed format | Upgraded in session 2 to owner answer Q2: `adm_<id>.<secret>`, 32-byte CSPRNG base64url secret, store SHA-256(secret) only, constant-time compare | docowner.txt Q2 (msgs/docowner.txt, 2026-10-10): id prefix = one lookup + one compare and lets secret scanners spot leaks | 2 | Easy (one function + seed note) | M2 (seed prints token once in this format), M8/M11 (send it) |
+| Key string format detail | plain 25-char base32 vs 25+1 checksum | 25 base32 chars + 1 mod-32 checksum char | doc.md "Key design" says "Optional checksum character so typos fail before hitting the database" — checksum catches typos pre-hash; format stays inside the contract's `PREFIX-XXXXX-…-XXXXX` shape | 2 | Medium (admin-visible string shape; no storage impact) | M8 (bot displays), M11 (dashboard) |
+| Body size cap | none vs 8 KB vs 16 KB | 16 KB | Largest contract body is the auth init request (~500 bytes); 16 KB leaves headroom for executor header noise while bounding abuse surface | 2 | Trivial (constant) | none |
+| X25519 implementation (session 2) | WebCrypto on Workers + node:crypto in Node vs pure-TS RFC 7748 | Pure-TS BigInt X25519 (RFC 7748) | Bun WebCrypto X25519 is broken for export/derive in this test runtime — captured failure: `subtle.exportKey("raw", priv)` → "The requested operation is not valid for the provided key" (2026-10-10, bun 1.3.14); node:crypto x25519 works in Bun but node:crypto cipher surface is not guaranteed on Workers; one code path runs in tests AND production; RFC 7748 §5.2/§6.1 vectors are the outside source | 1 | Easy (one module; swap to WebCrypto later if both runtimes mature) | M3 (mirror-side vectors), M5 |
+| ChaCha20-Poly1305 implementation (session 2) | WebCrypto (unavailable) vs node:crypto (Workers-risky) vs pure-TS RFC 8439 | Pure-TS RFC 8439 | WebCrypto has no ChaCha20-Poly1305 (RESEARCH-M1.md); Workers node:crypto AEAD support is not part of the WebCrypto-standard surface we can rely on; doc.md §9 names ChaCha20-Poly1305 and the pure-Lua loader must implement it anyway, so a TS twin with shared RFC vectors is the cross-implementation test the doc requires (§9 "Cross-implementation tests") | 1 | Easy | M3 (loader decrypt), M5/M6 |
+| Auth init response wire shape | (A) pub(32)\|\|ct\|\|tag with client-nonce-only HKDF, (B) pub(32)\|\|serverNonce(16)\|\|ct\|\|tag with both-nonces HKDF | (B) | doc.md §5.7 says the session key is derived "from the X25519 shared secret and both nonces" — (A) would use one nonce and leave the derivation weaker than specified; the 16 extra clear bytes are documented here and proposed to the owner (see PROPOSAL below); AEAD tag still authenticates the exact wire bytes incl. the nonce position | 2 (see proposal) | Trivial (one length constant + nonce read offset) | M3 (init client decrypt) |
+| Payload-key derivation inputs | session key only vs session key + build hash + watermark id | HKDF-SHA256(ikm = session key, salt = build hash (32 raw bytes), info = "payload-key" \|\| watermark id (16 raw bytes)) | doc.md §5.7 "payload-key: from session key, build hash, and watermark id" — all three present; salt/info split chosen so the ikm is the secret and the public diversifiers are salt+info | 1 | Trivial | M3, M6 |
+| Session key transport (stateless payload auth) | (a) new sessions column storing the key, (b) server-sealed blob inside the contract's opaque `payload_ref`, (c) KV/DO session cache | (b) | No schema change (M2's table stays contract-pure); KV is eventually-consistent (stale reads break payload), DO adds per-session state for no benefit; `payload_ref` is already an opaque contract field (doc.md §5.5); sealed with a server-only key derived from the `SESSION_SEAL_KEY` env secret | 2 | Medium (ref format is client-opaque; rotating the seal key invalidates in-flight refs only) | M3 (treats it as opaque bytes) |
+| Auth endpoint error transport | encrypted blob vs JSON envelope | JSON envelope (doc.md §5.4 codes) on failure; text/plain ciphertext only on success | §5.3 defines success returns; §5.4's code list is "the only ones the SDK may receive" — errors must be those codes; AEAD cannot be produced before the handshake completes anyway | 2 | Easy | M3 |
+| Heartbeat writes | per-beat session row update vs status check + kill code only | Status check; no per-beat DB write; `session_heartbeat` event written only on kill | doc.md §8.11 heartbeat is "optional" and exists to kill revoked sessions; per-beat writes add D1 load proportional to online users for no contract gain; sessions table has no last_seen column (adding one would be a Tier 2 schema change with no owner ask) | 1 | Easy (add column later if owner wants liveness metrics) | M12 (metrics via events if needed) |
+
+| Session TTL | 600 s vs 3600 s vs 24 h | 3600 s (env `SESSION_TTL_SEC`) | payload fetch follows init within seconds; heartbeat is the liveness channel for long sessions; 1 h bounds the sealed-ref abuse window; provisional per doc.md decision-authority rule 4 (no owner answer yet) | 2 | Trivial (env var) | M3 (re-init cadence), M12 |
+| Game routing semantics | empty `script_games` = no scripts vs any game | Any game allowed when the table has no rows for the script | doc.md §6 comment says "routing by game/place" — a script without rows was never restricted; restricting would break keyless public tools | 2 | Easy (flip the check) | M11 (dashboard game editor) |
+| Keyless HWID source | require executor headers vs fallback hash | Fallback: hash of the empty string with the project salt when no executor header is present | `sessions.hwid_hash` is NOT NULL in the contract schema; keyless scripts still get blacklisted-hwid enforcement when headers exist; the fallback is a constant, so it cannot be used to bypass a real-hwid blacklist entry | 2 | Easy | none |
+| Init-build mismatch response | BAD_REQUEST vs UPDATE_REQUIRED | UPDATE_REQUIRED | A stale stub/init (doc §5.6 build id) means the client must re-fetch, exactly what UPDATE_REQUIRED exists for | 2 | Easy | M3, M13 |
+| Version row missing at payload time | SERVER_ERROR vs UPDATE_REQUIRED | UPDATE_REQUIRED | The session pinned a version the admin deleted/rolled back — the loader recovers by re-running init; SERVER_ERROR would hide an operator action behind a 5xx | 2 | Easy | M13 |
+| Payload per-session rate limit | none vs per-IP only vs per-session 5/min | `payload:<sessionId>` 5/min | The general 60/min/IP gate lets one IP hold many sessions; bundle re-encryption is CPU; 5 fetches/min per session covers retry storms; bucket key is the random session id (not guessable) | 2 | Trivial | none |
+| Auth success response headers | x-sig over body vs x-ts only | x-ts only; AEAD is the authenticity | doc.md §5.4 defines x-sig for the JSON envelope; text/plain auth responses get integrity from ChaCha20-Poly1305 with the session key (only the true server can seal — X25519 bound to the client's fresh ephemeral); replayed responses fail AEAD because the key depends on the fresh ephemeral | 1 | Easy | M3 |
+| Blacklist value hashing per kind | one scheme vs per-kind | ip: sha256(pepper\|"ip"\|value); hwid: project-salted; roblox_user: sha256(pepper\|"roblox_user"\|id); discord: sha256(pepper\|"discord"\|id) | Mirrors the exact hash each public endpoint already computes (checkkey ip/hwid, auth init roblox_user/discord), so admin-added entries actually match the values seen in traffic | 2 | Easy | M8 (bot /blacklist add), M11 (dashboard) |
+| Bundle bytes location | D1 blob column vs R2 bucket vs KV | R2 bucket binding `BUNDLES`, `blob_ref` is the object key | D1 rows have size/practicality limits and bundles can be MBs; KV is eventually consistent and unbounded per-value pricing; R2 is strongly consistent on read-after-write for new objects and cheap at rest (RESEARCH-M1.md Workers limits table) | 2 | Medium (ref = key, migration = copy objects) | M13 (stub generator uploads), M12 (backup policy) |
+| Analytics response shape | many endpoints vs one overview | `GET /admin/analytics/overview` returning 24h counts | doc.md §16 lists `GET /admin/analytics/*` with no field spec — the smallest honest shape; `*` stays open for M11 to extend per-page | 2 | Easy (additive) | M11 (dashboard analytics page) |
+
+| protocol_versions gate query (revised after M2's Q1 re-land) | (A) WHERE handler = 'check_key'/'auth' (session-1 choice), (B) check_key: least-strict active min_loader + kill when no active rows; auth: the row WHERE version = client's v | (B) | glm3's owner-ruling re-land (Public c696a45) seeds handler 'v1' per docowner Q1 — choice (A) matches no rows and silently disables the version gate (fail-open); (B) reads the rows the owner actually specified, unknown/retired protocol version = UPDATE_REQUIRED kill switch per doc §19; recorded as a mind-change from (A) per decision-authority rule 6 | 2 | Easy (single query) | M2 (seed values), M3 (protocol version in request v) |
+## Contract Change Proposals (Tier 3 channel)
+
+None of the above silently edits doc.md. One proposal is filed:
+
+### CCP-1: auth init response wire format — server nonce position
+
+- **Contract and section affected:** doc.md §5.5, `/auth/<script_id>/init` response.
+- **Problem:** The contract says the first 32 bytes are the server's ephemeral
+  public key "followed by ciphertext and tag", while §5.7 requires the session
+  key to be derived from "the X25519 shared secret and both nonces". The second
+  nonce (the server's) has no specified transport position. Implementing §5.7
+  faithfully requires transmitting it.
+- **Proposed change (exact wording):** after the 32-byte server ephemeral
+  public key, the response carries a 16-byte clear server nonce, then the
+  ciphertext and tag: `serverPub(32) | serverNonce(16) | ciphertext | tag(16)`.
+  Session key = HKDF-SHA256(ikm = X25519 shared secret,
+  salt = clientNonce(16) | serverNonce(16), info = "session-key").
+- **Impact:** M3 init client reads the nonce at offset 32 and joins both
+  nonces as the HKDF salt. M1 already implements it. No other module affected.
+- **Migration:** single constant change on any client that had assumed
+  ciphertext starts at offset 32 (none exist yet — glm1's M3 is in flight and
+  gets this note by message).
+- **Risk if not changed:** implementers either drop the server nonce (weaker,
+  single-nonce derivation contradicting §5.7) or invent divergent positions
+  per module, breaking interop silently.
