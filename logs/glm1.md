@@ -379,3 +379,51 @@ standard, msg other glm to see what it need to improve".
 - M3 session 2: handshake.lua adopted M1's exact wire (read their auth.ts, not just the msg): init serverPub32|serverNonce16|ct|tag, nonce=serverNonce[0..12), aad=scriptId|serverPub|serverNonce; payload nonce12|ct|tag, payloadKey HKDF(sessionKey, fromHex(build_hash), "payload-key"|fromHex(watermark_id)), aad=scriptId|sessionId16raw; init plaintext requires build_hash+watermark_id (hex). Mock server now emits the real shapes. tests 95/95 x3 + fresh-copy run on delivered Public bytes. gen_vectors_ext.lua: x25519+ed25519 sections into contracts/test_vectors.json (machine transfer from suite-verified vectors.lua, every entry re-verified against the shipped impls before write; python zero-drift check vs git HEAD). DELIVERED ee3b58f; msg to main-agent (extend cross-m3 with the new sections).
 - Debug notes: json_test.encode returns ONE value (out) — my generator asserted a phantom second return; a hand-edit mangled the signer sk literal (caught by re-read, restored byte-exact — hand-transcription hazard again, now 2 lessons).
 - M6 claim + research (user direction "other modules"): RESEARCH-M6 with opened sources (web-search + page-reader: Luraph-v15 devirtualizer README incl. its honest v14.8/9 gaps + published lift tables; Ironbrew2 + its deobfuscator; unluau; luau.org/performance read as user-level guidance only). Dispatch benchmark bench_dispatch.lua: 4 generated strategies x ISA {16,64,256} on the same stream; chain linear / tree log / closure flat / str-fetch +15-28ns. BUG WAR: bintree leaf token-gluing (fixed w/ do..end), closure return pc, param naming, regs[9] nil, HALT leaf mapping, and the sneaky one — string variant not-taken delta pc+4 with 3-byte instructions walked MID-INSTRUCTION garbage (looked FAST, was wrong; caught by instruction-count parity 380 vs 357; fixed to +6; parity re-verified 367/367 353/353 357/357). DECISIONS-M6 D-M6-1..5. DELIVERED Public 4f25733 (obfuscator/vm/ tree established); container question msg'd to glm6.
+
+## Session 20 — 2026-10-10 — M6 implementation (LP1)
+
+- Sandbox FULLY RESET at session start (4th+ reset): /home/z/SavedFolder
+  + /tmp/Public wiped. Recovery: re-clone both repos (TASK_SOURCE.md
+  survived in my-project with the URLs), restore lua5.4.7 from the
+  surviving .deb files in my-project (dpkg-deb -x → ~/.lua54, M5's
+  harness path), push token re-grepped from worklog (display-redacted
+  only).
+- State delta vs my summary: MY M3 session 2 (ee3b58f wire adoption) and
+  M6 research (4f25733) had already landed in prior sessions; M5
+  delivered (c26c157) mid-timeline; glm3 M4 s4 printer + IR.md v0 (44f04bf,
+  26fa49d); main-agent M9/M10/M11 done + M11 s3 (13bf298). M4 token→AST
+  parser still pending → corpus end-to-end still blocked (same as M5).
+- Dev workspace /home/z/lp6 mirroring Public layout via symlinks
+  (Write tool is /home/z-restricted) — rsync to /tmp/Public at delivery.
+- BUG WAR (5 found+fixed+regression-tested, VERIFICATION-M6 §2):
+  1. MKFN returned RUN's pack table instead of unpacking (host calls into
+     guest closures got a table) — caught by oop-metatables fixture
+     "__tostring must return a string".
+  2. Closure dispatch off-by-one: loop indexed HDIS[I[1]] (0-based) vs
+     1-based bindings — every closure build dispatched the wrong handler;
+     caught by fixture×strategy matrix (chain/tree green, closure 100%).
+  3. Non-monotonic pool access miskeyed the walk-forward-only chain head
+     (K_j used for pool i<j after j loaded first) → AEAD "load failed" on
+     varargs/oop/errors/metamethods fixtures; fixed with memoized key
+     cache (KS[i]=K_{i-1}, resume from highest contiguous index).
+  4. %* conformance gap: M5 lowers Luau interp-strings to
+     string.format('%*...') which real hosts reject (M5-TS implements it
+     internally — only the second-oracle differential could catch this
+     class); fixed with %*-aware wrapped env (D-M6-9).
+  5. Harness bugs (double-escaped constKey literal in parity runner,
+     wrong djb2 KAT constant, float-formatted FNV output).
+- The chain-key order bug is a genuine pin-level insight for anyone
+  implementing lazy decrypt from BYTECODE-M5 §6.1: "walk forward, cache
+  the chain head" (my own RESEARCH-M6 §5 sketch!) is WRONG for
+  non-monotonic access — memoize, don't walk. Msg'd glm6 (FYI note).
+- Origin raced TWICE during delivery (44f04bf, then 26fa49d landed
+  between fetch and push) — push rejected non-fast-forward both times;
+  fetch+rebase+re-test+push protocol held; also caught a URL typo in my
+  own push command via the 404 (cautuanthanh147 typo).
+- 63/63 on delivered bytes (fresh-tree re-run in /tmp/Public pre-push,
+  post-rebase).
+- Bookkeeping: TASKS M6 row → done; msgs → glm6 (delivered+%*+chain
+  note), main-agent (CCP-M6 ruling + payload `c` field + M7/M12
+  availability), glm3 (IR.md Q3 correction: M6 consumes packed
+  containers, no pre-compile transforms); canonical work/lp/m6;
+  worklog.md + TASK_SOURCE.md updated.

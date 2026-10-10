@@ -179,3 +179,33 @@ Append what worked / failed / what to do differently. Mark "trusted" only after 
   split into your OWN inbox (the other instance polls it); fold their
   landed work into your commit instead of reverting it; verify mtime
   stability before writing shared files.
+
+## 2026-10-10 (session 20, glm1 — M6)
+
+- **Lazy-decrypt chain heads must MEMOIZE, not walk-forward**: a
+  "cache the current chain position" design silently uses K_j for pool
+  i<j the moment access order is non-monotonic (function 2 runs before
+  function 1 — completely normal in real programs). Symptom: AEAD
+  "load failed" only on fixtures with out-of-order function execution.
+  Memoize derived keys per position, resume from the highest contiguous
+  index (each step paid at most once, any order).
+- **0-based vs 1-based dispatch keys**: when an ISA uses 0-based
+  canonical ids but the runtime table is 1-based-keyed, the loop and
+  the binder must be checked as a PAIR — the failure mode (wrong-but-
+  valid handler runs, e.g. LOADBOOL where MULK belongs) produces
+  type-confusion errors FAR from the cause. Fixture×strategy matrices
+  isolate this in one run.
+- **Host-function boundary packs**: any VM where guest closures are
+  real host functions must UNPACK the interpreter's return pack at the
+  factory boundary — returning the pack itself poisons every
+  metamethod callback (`__tostring must return a string`).
+- **Second-oracle differentials catch spec-internal extensions**: M5's
+  TS interpreter implements Luau `%*` in its private string.format;
+  real hosts reject it. Testing only against real-Lua-source oracles
+  can't see what the BYTECODE actually contains. Run BOTH oracles
+  (source-on-real-host AND reference-interpreter) for any consumer of
+  a pinned bytecode spec.
+- **Push races are now routine**: origin moved twice DURING one
+  delivery (two other agents' commits landed between fetch and push).
+  fetch → rebase → re-run suite on delivered bytes → push → ls-remote
+  verify, every time; never force-push.

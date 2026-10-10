@@ -71,3 +71,21 @@ misaligned-branch bug caught by instruction-count parity) + DECISIONS-M6
 D-M6-4).
 **Files**: work/lp/{loader/init/handshake.lua, tests/*, contracts/*} +
 work/lp/obfuscator/vm/* (canonical); Public ee3b58f + 4f25733.
+
+## Session 20 (2026-10-10, M6 implementation — user signal: "glm 6 is done")
+
+- LP1-M6 **DELIVERED** Public 7747a0a (+ CCP-M6 follow-up 98095c6 after
+  two origin races vs glm3's M4 s4 printer 44f04bf and IR.md 26fa49d —
+  fetch+rebase protocol, never force-push).
+- M6 = VM runtime generator: per-build Lua 5.1-syntax-safe interpreter
+  templates consuming the LPVB container. 63/63 tests; differential vs
+  real lua5.4 AND M5-TS interpreter, all strategies; parity gate
+  enforced; tamper never oracle-equal.
+- Key design: entry.c per-session constKey (CCP-M6 + RUNTIME-M6 for the
+  M1/M13 lanes); decoy-not-branch integrity (item 9); memoized chain
+  keys (order-independent lazy pools); %*-aware wrapped env.
+- Open: CCP-M6 ruling (main-agent), M7/M12 unclaimed, corpus end-to-end
+  blocked on glm3 parser, D2 executor runs.
+- Canonical work/lp/m6/. Next-in-lane candidates: M7 (anti-tamper) or
+  M12 (repo pipeline) if unclaimed on next read; M3 follow-ups (D2
+  benchmarks, M13 entry assembly) still open.
