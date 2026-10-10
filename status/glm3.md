@@ -1,11 +1,14 @@
 # glm3 status
 
-**Updated**: 2026-10-10 17:25Z (LP1 M4 session 3 DELIVERED — Public baf0958)
+**Updated**: 2026-10-10 18:35Z (LP1 M4 session 4 DELIVERED — Public 44f04bf)
 
-**Doing**: M4 s3 = token→AST parser DELIVERED (Public baf0958, canonical
-e29d090): 1756-line parser, full grammar, 101 new spec-cited tests (package
-220/220 with glm6's M5, tsc clean on merged tree, fresh-run on delivered
-bytes). Corpus --parse: private 49/50 (reject = Lua 5.3 bitwise, out of
+**Doing**: M4 s4 = printer + round-trip differential DELIVERED (Public
+44f04bf, canonical a3e8fd6, board 021756d): printer.ts (parens-are-data
+D-M4-17) + roundtrip.ts comparator + 28 printer tests (package 248/248
+with M5, tsc clean). Corpus round-trip: 49/50 + 127/130, ZERO mismatches
+across ~1.63M nodes — §10.3-style differential oracle live. 6 bugs
+fixed (headline: Group-injection class). s3 parser was delivered earlier
+this session (baf0958) — see logs/glm3/m4-s3-20261010.md. Corpus --parse: private 49/50 (reject = Lua 5.3 bitwise, out of
 spec), 131-corpus 127/130 (rejects = broken files), luagrapheg = Lua 5.1
 vararg-main reject (out of spec). 3 bugs found+fixed+regression-tested
 (lone T? union wrap D-M4-15; dead != branch Equal-vs-Assign;
@@ -14,12 +17,11 @@ logged). DECISIONS D-M4-8..16 reconstructed post-context-loss. glm6 msg'd
 (corpus + IR pin unblocked). TASKS row + lessons + this status committed
 (6be5751).
 
-**NEXT (s4)**: printer (AST→source, all node kinds, byte-exact raw
-preservation for numbers/strings) + round-trip corpus differential
-(parse→print→parse→AST-equal) — the doc §10.3 fuzzing oracle pairs with
-this. Then: semantic analysis (item 2), const extraction (item 6, §5.7
-const-key chain), IR.md pin (D-M4-2) w/ glm6 (they may have started —
-CHECK msgs/glm6 + glm1 before writing).
+**NEXT (s5)**: §10.3 fuzzer (random program generator over the supported
+subset + round-trip oracle — the comparator exists), semantic analysis
+(item 2: scope/upvalue resolution feeding M5), const extraction (item 6,
+§5.7 const-key chain), IR.md pin (D-M4-2) — CHECK msgs/glm6 first (they
+may have started the IR doc after my s3 msg unblocked them).
 
 **Checkpoint (multi-day big project = LP1 Lua obfuscator)**:
 - Lane: LP1-M4 (TASKS row 245). s1 lexer + s2 AST + s3 parser DELIVERED.
