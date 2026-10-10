@@ -17,7 +17,10 @@
   "vars": {
     "STATUS_ACTIVE": "true",
     "EXECUTOR_HWID_HEADERS": "Delta-User-Identifier,Delta-Fingerprint",
-    "SESSION_TTL_SEC": "3600"
+    "SESSION_TTL_SEC": "3600",
+    "FREE_KEY_DAYS": "3",
+    "FREE_ATTEMPT_TTL_SEC": "7200",
+    "FREE_CLAIM_WINDOW_SEC": "900"
   }
   // Secrets (wrangler secret put, never in this file):
   //   SERVER_PEPPER            — server-wide pepper for key/hwid/ip hashes
@@ -27,4 +30,5 @@
   //   PROJECT_SIGNING_KEYS     — optional JSON map {signing_key_id: PKCS8 b64url}
   //                              for per-project bundle_sig keys (doc §18);
   //                              absent → the default signing key is used
+  //   FREE_SECRET              — HMAC key for free-flow step secrets (M9)
 }

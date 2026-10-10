@@ -328,6 +328,8 @@ export async function handleAuthInit(ctx: AppContext, config: ApiConfig, input: 
     auth_expire: keyRow?.expires_at ?? 0,
     discord_id: keyRow?.discord_id ?? null,
     note: keyRow?.note ?? null,
+    build_hash: version.build_hash,
+    watermark_id: watermarkId,
     payload_ref: payloadRef,
   });
 

@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { DOC_SCHEMA_SQL, SqliteAdapter } from "../src/db";
 import { MemoryNonceStore, MemoryRateLimiter } from "../src/state";
 import { utf8 } from "../src/crypto";
-import { b64urlEncode } from "../src/contracts";
+import { b64urlEncode, toHex } from "../src/contracts";
 import { generateSigningKeys, makeSigner, makeVerifier, randomBytes, sha256Hex, hmacSha256 } from "../src/crypto";
 import { ApiConfig, AppContext, RequestInput, proofPayload } from "../src/flow";
 import { generateKey, hashKey, projectHwidSalt, hashHwid } from "../src/keys";
@@ -28,6 +28,9 @@ export const RESELLER_TOKEN = `adm_${RESELLER_ID}.${b64urlEncode(RESELLER_SECRET
 export const INIT_BUILD = "init-b1";
 export const BUNDLE_REF = "bundle/v1/test";
 export const BUILD_HASH = "ab".repeat(32);
+export const FREE_SECRET = utf8("free-secret-for-tests-0123456789");
+export const CHECKPOINT_1_SECRET_URL = "https://dash.example.test/free/cb?s={{SECRET}}";
+export const CHECKPOINT_2_SECRET_URL = "https://dash.example.test/free/cb2?s={{SECRET}}&a={{ATTEMPT}}";
 
 export interface TestEnv {
   db: Database;
@@ -72,6 +75,9 @@ export async function buildEnv(): Promise<TestEnv> {
   const blobs = new MemoryBlobStore();
   blobs.put(BUNDLE_REF, utf8("-- protected script bundle bytes v1"));
 
+  db.prepare("INSERT INTO checkpoints (id, project_id, position, provider, config) VALUES (?, ?, 1, 'custom', ?)").run("cp1", PROJECT_ID, JSON.stringify({ url: CHECKPOINT_1_SECRET_URL, min_seconds: 1, cooldown_seconds: 90 }));
+  db.prepare("INSERT INTO checkpoints (id, project_id, position, provider, config) VALUES (?, ?, 2, 'custom', ?)").run("cp2", PROJECT_ID, JSON.stringify({ url: CHECKPOINT_2_SECRET_URL, min_seconds: 0, cooldown_seconds: 90 }));
+
   const config: ApiConfig = {
     pepper: PEPPER,
     proofKey: PROOF_KEY,
@@ -82,13 +88,28 @@ export async function buildEnv(): Promise<TestEnv> {
     refSealKey: await refSealKey(SESSION_SEAL_SECRET),
     bundleStore: blobs,
     bundleSignerFor: () => signer,
+    free: {
+      requestsPerIpPerMin: 30,
+      startsPerIpPerMin: 5,
+      attemptsPerIpPerHour: 10,
+      attemptTtlSec: 7200,
+      claimWindowSec: 900,
+      keyDays: 3,
+    },
+    freeSecret: FREE_SECRET,
   };
 
+  let nowOverride: number | null = null;
   const ctx: AppContext = {
     db: adapter,
     limiter: new MemoryRateLimiter(),
     nonce: new MemoryNonceStore(),
-    nowSec: Date.now() / 1000,
+    get nowSec() {
+      return nowOverride ?? Date.now() / 1000;
+    },
+    set nowSec(v: number) {
+      nowOverride = v;
+    },
   };
 
   const createKey: TestEnv["createKey"] = async (opts) => {
@@ -116,7 +137,7 @@ export async function makeSignedInput(
   const nonce = opts.nonce ?? b64urlEncode(randomBytes(16));
   const bodyBytes = opts.bodyBytes ?? (body !== null ? utf8(JSON.stringify(body)) : new Uint8Array(0));
   const bodyHashHex = await sha256Hex(bodyBytes);
-  const proof = b64urlEncode(await hmacSha256(PROOF_KEY, proofPayload(method, path, String(ts), nonce, bodyHashHex)));
+  const proof = toHex(await hmacSha256(PROOF_KEY, proofPayload(method, path, String(ts), nonce, bodyHashHex)));
   const headers: Record<string, string> = {
     "x-ts": String(ts),
     "x-nonce": nonce,

@@ -77,21 +77,56 @@ export function fromHex(hex: string): Uint8Array {
   return out;
 }
 
+function escapeCanonicalString(s: string): string {
+  // Byte-exact with M3's loader/sdk canonical_json (contracts/canonical_json.md):
+  // only `"` and `\` are escaped as their short forms; bytes < 0x20 escape as
+  // \u00xx; all other bytes pass through raw (UTF-8 included).
+  let out = '"';
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i);
+    if (code === 34) out += '\\"';
+    else if (code === 92) out += "\\\\";
+    else if (code < 32) out += "\\u" + code.toString(16).padStart(4, "0");
+    else out += s[i];
+  }
+  return out + '"';
+}
+
+const CANONICAL_NUMBER_BOUND = 9007199254740992;
+
+function utf8BytesOf(s: string): Uint8Array {
+  return new TextEncoder().encode(s);
+}
+
 function canonicalValue(v: unknown): string {
   if (v === null) return "null";
-  if (typeof v === "string") return JSON.stringify(v);
+  if (typeof v === "string") return escapeCanonicalString(v);
   if (typeof v === "number") {
     if (!Number.isInteger(v)) throw new Error("non-integer number in canonical JSON");
+    if (Math.abs(v) > CANONICAL_NUMBER_BOUND) throw new Error("number beyond ±2^53 in canonical JSON (SDK cannot verify)");
     return String(v);
   }
   if (typeof v === "boolean") return v ? "true" : "false";
   if (Array.isArray(v)) return "[" + v.map(canonicalValue).join(",") + "]";
   if (typeof v === "object") {
-    const keys = Object.keys(v as Record<string, unknown>).sort();
-    const body = keys
-      .map((k) => JSON.stringify(k) + ":" + canonicalValue((v as Record<string, unknown>)[k]))
-      .join(",");
-    return "{" + body + "}";
+    const keys = Object.keys(v as Record<string, unknown>).sort((a, b) => {
+      const ab = utf8BytesOf(a);
+      const bb = utf8BytesOf(b);
+      const n = Math.min(ab.length, bb.length);
+      for (let i = 0; i < n; i++) {
+        if (ab[i] !== bb[i]) return ab[i] < bb[i] ? -1 : 1;
+      }
+      return ab.length - bb.length;
+    });
+    const parts: string[] = [];
+    for (const k of keys) {
+      const value = (v as Record<string, unknown>)[k];
+      // Null-valued keys are DROPPED: Roblox HttpService:JSONDecode erases
+      // them, so the SDK signs the reduced object (canonical_json.md C3).
+      if (value === null) continue;
+      parts.push(escapeCanonicalString(k) + ":" + canonicalValue(value));
+    }
+    return "{" + parts.join(",") + "}";
   }
   throw new Error("unsupported canonical JSON value: " + typeof v);
 }

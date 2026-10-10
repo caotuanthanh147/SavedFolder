@@ -30,7 +30,7 @@ function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 }
 
-async function authenticate(ctx: AppContext, _config: ApiConfig, input: RequestInput): Promise<AdminRow | null> {
+export async function authenticate(ctx: AppContext, _config: ApiConfig, input: RequestInput): Promise<AdminRow | null> {
   const auth = headerValue(input.headers, "authorization");
   if (!auth || !auth.startsWith("Bearer ")) return null;
   const token = auth.slice(7).trim();

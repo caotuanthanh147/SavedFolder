@@ -16,6 +16,16 @@ import {
   handleAdminScriptVersion,
 } from "./admin";
 import { handleAuthHeartbeat, handleAuthInit, handleAuthPayload } from "./auth";
+import { handleFreeClaim, handleFreeStart, handleFreeStep } from "./freekey";
+import {
+  handleAdminListKeys,
+  handleAdminListScripts,
+  handleAdminListBlacklist,
+  handleAdminListNodes,
+  handleAdminListProtocolVersions,
+  handleAdminListSessions,
+  handleAdminListAdmins,
+} from "./adminread";
 
 export interface RouteHandlerArgs {
   ctx: AppContext;
@@ -52,8 +62,11 @@ function methodNotAllowed(): Promise<Response> {
 }
 
 function matchPattern(pattern: string, path: string): Record<string, string> | null {
+  // Query strings are not part of route matching (the Workers entry passes
+  // url.pathname; handlers that need the query keep it in input.path).
+  const cleanPath = path.split("?")[0];
   const pParts = pattern.split("/");
-  const uParts = path.split("/");
+  const uParts = cleanPath.split("/");
   if (pParts.length !== uParts.length) return null;
   const params: Record<string, string> = {};
   for (let i = 0; i < pParts.length; i++) {
@@ -76,6 +89,16 @@ export function buildRoutes(): Route[] {
     { method: "POST", pattern: "/auth/:script_id/init", handler: (a) => handleAuthInit(a.ctx, a.config, a.input, a.params.script_id) },
     { method: "POST", pattern: "/auth/:script_id/payload", handler: (a) => handleAuthPayload(a.ctx, a.config, a.input, a.params.script_id) },
     { method: "POST", pattern: "/auth/:script_id/heartbeat", handler: (a) => handleAuthHeartbeat(a.ctx, a.config, a.input, a.params.script_id) },
+    { method: "POST", pattern: "/free/start", handler: ({ ctx, config, input }) => handleFreeStart(ctx, config, input) },
+    { method: "POST", pattern: "/free/step", handler: ({ ctx, config, input }) => handleFreeStep(ctx, config, input) },
+    { method: "POST", pattern: "/free/claim", handler: ({ ctx, config, input }) => handleFreeClaim(ctx, config, input) },
+    { method: "GET", pattern: "/admin/keys", handler: ({ ctx, config, input }) => handleAdminListKeys(ctx, config, input) },
+    { method: "GET", pattern: "/admin/scripts", handler: ({ ctx, config, input }) => handleAdminListScripts(ctx, config, input) },
+    { method: "GET", pattern: "/admin/blacklist", handler: ({ ctx, config, input }) => handleAdminListBlacklist(ctx, config, input) },
+    { method: "GET", pattern: "/admin/nodes", handler: ({ ctx, config, input }) => handleAdminListNodes(ctx, config, input) },
+    { method: "GET", pattern: "/admin/protocol-versions", handler: ({ ctx, config, input }) => handleAdminListProtocolVersions(ctx, config, input) },
+    { method: "GET", pattern: "/admin/sessions", handler: ({ ctx, config, input }) => handleAdminListSessions(ctx, config, input) },
+    { method: "GET", pattern: "/admin/admins", handler: ({ ctx, config, input }) => handleAdminListAdmins(ctx, config, input) },
     { method: "POST", pattern: "/admin/keys", handler: ({ ctx, config, input }) => handleAdminCreateKeys(ctx, config, input) },
     { method: "PATCH", pattern: "/admin/keys/:id", handler: (a) => handleAdminPatchKey(a.ctx, a.config, a.input, a.params.id) },
     { method: "POST", pattern: "/admin/keys/:id/revoke", handler: (a) => handleAdminRevokeKey(a.ctx, a.config, a.input, a.params.id) },

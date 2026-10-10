@@ -1,4 +1,4 @@
-import { HEADERS, MAX_BODY_BYTES, TS_WINDOW_SECONDS, canonicalJson, b64urlDecode, b64urlEncode, makeEnvelope, Envelope } from "./contracts";
+import { HEADERS, MAX_BODY_BYTES, TS_WINDOW_SECONDS, canonicalJson, b64urlDecode, b64urlEncode, fromHex, makeEnvelope, Envelope } from "./contracts";
 import { Signer, hmacSha256, randomId, sha256, sha256Hex, utf8 } from "./crypto";
 import { DbAdapter } from "./db";
 import { BlobStore } from "./blobs";
@@ -20,6 +20,15 @@ export interface RequestInput {
   colo: string;
 }
 
+export interface FreeFlowConfig {
+  requestsPerIpPerMin: number;
+  startsPerIpPerMin: number;
+  attemptsPerIpPerHour: number;
+  attemptTtlSec: number;
+  claimWindowSec: number;
+  keyDays: number;
+}
+
 export interface ApiConfig {
   pepper: string;
   proofKey: Uint8Array;
@@ -30,9 +39,9 @@ export interface ApiConfig {
   refSealKey: Uint8Array;
   bundleStore: BlobStore;
   bundleSignerFor: (projectId: string, signingKeyId: string) => Signer;
+  free: FreeFlowConfig;
+  freeSecret: Uint8Array;
 }
-
-const PROOF_LABEL = "m1-proof-v1";
 
 export function headerValue(headers: Record<string, string>, name: string): string | null {
   const lower = name.toLowerCase();
@@ -42,26 +51,25 @@ export function headerValue(headers: Record<string, string>, name: string): stri
   return null;
 }
 
+// x-proof (doc.md §5.2; format per contracts/proof_spec.md — cross-checked
+// against M3's loader/sdk/library.lua): hex(HMAC-SHA256(proof_key,
+// method|path|x-ts|x-nonce|hex(SHA-256(body)))). No domain label; the path
+// carries no query string. The proof is a spam filter, not a trust anchor.
 export function proofPayload(method: string, path: string, ts: string, nonce: string, bodyHashHex: string): Uint8Array {
-  return utf8(`${PROOF_LABEL}|${method}|${path}|${ts}|${nonce}|${bodyHashHex}`);
+  return utf8(`${method}|${path}|${ts}|${nonce}|${bodyHashHex}`);
 }
 
 export async function verifyProof(config: ApiConfig, input: RequestInput, ts: string, nonce: string): Promise<boolean> {
   const supplied = headerValue(input.headers, HEADERS.proof);
-  if (!supplied) return false;
-  let mac: Uint8Array;
-  try {
-    mac = b64urlDecode(supplied);
-  } catch {
-    return false;
-  }
-  if (mac.length !== 32) return false;
+  if (!supplied || !/^[0-9a-f]{64}$/.test(supplied)) return false;
   const bodyHash = await sha256(input.bodyBytes);
   const bodyHashHex = Array.from(bodyHash, (b) => b.toString(16).padStart(2, "0")).join("");
-  const payload = proofPayload(input.method, input.path, ts, nonce, bodyHashHex);
+  const pathNoQuery = input.path.split("?")[0];
+  const payload = proofPayload(input.method, pathNoQuery, ts, nonce, bodyHashHex);
   const expected = await hmacSha256(config.proofKey, payload);
+  const given = fromHex(supplied);
   let diff = 0;
-  for (let i = 0; i < 32; i++) diff |= mac[i] ^ expected[i];
+  for (let i = 0; i < 32; i++) diff |= given[i] ^ expected[i];
   return diff === 0;
 }
 
@@ -130,7 +138,11 @@ export async function recordEvent(ctx: AppContext, keyId: string | null, type: s
 export function signedResponse(envelope: Envelope, signer: Signer, nowSec: number, extraHeaders: Record<string, string> = {}): Promise<Response> {
   return (async () => {
     const ts = String(Math.floor(nowSec));
-    const payload = utf8(`${envelope.code}|${envelope.message}|${canonicalJson(envelope.data ?? null)}|${ts}`);
+    // SDK x-sig semantics (contracts/proof_spec.md + sdk canonical_json):
+    // data defaults to an EMPTY OBJECT when null — the SDK computes
+    // canonical_json(envelope.data or {}) — and null keys drop inside
+    // canonicalJson (Roblox JSONDecode erases them).
+    const payload = utf8(`${envelope.code}|${envelope.message}|${canonicalJson(envelope.data ?? {})}|${ts}`);
     const signature = await signer.sign(payload);
     const sigB64 = b64urlEncode(signature);
     const headers: Record<string, string> = {

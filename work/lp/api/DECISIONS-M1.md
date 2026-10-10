@@ -59,3 +59,19 @@ None of the above silently edits doc.md. One proposal is filed:
 - **Risk if not changed:** implementers either drop the server nonce (weaker,
   single-nonce derivation contradicting §5.7) or invent divergent positions
   per module, breaking interop silently.
+
+## Session 3 (2026-10-10, after glm1's M3 re-land 53525bb) — M1↔M3 interop alignment
+
+| Decision | Options considered | Choice | Why (with evidence) | Tier | Reversibility | Affects modules |
+|---|---|---|---|---|---|---|
+| M3-M1-1 x-proof encoding | keep b64url+label / adopt M3 hex-no-label | hex(HMAC(key, method\|path\|x-ts\|x-nonce\|hex(sha256(body)))), no label, path without query — per contracts/proof_spec.md, cross-checked against loader/sdk/library.lua L124-125 | The SDK is the client; the server must verify what the SDK sends. Verified byte-exact via test/cross-m3.test.ts | 3 (wire format) — adopted M3's filed spec | Medium | M3, M13 |
+| M3-M1-2 canonical JSON nulls | keep "null" values / drop null-valued keys | Drop null-valued keys in objects; top-level null data signs as "{}" (SDK computes canonical_json(envelope.data or {})) | Roblox HttpService:JSONDecode erases null keys — the client CANNOT reproduce a signature over them (canonical_json.md C3); without this every x-sig check on note/discord_id:null envelopes fails client-side | 3 — adopted M3's filed spec | Medium | M3, M8 |
+| M3-M1-3 canonical escapes + sort | JSON.stringify / SDK-exact | Only `\"` `\\` + \u00xx for bytes <0x20 (no \n shorthand); keys sort by UTF-8 bytes; numbers bounded ±2^53 | Byte-exactness with the SDK's canonical_json (loader/sdk/library.lua L35-88) | 2 | High | M3 |
+| M3-M1-4 init response fields | keep §5.5 set / add build_hash + watermark_id | Add both (hex) to the decrypted init response — additive optional fields | M3's cross-check table: "M1 GAP — buildHash & watermark exist only inside the sealed payload_ref; the client cannot derive payloadKey". Tier 2 explicitly allows optional extra fields | 2 | High | M3 (handshake), M13 |
+| M3-M1-5 payload-key derivation | keep M1 formula / switch to M3's C6 | KEEP M1 (salt=fromHex(build_hash), info="payload-key"\|watermark) — M3's proof_spec proposed resolution adopts M1's formula once M1-M1-4 lands | M3 explicitly deferred to the server ("M1 is the server"); their proposal keeps M1's wire formats | 3 (crypto) — no change to M1 | n/a | M3 |
+| M3-M1-6 array support in canonical | drop arrays / keep | Keep (server can sign them; the SDK cannot VERIFY array data — arrays never appear in §5.4 SDK envelopes, only admin surfaces) | No SDK-visible envelope carries arrays; dropping would break admin envelope signing | 1 | High | none |
+
+Verification: test/cross-m3.test.ts (13 tests) runs MY implementations against
+glm1's contracts/test_vectors.json (sha256, hmac-sha256, hkdf RFC 5869
+TC1-3, chacha20 §2.3.2/§2.4.2, poly1305 §2.5.2 + 8 carry edge cases, aead
+§2.8.2) plus the SDK canonicalization semantics. Full suite 176/176, tsc clean.

@@ -23,6 +23,10 @@ interface Env {
   SESSION_SEAL_KEY: string;
   SESSION_TTL_SEC: string;
   PROJECT_SIGNING_KEYS: string;
+  FREE_SECRET: string;
+  FREE_KEY_DAYS: string;
+  FREE_ATTEMPT_TTL_SEC: string;
+  FREE_CLAIM_WINDOW_SEC: string;
 }
 
 interface RateStub {
@@ -109,6 +113,15 @@ export default {
       refSealKey: await refSealKey(env.SESSION_SEAL_KEY),
       bundleStore: new R2BlobStore(env.BUNDLES as never),
       bundleSignerFor,
+      free: {
+        requestsPerIpPerMin: 30,
+        startsPerIpPerMin: 5,
+        attemptsPerIpPerHour: 10,
+        attemptTtlSec: Number(env.FREE_ATTEMPT_TTL_SEC ?? "7200") || 7200,
+        claimWindowSec: Number(env.FREE_CLAIM_WINDOW_SEC ?? "900") || 900,
+        keyDays: Number(env.FREE_KEY_DAYS ?? "3") || 3,
+      },
+      freeSecret: b64urlDecode(env.FREE_SECRET ?? ""),
     };
     const ctx: AppContext = {
       db: new D1Adapter(env.DB as never),
