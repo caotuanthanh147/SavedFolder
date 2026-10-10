@@ -58,7 +58,7 @@ export function SettingsView(): React.JSX.Element {
         setNotice(json.error ?? "totp action failed");
         return;
       }
-      setError(null);
+      setNotice(null);
       if (action === "enroll") {
         setSecret(json.secret ?? null);
         setOtpauth(json.otpauth_uri ?? null);

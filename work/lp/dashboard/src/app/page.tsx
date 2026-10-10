@@ -13,6 +13,7 @@ import { UsersView } from "@/components/dashboard/users";
 import { SessionsView } from "@/components/dashboard/sessions";
 import { BlacklistView } from "@/components/dashboard/blacklist";
 import { AuditView } from "@/components/dashboard/audit";
+import { LeakToolsView } from "@/components/dashboard/leak-tools";
 import { ResellersView } from "@/components/dashboard/resellers";
 import { NodesView } from "@/components/dashboard/nodes";
 import { PaymentsView } from "@/components/dashboard/payments";
@@ -21,6 +22,9 @@ import { SettingsView } from "@/components/dashboard/settings";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { CommandPalette, type Command } from "@/components/dashboard/command-palette";
 import { ApiInspectorButton, ApiInspectorPanel, ApiProgressBar } from "@/components/dashboard/api-inspector";
+import { ShortcutsDialog } from "@/components/dashboard/shortcuts";
+import { useApiData } from "@/lib/use-api-data";
+import { KeyRow, gw } from "@/lib/api";
 import {
   ShieldCheck,
   BarChart3,
@@ -40,6 +44,9 @@ import {
   Search,
   Command as CommandIcon,
   Activity,
+  Fingerprint,
+  Printer,
+  Keyboard,
 } from "lucide-react";
 
 type ViewId =
@@ -51,9 +58,10 @@ type ViewId =
   | "sessions"
   | "blacklist"
   | "audit"
-  | "nodes"
+  | "leak"
   | "payments"
   | "freekey"
+  | "nodes"
   | "settings";
 
 const NAV: { id: ViewId; label: string; icon: React.ReactNode; group: string; hint: string }[] = [
@@ -65,6 +73,7 @@ const NAV: { id: ViewId; label: string; icon: React.ReactNode; group: string; hi
   { id: "sessions", label: "Sessions", icon: <Stamp className="h-4 w-4" />, group: "Security", hint: "watermarks" },
   { id: "blacklist", label: "Blacklist", icon: <Ban className="h-4 w-4" />, group: "Security", hint: "bans" },
   { id: "audit", label: "Audit log", icon: <ScrollText className="h-4 w-4" />, group: "Security", hint: "history" },
+  { id: "leak", label: "Leak tools", icon: <Fingerprint className="h-4 w-4" />, group: "Security", hint: "watermark trace" },
   { id: "payments", label: "Payments", icon: <Banknote className="h-4 w-4" />, group: "Revenue", hint: "orders" },
   { id: "freekey", label: "Free-key flow", icon: <Gift className="h-4 w-4" />, group: "Revenue", hint: "checkpoints" },
   { id: "nodes", label: "Nodes & protocol", icon: <ServerCog className="h-4 w-4" />, group: "System", hint: "hosts" },
@@ -80,6 +89,7 @@ const TITLES: Record<ViewId, { title: string; sub: string }> = {
   sessions: { title: "Sessions", sub: "Per-execution session rows with unique watermark ids" },
   blacklist: { title: "Blacklist", sub: "Hashed hwid / ip / roblox_user / discord entries" },
   audit: { title: "Audit log", sub: "Complete mutation history" },
+  leak: { title: "Leak tools", sub: "Module M7 — watermark extraction, session correlation, and the revoke chain (doc §12)" },
   payments: { title: "Payments", sub: "Module M10 — webhook-verified orders, product mappings, refunds, reconciliation" },
   freekey: { title: "Free-key flow", sub: "The public checkpoint flow (module M9) — drive it end to end" },
   nodes: { title: "Nodes & protocol versions", sub: "Auth hostnames and handler gating" },
@@ -90,8 +100,43 @@ export default function Home(): React.JSX.Element {
   const [view, setView] = useState<ViewId>("overview");
   const [menuOpen, setMenuOpen] = useState(false);
   const [devMode, setDevMode] = useState<boolean | null>(null);
+  // Print letterhead timestamp — resolved at print time (toLocaleString is
+  // locale/tz-dependent: a server-rendered value would hydration-mismatch).
+  const [printedAt, setPrintedAt] = useState<string | null>(null);
+  useEffect(() => {
+    const stamp = () => setPrintedAt(new Date().toLocaleString());
+    window.addEventListener("beforeprint", stamp);
+    return () => window.removeEventListener("beforeprint", stamp);
+  }, []);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  // Bumped on every palette OPEN; used as the palette's React key so each open
+  // remounts it with a clean query (a stale filter would strand navigation —
+  // found in QA). Closing does not bump, so Radix exit animations survive.
+  const [paletteSession, setPaletteSession] = useState(0);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  // Cross-view leak trace (M7): Sessions rows can hand a watermark id to the
+  // Leak tools view. `leakTraceSession` remounts the view so the prefill lands
+  // through the mount-time state initializer (no set-state-from-props).
+  const [leakTrace, setLeakTrace] = useState<{ text: string; session: number } | null>(null);
+  // Keys-view prefill from the palette's entity search — same remount pattern
+  // (the KeysView initial query reads this once at mount).
+  const [keysPrefill, setKeysPrefill] = useState<{ text: string; session: number } | null>(null);
+
+  // Keys index for the palette's global entity search (id / note / discord /
+  // roblox). One fetch on mount + 60s poll — the palette filters client-side,
+  // so entity search costs zero extra requests while open.
+  const keysIndex = useApiData(
+    () => gw<{ rows: KeyRow[] }>("GET", "/admin/keys?limit=500").then((r) => r.rows),
+    [],
+    { pollMs: 60000 },
+  );
+
+  const openPalette = useCallback(() => {
+    setPaletteSession((s) => s + 1);
+    setPaletteOpen(true);
+  }, []);
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
 
   useEffect(() => {
     fetch("/api/dash/info", { cache: "no-store" })
@@ -100,23 +145,44 @@ export default function Home(): React.JSX.Element {
       .catch(() => setDevMode(false));
   }, []);
 
-  // ⌘K / Ctrl+K opens the palette; ⌘I / Ctrl+I opens the API inspector
+  // ⌘K / Ctrl+K opens the palette; ⌘I / Ctrl+I opens the API inspector;
+  // "?" (shift+/) opens the shortcuts overlay when no field is focused.
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen((o) => !o);
+        if (paletteOpen) closePalette();
+        else openPalette();
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
         e.preventDefault();
         setInspectorOpen((o) => !o);
+      } else if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const t = e.target as HTMLElement | null;
+        const tag = t !== null ? t.tagName : "";
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && t?.isContentEditable !== true) {
+          e.preventDefault();
+          setHelpOpen((o) => !o);
+        }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [paletteOpen, openPalette, closePalette]);
 
   const go = useCallback((v: ViewId) => {
     setView(v);
+    setMenuOpen(false);
+  }, []);
+
+  const traceWatermark = useCallback((watermarkId: string) => {
+    setLeakTrace((t) => ({ text: watermarkId, session: (t?.session ?? 0) + 1 }));
+    setView("leak");
+    setMenuOpen(false);
+  }, []);
+
+  const jumpKey = useCallback((id: string) => {
+    setKeysPrefill((t) => ({ text: id, session: (t?.session ?? 0) + 1 }));
+    setView("keys");
     setMenuOpen(false);
   }, []);
 
@@ -136,6 +202,25 @@ export default function Home(): React.JSX.Element {
       group: "System",
       icon: <Activity className="h-4 w-4" />,
       run: () => setInspectorOpen(true),
+    },
+    {
+      id: "print-view",
+      label: "Print / save as PDF",
+      hint: "export",
+      group: "System",
+      icon: <Printer className="h-4 w-4" />,
+      run: () => {
+        setPrintedAt(new Date().toLocaleString());
+        window.print();
+      },
+    },
+    {
+      id: "shortcuts-help",
+      label: "Keyboard shortcuts",
+      hint: "help",
+      group: "System",
+      icon: <Keyboard className="h-4 w-4" />,
+      run: () => setHelpOpen(true),
     },
   ];
 
@@ -166,7 +251,7 @@ export default function Home(): React.JSX.Element {
           <div className="ml-auto flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setPaletteOpen(true)}
+              onClick={openPalette}
               className="hidden items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
               aria-label="open command palette"
             >
@@ -177,7 +262,7 @@ export default function Home(): React.JSX.Element {
                 <Kbd className="border bg-background">K</Kbd>
               </span>
             </button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={() => setPaletteOpen(true)} aria-label="open command palette">
+            <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={openPalette} aria-label="open command palette">
               <CommandIcon className="h-4 w-4" />
             </Button>
             {devMode === true && (
@@ -262,26 +347,36 @@ export default function Home(): React.JSX.Element {
 
             <div className="hidden rounded-lg border border-dashed p-3 lg:block">
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                <Kbd className="border bg-background px-1 font-mono">⌘K</Kbd> palette · <Kbd className="border bg-background px-1 font-mono">⌘I</Kbd> API inspector
+                <Kbd className="border bg-background px-1 font-mono">⌘K</Kbd> palette · <Kbd className="border bg-background px-1 font-mono">⌘I</Kbd> API inspector · <Kbd className="border bg-background px-1 font-mono">?</Kbd> shortcuts
               </p>
             </div>
           </div>
         </nav>
 
         <main className="min-w-0 flex-1">
-          <div className="mb-5">
+          {/* Print-only letterhead: view title + timestamp (hidden on screen). */}
+          <div className="print-only border-b pb-2">
+            <p className="text-sm font-semibold">Yuri Licensing Platform — {current.title}</p>
+            <p className="text-xs text-muted-foreground">
+              {printedAt !== null ? `printed ${printedAt} · dev-mode data` : "dashboard export"}
+            </p>
+          </div>
+          <div className="mb-5 print:mb-3">
             <h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1>
             <p className="text-sm text-muted-foreground">{current.sub}</p>
           </div>
           <div key={view} className="view-enter">
-            {view === "overview" && <OverviewView />}
-            {view === "keys" && <KeysView />}
+            {view === "overview" && <OverviewView onNavigate={go} />}
+            {view === "keys" && <KeysView key={keysPrefill?.session ?? 0} prefill={keysPrefill?.text} />}
             {view === "scripts" && <ScriptsView />}
             {view === "users" && <UsersView />}
             {view === "resellers" && <ResellersView />}
-            {view === "sessions" && <SessionsView />}
+            {view === "sessions" && <SessionsView onTrace={traceWatermark} />}
             {view === "blacklist" && <BlacklistView />}
             {view === "audit" && <AuditView />}
+            {view === "leak" && (
+              <LeakToolsView key={leakTrace?.session ?? 0} prefill={leakTrace?.text} />
+            )}
             {view === "payments" && <PaymentsView />}
             {view === "freekey" && <FreeKeyView />}
             {view === "nodes" && <NodesView />}
@@ -309,7 +404,18 @@ export default function Home(): React.JSX.Element {
         </div>
       </footer>
 
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
+      <CommandPalette
+        key={paletteSession}
+        open={paletteOpen}
+        onOpenChange={(o) => {
+          if (o) openPalette();
+          else closePalette();
+        }}
+        commands={commands}
+        keysIndex={keysIndex.data ?? []}
+        onJumpKey={jumpKey}
+      />
+      <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
       <ApiInspectorPanel open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
     </div>
   );

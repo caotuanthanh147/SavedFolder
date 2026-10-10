@@ -12,9 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { copyText } from "@/lib/export-utils";
 import { TierBadge, StatusBadge } from "@/components/dashboard/badges";
-import { formatTime, gw, KeyRow } from "@/lib/api";
+import { AbuseScore, AbuseScoresResponse, formatTime, gw, KeyRow } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
-import { CalendarClock, Gamepad2, KeyRound, RefreshCw, Search, Users } from "lucide-react";
+import { CalendarClock, Gamepad2, KeyRound, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
 
 interface UserRow {
   identity: string;
@@ -27,6 +27,21 @@ interface UserRow {
   last_used: number | null;
 }
 
+function RiskBadge({ score }: { score: AbuseScore }): React.JSX.Element {
+  const tone =
+    score.band === "high"
+      ? "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+      : score.band === "watch"
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tone}`}>
+      <ShieldAlert className="h-3 w-3" aria-hidden />
+      {score.band} · {score.score}
+    </span>
+  );
+}
+
 /** Detail dialog: fetches the key list once and joins client-side so both
  *  discord ids and roblox ids resolve (server-side q only matches discord). */
 function UserDetailDialog({ user, onClose }: { user: UserRow | null; onClose: () => void }): React.JSX.Element {
@@ -37,9 +52,15 @@ function UserDetailDialog({ user, onClose }: { user: UserRow | null; onClose: ()
     () => (user === null ? Promise.resolve({ rows: [] as KeyRow[] }) : gw<{ rows: KeyRow[] }>("GET", "/admin/keys?limit=200")),
     [user?.identity],
   );
+  // Abuse scores (M7 D-M7-7) joined per key for risk context.
+  const { data: scoresData } = useApiData<AbuseScoresResponse>(
+    () => (user === null ? Promise.resolve({ now: 0, weights: {}, scores: [] }) : gw<AbuseScoresResponse>("GET", "/admin/abuse-scores")),
+    [user?.identity],
+  );
   const keys = user === null ? [] : data === null ? null : data.rows.filter((k) =>
     user.kind === "discord" ? k.discord_id === user.identity : String(k.roblox_user_id ?? "") === user.identity,
   );
+  const scoreOf = (keyId: string): AbuseScore | null => (scoresData?.scores ?? []).find((s) => s.key_id === keyId) ?? null;
 
   return (
     <Dialog open={user !== null} onOpenChange={(o) => !o && onClose()}>
@@ -115,6 +136,7 @@ function UserDetailDialog({ user, onClose }: { user: UserRow | null; onClose: ()
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Execs</TableHead>
                         <TableHead>Expires</TableHead>
+                        <TableHead>Risk</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -142,6 +164,12 @@ function UserDetailDialog({ user, onClose }: { user: UserRow | null; onClose: ()
                               {formatTime(k.expires_at)}
                             </span>
                           </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const s = scoreOf(k.id);
+                              return s !== null && s.score > 0 ? <RiskBadge score={s} /> : <span className="text-xs text-muted-foreground">clean</span>;
+                            })()}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -164,6 +192,27 @@ export function UsersView(): React.JSX.Element {
     () => gw<{ rows: UserRow[] }>("GET", `/admin/users${trimmed.length > 0 ? `?q=${encodeURIComponent(trimmed)}` : ""}`),
     [trimmed],
   );
+  // Risk column (M7 D-M7-7): abuse scores joined through the key list so each
+  // identity shows its worst active key's band. Scores only list flagged
+  // active keys, so most users render no badge (clean by default).
+  const { data: riskData } = useApiData<{ keys: KeyRow[]; scores: AbuseScoresResponse }>(async () => {
+    const [keys, scores] = await Promise.all([
+      gw<{ rows: KeyRow[] }>("GET", "/admin/keys?limit=200"),
+      gw<AbuseScoresResponse>("GET", "/admin/abuse-scores"),
+    ]);
+    return { keys: keys.rows, scores };
+  }, []);
+  const worstRiskOf = (u: UserRow): AbuseScore | null => {
+    if (riskData === null) return null;
+    const myKeys = new Set(
+      riskData.keys
+        .filter((k) => (u.kind === "discord" ? k.discord_id === u.identity : String(k.roblox_user_id ?? "") === u.identity))
+        .map((k) => k.id),
+    );
+    const mine = riskData.scores.scores.filter((s) => myKeys.has(s.key_id));
+    if (mine.length === 0) return null;
+    return mine.reduce((a, b) => (b.score > a.score ? b : a));
+  };
   const rows = data?.rows ?? null;
 
   return (
@@ -222,6 +271,7 @@ export function UsersView(): React.JSX.Element {
                     <TableHead className="text-right">Executions</TableHead>
                     <TableHead>First seen</TableHead>
                     <TableHead>Last used</TableHead>
+                    <TableHead>Risk</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -250,6 +300,12 @@ export function UsersView(): React.JSX.Element {
                       <TableCell className="text-right tabular-nums text-muted-foreground">{r.total_executions}</TableCell>
                       <TableCell className="text-xs">{formatTime(r.first_seen)}</TableCell>
                       <TableCell className="text-xs">{formatTime(r.last_used)}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const worst = worstRiskOf(r);
+                          return worst !== null && worst.score > 0 ? <RiskBadge score={worst} /> : <span className="text-xs text-muted-foreground">clean</span>;
+                        })()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

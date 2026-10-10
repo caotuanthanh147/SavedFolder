@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { FreshnessPill } from "@/components/dashboard/freshness";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { csvTimestamp, exportCsv } from "@/lib/export-utils";
 import { AuditEntry, formatTime, gw } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
-import { Banknote, Download, Gift, KeyRound, RefreshCw, ScrollText, Search, ServerCog, ShieldAlert } from "lucide-react";
+import { Banknote, Download, Fingerprint, Gift, KeyRound, RefreshCw, ScrollText, Search, ServerCog, ShieldAlert } from "lucide-react";
 
 const CATEGORIES = [
   { value: "all", label: "all actions" },
@@ -24,7 +25,8 @@ const CATEGORIES = [
   { value: "script", label: "scripts" },
 ];
 
-function categorize(action: string): string {
+// Reused by the Overview timeline to pick dot colors (timeline-cat-*).
+export function categorize(action: string): string {
   if (action.startsWith("key.") || action.startsWith("hwid")) return "key";
   if (action.startsWith("payment")) return "payment";
   if (action.includes("free")) return "free";
@@ -33,8 +35,16 @@ function categorize(action: string): string {
   return "other";
 }
 
-function ActionBadge({ action }: { action: string }): React.JSX.Element {
+// Reused by the Overview "recent activity" timeline — the audit action →
+// category → color mapping is a shared visual vocabulary.
+export function ActionBadge({ action }: { action: string }): React.JSX.Element {
   const cat = categorize(action);
+  if (action.startsWith("admin.leak"))
+    return (
+      <Badge variant="outline" className="gap-1 border-rose-600/40 bg-rose-600/15 text-rose-700 dark:text-rose-300">
+        <Fingerprint className="h-3 w-3" aria-hidden /> {action}
+      </Badge>
+    );
   if (cat === "payment")
     return (
       <Badge variant="outline" className="gap-1 border-emerald-600/30 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400">
@@ -68,7 +78,9 @@ function ActionBadge({ action }: { action: string }): React.JSX.Element {
   return <Badge variant="secondary">{action}</Badge>;
 }
 
-function relTime(unix: number): string {
+// Reused by the Overview "recent activity" timeline (client-only render:
+// only mounted after data lands, so Date.now() here is hydration-safe).
+export function relTime(unix: number): string {
   const diff = Math.floor(Date.now() / 1000) - unix;
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -77,14 +89,9 @@ function relTime(unix: number): string {
 }
 
 export function AuditView(): React.JSX.Element {
-  const { data, error, refresh } = useApiData(() => gw<{ entries: AuditEntry[] }>("GET", "/admin/audit?limit=200"), []);
+  const { data, error, refresh, lastUpdatedAt } = useApiData(() => gw<{ entries: AuditEntry[] }>("GET", "/admin/audit?limit=200"), [], { pollMs: 20000 });
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    const timer = setInterval(() => refresh(), 20000);
-    return () => clearInterval(timer);
-  }, [refresh]);
 
   const rows: AuditEntry[] | null = data?.entries ?? null;
   const filtered = useMemo(() => {
@@ -118,6 +125,7 @@ export function AuditView(): React.JSX.Element {
           Every mutation through the admin API lands here — key creates/revokes, HWID resets, script versions, blacklists, node and
           protocol changes, and free-flow claims. Polls every 20s.
         </p>
+        <FreshnessPill lastUpdatedAt={lastUpdatedAt} onRefresh={refresh} pollMs={20000} />
         <div className="relative flex-1 lg:max-w-52">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="search actor/action/detail" className="pl-8" />

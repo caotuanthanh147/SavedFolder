@@ -304,6 +304,58 @@ async function seedAnalyticsHistory(raw: RawSqlite, now: number): Promise<void> 
   }
 }
 
+// M7 abuse-score demo (Users view Risk column + Leak tools context): an
+// active key with client tamper reports + HWID churn, so the D-M7-7 bands
+// render on first load. Idempotent via its own actor marker.
+async function seedAbuseDemo(raw: RawSqlite, now: number): Promise<void> {
+  const marker = raw.query("SELECT COUNT(*) AS n FROM audit_log WHERE actor_id = 'seed-abuse'", []) as { n: number }[];
+  if ((marker[0]?.n ?? 0) > 0) return;
+
+  const generated = generateKey("YURI");
+  const keyId = "k" + generated.body.slice(0, 31).toLowerCase();
+  const keyHash = await hashKey(generated.plaintext, PEPPER);
+  raw.run(
+    "INSERT INTO keys (id, project_id, key_hash, tier, status, note, total_executions, created_by, created_at, expires_at, first_used_at, last_used_at, discord_id, roblox_user_id) VALUES (?, ?, ?, 'paid', 'active', 'abuse-watch demo (seed)', 61, 'seed', ?, ?, ?, ?, '203044', NULL)",
+    [keyId, DEMO_PROJECT_ID, keyHash, now - 6 * 86400, now + 24 * 86400, now - 6 * 86400, now - 1800],
+  );
+  raw.run("INSERT INTO key_scripts (key_id, script_id) VALUES (?, ?)", [keyId, DEMO_SCRIPT_ID]);
+
+  // Two sessions with different HWID hashes = churn 1 (first binding legit).
+  const hwids = ["ab".repeat(31), "cd".repeat(31)];
+  for (let i = 0; i < hwids.length; i++) {
+    raw.run(
+      "INSERT INTO sessions (id, key_id, script_id, version, hwid_hash, ip_hash, roblox_user_id, place_id, watermark_id, created_at, expires_at) VALUES (?, ?, ?, 2, ?, ?, NULL, ?, ?, ?, ?)",
+      [
+        "sa" + String(i).padStart(2, "0") + "e".repeat(28),
+        keyId,
+        DEMO_SCRIPT_ID,
+        hwids[i],
+        "ef".repeat(31),
+        DEMO_GAME_ID,
+        "ab" + String(i).padStart(2, "0") + "f".repeat(28),
+        now - (5 - i) * 86400,
+        now + 3600,
+      ],
+    );
+  }
+
+  // Three client tamper reports inside the 7d window (D-M7-6 shape).
+  for (let i = 0; i < 3; i++) {
+    raw.run("INSERT INTO events (id, key_id, type, detail, created_at) VALUES (?, ?, 'tamper', ?, ?)", [
+      "ta" + String(i).padStart(2, "0") + "a".repeat(28),
+      keyId,
+      `client:${["native-request", "env-consistency", "timing"][i]}:seed`,
+      now - (3 - i) * 7200,
+    ]);
+  }
+
+  raw.run("INSERT INTO audit_log (id, actor_id, action, target, detail, created_at) VALUES (?, 'seed-abuse', 'seed.abuse-demo', NULL, ?, ?)", [
+    "sb" + "b".repeat(30),
+    "abuse-score demo key + tamper events",
+    now,
+  ]);
+}
+
 async function buildStore(): Promise<DevStore> {
   mkdirSync(DB_DIR, { recursive: true });
   const keys = await loadOrCreateKeystore();
@@ -325,6 +377,7 @@ async function buildStore(): Promise<DevStore> {
   const secretHash = await sha256Hex(b64urlDecode(keys.devAdminSecretB64url));
   await seedDemoData(raw, { id: keys.devAdminId, secretHash }, now);
   await seedAnalyticsHistory(raw, now);
+  await seedAbuseDemo(raw, now);
 
   const signer = await makeSigner(keys.signingPrivateKeyB64url);
   const blobs = new MemoryBlobStore();

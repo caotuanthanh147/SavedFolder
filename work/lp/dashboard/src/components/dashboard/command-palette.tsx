@@ -4,7 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, CornerDownLeft, Moon, Search, Sun } from "lucide-react";
+import { ArrowRight, CornerDownLeft, KeyRound, Moon, Search, Sun } from "lucide-react";
+import type { KeyRow } from "@/lib/api";
 
 export interface Command {
   id: string;
@@ -32,14 +33,28 @@ function matches(query: string, cmd: Command): boolean {
   );
 }
 
+// Entity search: match a key row against a query across its id, note,
+// discord id, roblox id, and tier. Query ≥ 3 chars gates the search so short
+// palette queries ("key", "set") still show commands first.
+function keyMatches(query: string, k: KeyRow): boolean {
+  const q = norm(query);
+  if (q.length < 3) return false;
+  const hay = [k.id, k.note ?? "", k.discord_id ?? "", k.roblox_user_id !== null ? String(k.roblox_user_id) : "", k.tier, k.status];
+  return hay.some((h) => norm(h).includes(q));
+}
+
 export function CommandPalette({
   open,
   onOpenChange,
   commands,
+  keysIndex,
+  onJumpKey,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   commands: Command[];
+  keysIndex: KeyRow[];
+  onJumpKey: (id: string) => void;
 }): React.JSX.Element {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -60,13 +75,31 @@ export function CommandPalette({
   );
 
   const filtered = useMemo(() => commands.filter((c) => matches(query, c)), [commands, query]);
+  // Live entity results (top 8) — merged AFTER command matches so ⌘K stays
+  // command-first; arrows/Enter treat them identically (one flat list).
+  const entityCommands = useMemo(() => {
+    if (query.trim().length < 3 || keysIndex.length === 0) return [];
+    return keysIndex
+      .filter((k) => keyMatches(query, k))
+      .slice(0, 8)
+      .map((k) => ({
+        id: `key-${k.id}`,
+        label: k.id,
+        hint: `${k.tier} · ${k.status}`,
+        group: "Keys",
+        icon: <KeyRound className="h-4 w-4" />,
+        run: () => onJumpKey(k.id),
+      }));
+  }, [query, keysIndex, onJumpKey]);
   const all = useMemo(
-    () => (matches(query, themeCommand) ? [...filtered, themeCommand] : filtered),
-    [filtered, themeCommand, query],
+    () => (matches(query, themeCommand) ? [...filtered, themeCommand, ...entityCommands] : [...filtered, ...entityCommands]),
+    [filtered, entityCommands, themeCommand, query],
   );
 
   // Open/close transitions happen in the dialog's own onOpenChange wrapper so
-  // no state is set from an effect body.
+  // no state is set from an effect body. (Fresh state on every open is also
+  // guaranteed structurally: the parent keys this component by an open-session
+  // counter, so each open remounts the palette with a clean query.)
   function handleOpenChange(o: boolean): void {
     if (o) {
       setQuery("");
@@ -112,8 +145,8 @@ export function CommandPalette({
               setActive(0);
             }}
             onKeyDown={onKeyDown}
-            placeholder="Jump to a view or run an action…"
-            aria-label="search commands"
+            placeholder="Jump to a view, or search keys by id / note / discord…"
+            aria-label="search commands and keys"
             className="w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
@@ -130,9 +163,9 @@ export function CommandPalette({
                 onMouseEnter={() => setActive(i)}
                 className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${
                   i === active ? "bg-secondary" : "hover:bg-secondary/60"
-                }`}
+                } ${cmd.group === "Keys" ? "font-mono text-xs" : ""}`}
               >
-                <span className="text-muted-foreground">{cmd.icon}</span>
+                <span className={cmd.group === "Keys" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>{cmd.icon}</span>
                 <span className="flex-1 truncate">{cmd.label}</span>
                 {cmd.hint && <Badge variant="outline" className="hidden text-[10px] sm:inline-flex">{cmd.hint}</Badge>}
                 <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">{cmd.group}</span>

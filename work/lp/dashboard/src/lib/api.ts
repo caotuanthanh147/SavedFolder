@@ -139,3 +139,73 @@ export function shortHash(hash: string | null | undefined, n = 10): string {
   if (!hash) return "—";
   return hash.slice(0, n) + "…";
 }
+
+// --- Module M7: leak tracing + abuse scores (doc §11, §12) ---
+
+export interface LeakExtraction {
+  watermark_id: string;
+  session_id: string | null;
+  source: "sealed_ref" | "session_token" | "watermark_id";
+  script_id: string | null;
+}
+
+export interface LeakSession {
+  id: string;
+  key_id: string | null;
+  script_id: string;
+  version: number;
+  hwid_hash: string | null;
+  ip_hash: string | null;
+  roblox_user_id: number | null;
+  watermark_id: string;
+  created_at: number;
+  expires_at: number;
+}
+
+export interface LeakKey {
+  id: string;
+  project_id: string;
+  tier: string;
+  status: string;
+  hwid_hash: string | null;
+  discord_id: string | null;
+  roblox_user_id: number | null;
+  note: string | null;
+  created_at: number;
+  expires_at: number | null;
+}
+
+export interface LeakLookupResponse {
+  watermark_id: string;
+  sessions: LeakSession[];
+  key: LeakKey | null;
+  events: Array<{ type: string; detail: string | null; created_at: number }>;
+  extraction: LeakExtraction;
+}
+
+export interface LeakRevokeResponse {
+  watermark_id: string;
+  key_id: string;
+  key_status: string;
+  already_revoked: boolean;
+  blacklisted: string[];
+  sessions_killed: boolean;
+}
+
+export interface AbuseScore {
+  key_id: string;
+  score: number;
+  band: "clean" | "watch" | "high";
+  tamper_7d: number;
+  hwid_mismatch_7d: number;
+  lockouts_7d: number;
+  distinct_hwids_30d: number;
+  hwid_churn_30d: number;
+  last_event_at: number;
+}
+
+export interface AbuseScoresResponse {
+  now: number;
+  weights: Record<string, number>;
+  scores: AbuseScore[];
+}
