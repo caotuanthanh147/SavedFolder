@@ -67,8 +67,8 @@ CREATE TABLE key_scripts (
 
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,
-  key_id        TEXT,
-  script_id     TEXT NOT NULL,
+  key_id        TEXT REFERENCES keys(id) ON DELETE RESTRICT,
+  script_id     TEXT NOT NULL REFERENCES scripts(id) ON DELETE RESTRICT,
   version       INTEGER NOT NULL,
   hwid_hash     TEXT NOT NULL,
   ip_hash       TEXT NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE protocol_versions (
 
 CREATE TABLE checkpoints (
   id            TEXT PRIMARY KEY,
-  project_id    TEXT NOT NULL,
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   position      INTEGER NOT NULL,
   provider      TEXT NOT NULL,
   config        TEXT NOT NULL
@@ -112,7 +112,7 @@ CREATE TABLE checkpoints (
 
 CREATE TABLE free_attempts (
   id            TEXT PRIMARY KEY,
-  project_id    TEXT NOT NULL,
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   fingerprint   TEXT NOT NULL,
   step          INTEGER NOT NULL,
   token_hash    TEXT NOT NULL,
@@ -139,6 +139,9 @@ CREATE TABLE audit_log (
   created_at    INTEGER NOT NULL
 ) STRICT;
 
+-- events: deliberately WITHOUT foreign keys (doc owner ruling 2026-10-10,
+-- msgs/docowner.txt Q3): failed validations can reference keys that don't
+-- exist, and audit history must outlive key deletions.
 CREATE TABLE events (
   id            TEXT PRIMARY KEY,
   key_id        TEXT,

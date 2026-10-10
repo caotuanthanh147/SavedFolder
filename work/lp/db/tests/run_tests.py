@@ -197,6 +197,49 @@ def main():
             "VALUES ('sess2', NULL, 's1', 1, 'hw2', 'ip2', 'wm2', 1, 2)")
         check("keyless session (key_id NULL) insertable",
               conn.execute("SELECT COUNT(*) FROM sessions WHERE key_id IS NULL").fetchone()[0] == 1)
+
+        # --- owner rulings 2026-10-10 (msgs/docowner.txt Q3/Q4) ------------
+        # sessions: FK RESTRICT — hard-deleting a key/script with sessions fails;
+        # revoke/deactivate instead of hard-deleting
+        try:
+            conn.execute("DELETE FROM keys WHERE id = 'k1'")
+            ok = False
+        except sqlite3.IntegrityError:
+            ok = True
+        check("sessions FK: DELETE key with session RESTRICTed (owner Q3)", ok)
+        try:
+            conn.execute("DELETE FROM scripts WHERE id = 's1'")
+            ok = False
+        except sqlite3.IntegrityError:
+            ok = True
+        check("sessions FK: DELETE script with session RESTRICTed (owner Q3)", ok)
+
+        # events: deliberately FK-less — failed validations may reference
+        # non-existent keys (owner Q3)
+        conn.execute(
+            "INSERT INTO events (id, key_id, type, detail, created_at) "
+            "VALUES ('e9', 'no-such-key', 'check_key_failed', 'x', 1)")
+        check("events FK-less: unknown key_id insertable (owner Q3)",
+              conn.execute("SELECT COUNT(*) FROM events WHERE key_id = 'no-such-key'").fetchone()[0] == 1)
+
+        # checkpoints / free_attempts: project_id ON DELETE CASCADE (owner Q4)
+        # (uses a fresh project p2 so unrelated FKs on p1 don't block the delete)
+        conn.execute(
+            "INSERT INTO projects (id, name, slug, owner_id, signing_key_id, created_at) "
+            "VALUES ('p2', 'cascade probe', 'cascade-probe', 'owner1', 'sk2', 1)")
+        conn.execute(
+            "INSERT INTO checkpoints (id, project_id, position, provider, config) "
+            "VALUES ('cp2', 'p2', 1, 'test', '{}')")
+        conn.execute(
+            "INSERT INTO free_attempts (id, project_id, fingerprint, step, token_hash, started_at, step_started_at) "
+            "VALUES ('fa2', 'p2', 'fp2', 1, 'th2', 1, 1)")
+        conn.execute("DELETE FROM projects WHERE id = 'p2'")
+        left = (
+            conn.execute("SELECT COUNT(*) FROM checkpoints WHERE id = 'cp2'").fetchone()[0],
+            conn.execute("SELECT COUNT(*) FROM free_attempts WHERE id = 'fa2'").fetchone()[0],
+        )
+        check("project delete cascades checkpoints + free_attempts (owner Q4)",
+              left == (0, 0), str(left))
         conn.close()
 
         # --- seed (bun) -----------------------------------------------------
@@ -220,13 +263,20 @@ def main():
 
             pv = sconn.execute(
                 "SELECT version, handler, min_loader, active FROM protocol_versions").fetchall()
-            check("seed: protocol_versions row", pv == [("1", "default", "1.0.0", 1)], str(pv))
+            check("seed: protocol_versions row (owner Q1: v1/handler v1/1.0.0/active)",
+                  pv == [("1", "v1", "1.0.0", 1)], str(pv))
 
             admin = sconn.execute(
                 "SELECT role, api_token_hash FROM admins").fetchone()
-            want_hash = hashlib.sha256(b"test-admin-token-0123456789abcdef").hexdigest()
-            check("seed: owner admin with SHA-256 hex token hash",
+            # owner Q2: store ONLY the SHA-256 of the SECRET part; the full
+            # token is adm_<id>.<secret> (printed once, never stored)
+            want_hash = hashlib.sha256(b"test-admin-secret-0123456789abcdef").hexdigest()
+            check("seed: owner admin stores SHA-256 of the SECRET (adm_<id>.<secret> format)",
                   admin == ("owner", want_hash), str(admin))
+            token_line = proc.stderr
+            check("seed: full adm_<id>.<secret> token printed once to stderr",
+                  "adm_000102030405060708090a0b0c0d0e0f.test-admin-secret-0123456789abcdef" in token_line,
+                  token_line.strip()[:120])
 
             sconn.executescript(seed_sql)
             counts = (

@@ -11,7 +11,15 @@ proven"), added in doc v3 (Public cd2ad33).
 | OS | Linux (sandbox container) |
 | Python | 3.12.14 |
 | SQLite engine | 3.53.1 (via python `sqlite3` module; sqlite3 CLI not installed in sandbox) |
-| Bun (seed tests) | available on PATH (version printed by test 18) |
+| Bun (seed tests) | available on PATH (version printed by test) |
+
+**2026-10-10 update:** schema + seed revised per the doc owner's direct
+rulings (SavedFolder msgs/docowner.txt, answers to RESEARCH-M2 Q1–Q4):
+sessions FKs (keys/scripts, ON DELETE RESTRICT, key_id nullable),
+checkpoints + free_attempts project_id ON DELETE CASCADE, events stays
+FK-less (rationale in 0001 comment), admin token `adm_<id>.<secret>` with
+only SHA-256(secret) stored, protocol row defaults v1/v1/1.0.0/active.
+Decision log: DECISIONS-M2.md.
 
 ## What I ran, and the output
 
@@ -23,7 +31,7 @@ Command: `python3 tests/run_tests.py` (from `db/`), which:
 3. runs `seed/seed.ts` via bun in `--test-fixtures` mode and asserts seeded rows,
 4. tears the DB down.
 
-Output (full, verbatim tail):
+Output (full, verbatim):
 
 ```
 [PASS] all 15 doc.md 6 tables created
@@ -43,21 +51,26 @@ Output (full, verbatim tail):
 [PASS] STRICT rejects wrong types (text->INTEGER, blob->TEXT)
 [PASS] keys defaults (hwid_resets=0, total_executions=0)
 [PASS] keyless session (key_id NULL) insertable
+[PASS] sessions FK: DELETE key with session RESTRICTed (owner Q3)
+[PASS] sessions FK: DELETE script with session RESTRICTed (owner Q3)
+[PASS] events FK-less: unknown key_id insertable (owner Q3)
+[PASS] project delete cascades checkpoints + free_attempts (owner Q4)
 [PASS] bun available on PATH for seed tests
 [PASS] seed: 1 node row
 [PASS] seed: node values from fixtures
-[PASS] seed: protocol_versions row
-[PASS] seed: owner admin with SHA-256 hex token hash
+[PASS] seed: protocol_versions row (owner Q1: v1/handler v1/1.0.0/active)
+[PASS] seed: owner admin stores SHA-256 of the SECRET (adm_<id>.<secret> format)
+[PASS] seed: full adm_<id>.<secret> token printed once to stderr
 [PASS] seed: idempotent (re-apply keeps counts)
 [PASS] seed: protocol row upserts on config change
 [PASS] batch-style atomicity: failed sequence rolls back entirely
 [PASS] auth-init join resolves key -> entitlement -> game
 
-26/26 checks passed
+31/31 checks passed
 ```
 
-Last full run: 2026-10-10, after the doc v3 force-push (re-verification on the
-exact bytes re-delivered in this commit).
+Last full run: 2026-10-10 (post owner-rulings update), re-verified on the
+exact bytes re-delivered in this commit.
 
 ## Why the tests are not "restating my implementation"
 
@@ -101,6 +114,10 @@ Every assertion derives from an outside source, not from my code:
 - Cross-checked by main-agent (M1 author, different instance) against their
   `DOC_SCHEMA_SQL`: COMPATIBLE — same columns/constraints; index-name deltas
   cosmetic (names not referenced by SQL). Their msg 2026-10-10T12:45Z.
+- The 2026-10-10 owner-ruling changes keep column LISTS identical (only
+  REFERENCES clauses + seed logic changed), so M1's DOC_SCHEMA_SQL column
+  check does not drift; M1's delete paths must switch to revoke/deactivate
+  (RESTRICT) — see DECISIONS-M2.md D-M2-3.
 - Per §22.1, security-critical double review: M2 is not on the crypto/HWID/
   replay critical list (it is schema + seed), so single cross-check + M14
   final pass applies. M14 has NOT yet run (M14 is always last per doc §7).

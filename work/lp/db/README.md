@@ -151,12 +151,25 @@ Primary source: Cloudflare D1 Time Travel docs (URL in RESEARCH-M2.md).
 - **`keys.key_hash` is indexed** through its UNIQUE constraint (implicit
   `sqlite_autoindex`); there is deliberately no second index on it.
 
-## Contract notes (see also RESEARCH-M2.md, Contract Issues section)
+## Contract notes (owner rulings 2026-10-10 — msgs/docowner.txt)
 
-- `sessions.script_id`, `events.key_id`, `checkpoints.project_id`, and
-  `free_attempts.project_id` have no `REFERENCES` clause in doc.md 6; they are
-  implemented exactly as written (history rows survive referenced-entity
-  deletion). Reported to the doc owner as a question, not changed.
+- `sessions.key_id REFERENCES keys(id)` (nullable, keyless scripts) and
+  `sessions.script_id REFERENCES scripts(id)`, both **ON DELETE RESTRICT**
+  (owner Q3): never hard-DELETE keys/scripts that have sessions — revoke or
+  deactivate instead.
+- `events.key_id` stays WITHOUT a foreign key (owner Q3): failed validations
+  may reference non-existent keys; audit history outlives deletions.
+- `checkpoints.project_id` and `free_attempts.project_id` now
+  **REFERENCES projects(id) ON DELETE CASCADE** (owner Q4; "the doc follows
+  the migrations" — the doc's §6 gap was an owner-acknowledged oversight).
+- Admin tokens (owner Q2, seed output): format `adm_<admin id>.<secret>`
+  with a 32-byte base64url secret. **Only SHA-256(secret) is stored.**
+  Runtime auth: parse the id prefix → one lookup → constant-time compare of
+  the secret hash (M1).
+- Protocol row (owner Q1): version `1`, handler `v1`, min_loader `1.0.0`,
+  active — seed defaults, env-overridable. Raise min_loader only when
+  retiring old loaders.
 - The doc index list entry `keys(key_hash)` is satisfied by the UNIQUE
   constraint's implicit index; no duplicate index is created (no unnecessary
   code). Tests assert index usage for that lookup.
+- Decision Log for all of the above (doc v4 format): DECISIONS-M2.md.

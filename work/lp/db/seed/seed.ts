@@ -8,12 +8,11 @@
 // the admin API, never seeded.
 //
 // Usage (bun):
-//   LP_SEED_NODES=auth.example.com,auth2.example.com \
-//   LP_SEED_NODE_REGIONS=eu,us \
-//   LP_SEED_PROTO_VERSION=1 LP_SEED_PROTO_HANDLER=default \
-//   LP_SEED_PROTO_MIN_LOADER=1.0.0 LP_SEED_PROTO_ACTIVE=1 \
+//   LP_SEED_NODES=auth.example.com \      # D11: launch with ONE hostname
 //   LP_SEED_ADMIN_DISCORD_ID=1234567890 \
 //   bun db/seed/seed.ts --print          # emit SQL to stdout
+//   (protocol row defaults per doc owner Q1: version 1, handler v1,
+//    min_loader 1.0.0, active; override via LP_SEED_PROTO_* env vars)
 //   bun db/seed/seed.ts --local dev.db   # apply to a local SQLite file
 //   bun db/seed/seed.ts --print --test-fixtures   # deterministic values (tests only)
 //
@@ -21,9 +20,13 @@
 //   bun db/seed/seed.ts --print > /tmp/seed.sql
 //   wrangler d1 execute <DATABASE_NAME> --file /tmp/seed.sql --remote
 //
-// The first owner's admin token is generated at seed time (32 random bytes,
-// base64url), printed to stderr exactly once, and stored only as its SHA-256
-// hex hash (doc.md 5.1). No secret is ever hardcoded or written to a file.
+// The first owner's admin token is generated at seed time with the format
+// `adm_<admin id>.<secret>` (doc owner ruling 2026-10-10, msgs/docowner.txt
+// Q2): the secret is 32 random bytes in base64url, the full token is printed
+// to stderr exactly once, and ONLY the SHA-256 hex hash of the SECRET is
+// stored (lookup by id prefix, then constant-time compare of the secret
+// hash at runtime — M1's job). No secret is ever hardcoded or written to a
+// file.
 
 import { randomBytes, createHash } from "node:crypto";
 
@@ -55,42 +58,44 @@ interface SeedConfig {
   admin: { discordId: string | null };
   now: number;
   adminId: string;
-  adminToken: string;
+  adminSecret: string;
+}
+
+function adminTokenOf(cfg: SeedConfig): string {
+  return `adm_${cfg.adminId}.${cfg.adminSecret}`;
 }
 
 function loadConfig(): SeedConfig {
   if (testFixtures) {
     return {
       nodes: [{ hostname: "auth-node-1.test", region: "test" }],
-      proto: { version: "1", handler: "default", minLoader: "1.0.0", active: 1 },
+      proto: { version: "1", handler: "v1", minLoader: "1.0.0", active: 1 },
       admin: { discordId: "000000000000000001" },
       now: 1700000000,
       adminId: "000102030405060708090a0b0c0d0e0f",
-      adminToken: "test-admin-token-0123456789abcdef",
+      adminSecret: "test-admin-secret-0123456789abcdef",
     };
   }
   const hostnames = (process.env.LP_SEED_NODES ?? "").split(",").map(s => s.trim()).filter(Boolean);
   const regions = (process.env.LP_SEED_NODE_REGIONS ?? "").split(",").map(s => s.trim());
   const nodes = hostnames.map((hostname, i) => ({ hostname, region: regions[i] || null }));
-  const protoVersion = process.env.LP_SEED_PROTO_VERSION ?? "";
-  const protoHandler = process.env.LP_SEED_PROTO_HANDLER ?? "";
-  if ((hostnames.length > 0 || protoVersion || protoHandler) && !(protoVersion && protoHandler)) {
-    console.error("LP_SEED_PROTO_VERSION and LP_SEED_PROTO_HANDLER must be set together");
-    process.exit(1);
-  }
+  // Owner defaults (msgs/docowner.txt Q1): version 1, handler v1,
+  // min_loader 1.0.0, active — env can override.
+  const protoVersion = process.env.LP_SEED_PROTO_VERSION ?? "1";
+  const protoHandler = process.env.LP_SEED_PROTO_HANDLER ?? "v1";
   const active = Number(process.env.LP_SEED_PROTO_ACTIVE ?? "1");
   return {
     nodes,
     proto: {
       version: protoVersion,
       handler: protoHandler,
-      minLoader: process.env.LP_SEED_PROTO_MIN_LOADER || null,
+      minLoader: process.env.LP_SEED_PROTO_MIN_LOADER || "1.0.0",
       active: active === 0 ? 0 : 1,
     },
     admin: { discordId: process.env.LP_SEED_ADMIN_DISCORD_ID || null },
     now: Math.floor(Date.now() / 1000),
     adminId: hexId(),
-    adminToken: randomBytes(32).toString("base64url"),
+    adminSecret: randomBytes(32).toString("base64url"),
   };
 }
 
@@ -108,10 +113,11 @@ function buildSql(cfg: SeedConfig): { sql: string; statements: string[] } {
         `ON CONFLICT(version) DO UPDATE SET handler = excluded.handler, min_loader = excluded.min_loader, active = excluded.active;`
     );
   }
-  const tokenHash = createHash("sha256").update(cfg.adminToken).digest("hex");
+  // store ONLY the SHA-256 of the secret part (doc owner Q2)
+  const secretHash = createHash("sha256").update(cfg.adminSecret).digest("hex");
   statements.push(
     `INSERT INTO admins (id, discord_id, role, api_token_hash, quota_keys, created_at) ` +
-      `SELECT ${sqlStr(cfg.adminId)}, ${sqlStr(cfg.admin.discordId)}, 'owner', ${sqlStr(tokenHash)}, NULL, ${cfg.now} ` +
+      `SELECT ${sqlStr(cfg.adminId)}, ${sqlStr(cfg.admin.discordId)}, 'owner', ${sqlStr(secretHash)}, NULL, ${cfg.now} ` +
       `WHERE NOT EXISTS (SELECT 1 FROM admins WHERE role = 'owner');`
   );
   return { sql: statements.join("\n") + "\n", statements };
@@ -123,7 +129,7 @@ const { sql, statements } = buildSql(cfg);
 if (wantPrint) {
   process.stdout.write(sql);
   process.stderr.write(
-    `admin token (shown once, only effective if no owner row existed): ${cfg.adminToken}\n`
+    `admin token (shown once, only effective if no owner row existed): ${adminTokenOf(cfg)}\n`
   );
 }
 
@@ -137,6 +143,6 @@ if (localFile) {
   tx(statements);
   db.close();
   process.stderr.write(
-    `admin token (shown once, only effective if no owner row existed): ${cfg.adminToken}\n`
+    `admin token (shown once, only effective if no owner row existed): ${adminTokenOf(cfg)}\n`
   );
 }

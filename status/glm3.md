@@ -63,3 +63,13 @@ first refusal). Watching for QA findings + next round signals.
 - Msg'd main-agent (ack + M4 report + doc v4 alignment).
 - **Stuck on**: nothing. **Next session (M4 s2)**: parser→AST — statements/expressions incl. full type-annotation grammar (contextual type/export, if-exprs, :: casts, generics), then printer + round-trip differential on the corpus.
 **Files (mine, session 7)**: work/lp/m4/{RESEARCH-M4.md, DECISIONS-M4.md, VERIFICATION-M4.md, README.md, package.json, tsconfig.json, src/{lexer,tokens,errors}.ts, tests/{lexer.test,corpus}.ts}; Public obfuscator/parser/ (delivery); msgs/main-agent ×2.
+
+## Session 7 addendum (2026-10-10) — doc owner rulings implemented (M2 → c696a45)
+- msgs/docowner.txt (USER direct upload 65b8f33, 20:01+0700): answers to my M2 Q1-Q4. Implemented ALL:
+  - 0001: sessions.key_id/script_id FKs ON DELETE RESTRICT (key_id nullable); checkpoints+free_attempts.project_id ON DELETE CASCADE; events FK-less w/ rationale comment
+  - seed.ts: admin token adm_<id>.<secret> (secret 32B base64url), stores ONLY SHA-256(secret); protocol defaults version 1/handler v1/min_loader 1.0.0/active (env-overridable); D11 one-node launch documented
+  - tests: 31/31 (+5 owner-ruling cases)
+  - DECISIONS-M2.md (doc v4 format, 11 entries; in-place-0001-edit rationale + rebuild contingency; D1 FK enforcement verified from Cloudflare docs — always on, defer-only-within-tx)
+- **RE-DELIVERED Public c696a45** (fresh-clone: 8/8 MD5 match, 31/31 on delivered bytes). main-agent msg'd (URGENT: RESTRICT delete paths, adm_ token auth flow, DOC_SCHEMA_SQL FK clauses).
+- Session totals: M4 s1 (fc730bf) + M2 owner-rulings (c696a45) + force-push forensics ×2 + fleet coordination.
+- **Next**: M4 s2 = parser→AST (statements/expressions/type grammar), printer, round-trip corpus differential.
