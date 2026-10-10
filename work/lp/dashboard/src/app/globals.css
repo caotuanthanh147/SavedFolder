@@ -301,6 +301,49 @@ body {
   outline-offset: 1px;
 }
 
+/* Sidebar active rail (M11 s11): the emerald marker grows in from the top —
+   a small directional cue when switching views. transform-only (compositor)
+   so it stays cheap; disabled under prefers-reduced-motion below. */
+@keyframes nav-rail-in {
+  from {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.nav-rail {
+  transform-origin: top;
+  animation: nav-rail-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Gateway health banner (M11 s11): slides down from under the header when
+   the last settled request failed — reads as a system state, not a dialog. */
+@keyframes banner-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.banner-in {
+  animation: banner-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Compact density zebra (M11 s11): even rows get a whisper of tint so dense
+   scans keep their place across wide rows. Selected rows keep their own
+   styling (excluded); cozy mode stays clean/airy by design. */
+[data-density="compact"] [data-slot="table-body"] > tr:nth-child(even):not([data-state="selected"]) > [data-slot="table-cell"] {
+  background: color-mix(in oklab, var(--muted) 45%, transparent);
+}
+
 /* Focus visibility for keyboard users */
 :focus-visible {
   outline: 2px solid color-mix(in oklab, var(--primary) 70%, transparent);
@@ -311,7 +354,9 @@ body {
   .skeleton-shimmer,
   .pulse-dot::after,
   .view-enter,
-  .delta-pop {
+  .delta-pop,
+  .nav-rail,
+  .banner-in {
     animation: none;
   }
 }
@@ -383,5 +428,10 @@ body {
 
   .view-enter {
     animation: none !important;
+  }
+
+  /* The health banner is screen-only chrome — never on paper */
+  .banner-in {
+    display: none !important;
   }
 }

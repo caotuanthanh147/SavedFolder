@@ -24,7 +24,9 @@ import { CommandPalette, type Command } from "@/components/dashboard/command-pal
 import { ApiInspectorButton, ApiInspectorPanel, ApiProgressBar } from "@/components/dashboard/api-inspector";
 import { LiveAlertsBell } from "@/components/dashboard/live-alerts";
 import { ShortcutsDialog } from "@/components/dashboard/shortcuts";
+import { GatewayHealthBanner } from "@/components/dashboard/gateway-health";
 import { useApiData } from "@/lib/use-api-data";
+import { loggedFetch } from "@/lib/api-log";
 import { KeyRow, gw } from "@/lib/api";
 import {
   ShieldCheck,
@@ -53,6 +55,7 @@ import {
   Plus,
   ChevronsDownUp,
   ChevronsUpDown,
+  HeartPulse,
 } from "lucide-react";
 
 type ViewId =
@@ -303,6 +306,19 @@ export default function Home(): React.JSX.Element {
       run: () => setHelpOpen(true),
     },
     {
+      id: "health-check",
+      label: "Check gateway health",
+      hint: "ping /sync",
+      group: "System",
+      icon: <HeartPulse className="h-4 w-4" />,
+      run: () => {
+        void loggedFetch("/api/gw/sync", { cache: "no-store" }).catch(() => {
+          /* the failed ping records status 0 in the shared request log — the
+             gateway banner reacts to it */
+        });
+      },
+    },
+    {
       id: "toggle-alerts",
       label: alertsMuted ? "Unmute security alerts" : "Mute security alerts",
       hint: "live ops",
@@ -397,6 +413,11 @@ export default function Home(): React.JSX.Element {
         </div>
       </header>
 
+      {/* Gateway health (M11 s11): slim status strip under the header — only
+          renders when the last settled request failed at the network level
+          (offline, rose) or answered 5xx (degraded, amber). */}
+      <GatewayHealthBanner />
+
       <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6">
         <nav
           aria-label="dashboard sections"
@@ -423,7 +444,7 @@ export default function Home(): React.JSX.Element {
                     >
                       {view === n.id && (
                         <span
-                          className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-gradient-to-b from-emerald-500 to-teal-600"
+                          className="nav-rail absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-gradient-to-b from-emerald-500 to-teal-600"
                           aria-hidden
                         />
                       )}

@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { copyText, csvTimestamp, exportCsv } from "@/lib/export-utils";
 import { loggedFetch } from "@/lib/api-log";
 import { TierBadge, StatusBadge } from "@/components/dashboard/badges";
+import { KeyUsagePanel } from "@/components/dashboard/key-usage";
 import { formatTime, gw, KeyRow, SyncData } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CalendarPlus, Copy, Download, FileKey2, KeyRound, Pencil, Plus, RefreshCw, Search, ShieldOff, Stamp, Undo2, X } from "lucide-react";
@@ -766,6 +767,9 @@ export function KeysView({ prefill, autoOpenCreate, onOpenSessions }: { prefill?
               <DetailRow label="first use">{formatTime(detail.first_used_at)}</DetailRow>
               <DetailRow label="last use">{formatTime(detail.last_used_at)}</DetailRow>
               <DetailRow label="created by">{detail.created_by}</DetailRow>
+              <div className="py-1.5">
+                <KeyUsagePanel keyId={detail.id} />
+              </div>
               <Separator />
               <div className="flex flex-wrap justify-end gap-2 pt-1">
                 {onOpenSessions !== undefined && (
