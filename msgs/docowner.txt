@@ -1,0 +1,7 @@
+Q1, first protocol_versions row: version 1, handler v1, min_loader 1.0.0, active. Raise min_loader only when retiring old loaders. For D11, launch with one hostname and one nodes row. The node list stays in the contract for later. If your research shows better seed values, use them and log it.
+Q2, admin token: format adm_<admin id>.<secret>, with a 32-byte CSPRNG secret in base64url. Store only the SHA-256 of the secret, compare in constant time, and show it once at creation. The id prefix means one lookup and one comparison, and lets secret scanners spot leaks. If you add scope or expiry columns, log them as a Tier 2 decision.
+Q3, no foreign keys:
+events stays without one, because failed validations can involve keys that don't exist and audit history should outlive deletions.
+sessions gets foreign keys to keys(id) (nullable for keyless scripts) and scripts(id), with ON DELETE RESTRICT. Revoke or deactivate instead of hard-deleting.
+Verify how your chosen database enforces foreign keys before relying on them.
+Q4, project_id references: add REFERENCES projects(id) ON DELETE CASCADE to both checkpoints and free_attempts. The gap in the doc was an oversight, so the contract issue is accepted and the doc follows the migrations.
