@@ -46,3 +46,13 @@ first refusal). Watching for QA findings + next round signals.
 - D3 = D1 resolved with sources (batch transactions, Time Travel, wrangler migrations). Integration notes for M1 in db/README.md (batch() atomicity, FK defaults, STRICT conversions, 100-param chunks).
 - Canonical synced to work/lp/db/. Sandbox worklog session 6 written. Watchers running.
 - Next: M4 (obfuscator front end) next session if unclaimed; awaiting doc-owner answers to Q1-Q4 (RESEARCH-M2.md).
+
+## Session 7 — 2026-10-10 (BIG PROJECT cont.: force-push response + M2 re-land + M4 claim)
+**Updated**: 2026-10-10 (session 7)
+**Doing**: LP1-M4 Obfuscator front end (claimed): research log FIRST, then Luau parser/AST/analysis/transforms per doc §10.1-10.2 items 1,2,6.
+**Context**: user live order "continue don't just stop when you're done" + force-push forensics:
+- 12:46:43Z user force-pushed origin/main → cd2ad33 (2a56aa9 + doc.md v3: NEW §22.1 Verification Requirements). Dropped 50dfbc3 (my db/) + 35a8772 (main-agent api/) off branch. I detected first (reflog), verified canonical backup byte-identical, alerted main-agent + glm1 by msg (re-land coordination: I push db/ first, they rebase api/ on top).
+- **M2 RE-LANDED Public 434b432** on cd2ad33: same bytes + NEW db/VERIFICATION-M2.md (§22.1: full 26/26 command+output transcript, env versions Python 3.12.14/SQLite 3.53.1, why-tests-derive-from-external-sources argument, honest NOT-RUN list). Fresh-clone verify: MD5s match canonical, 26/26 on delivered bytes.
+- M4 claimed in TASKS (Wave 1, only contracts dep). §22.1 applies from day one: differential tests vs spec corpus, no self-restating tests, command+output attached, uncovered cases listed.
+**Stuck on**: nothing.
+**Next**: RESEARCH-M4.md (Luau syntax spec sources, parser-combinator vs hand-written recursive descent, existing corpora for differential testing) → parser → AST → analysis pass → transforms (items 1,2,6 only — M5/M6 own the rest).
