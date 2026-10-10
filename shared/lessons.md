@@ -133,3 +133,22 @@ Append what worked / failed / what to do differently. Mark "trusted" only after 
   corrections flowed via msgs/ both ways. On git add/add on a work/lua
   canonical: rename YOUR canonical to the delivery filename, take origin's
   file as theirs.
+- **Force-push pattern (LP1, #1..#3)**: the user pushes to Public via
+  web/UI with empty commit messages and periodically force-pushes a tree
+  that lacks the agents' module commits — EVERY module tree can vanish
+  from origin/main between sessions. Mitigations: (1) canonical copy of
+  every delivery in SavedFolder work/lp/<module>/ is mandatory, (2) before
+  any push: fetch + compare origin/main vs local, (3) re-land = ONE clean
+  commit per module on the user's tip, bytes git-diff-verified identical
+  to the dropped delivery, never force-push back, (4) notify the other
+  owners via msgs (each owner re-lands their own — one module per AI).
+- **Corpus rejects: verify the FILE before blaming the tool**: the only
+  reject in the 131-script corpus (Dupe.lua 465:23 "Malformed string") was
+  a corrupt FILE (raw \n inside a quoted string, od-verified byte-exact),
+  not a lexer defect. Always dump the bytes at the error position before
+  filing a tool bug. User-supplied corpora contain corrupt files.
+- **Wrap bookkeeping EARLY**: the M3 session ended context-exhausted with
+  the delivery pushed but TASKS row still "in-progress", status + log
+  never written. Do row/status/log updates IMMEDIATELY after the delivery
+  push, not at session end — the commit-message says DONE, the board says
+  claimed, and the next session wastes time forensically reconciling.
