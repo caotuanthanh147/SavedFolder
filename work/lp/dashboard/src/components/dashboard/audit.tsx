@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { csvTimestamp, exportCsv } from "@/lib/export-utils";
 import { AuditEntry, formatTime, gw } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
-import { Banknote, Download, Fingerprint, Gift, KeyRound, RefreshCw, ScrollText, Search, ServerCog, ShieldAlert } from "lucide-react";
+import { ArrowUpRight, Banknote, Download, Fingerprint, Gift, KeyRound, RefreshCw, ScrollText, Search, ServerCog, ShieldAlert } from "lucide-react";
 
 const CATEGORIES = [
   { value: "all", label: "all actions" },
@@ -36,12 +36,18 @@ const RANGES: { v: string; label: string; secs: number }[] = [
 ];
 
 // Reused by the Overview timeline to pick dot colors (timeline-cat-*).
+// M11 s10 fix: substring matching catches the admin.* prefixed mutations
+// (admin.key.create/update were falling into "other" — the category filter,
+// ActionBadge and Overview timeline all misclassified them) plus the legacy
+// snake_case names (create_key) and admin.payment/admin.leak families.
 export function categorize(action: string): string {
-  if (action.startsWith("key.") || action.startsWith("hwid")) return "key";
-  if (action.startsWith("payment")) return "payment";
-  if (action.includes("free")) return "free";
-  if (action.startsWith("blacklist") || action.startsWith("session")) return "security";
-  if (action.startsWith("script") || action.startsWith("node") || action.startsWith("protocol")) return "script";
+  const a = action.toLowerCase();
+  if (a.includes("leak")) return "security";
+  if (a.includes("key") || a.startsWith("hwid")) return "key";
+  if (a.includes("payment")) return "payment";
+  if (a.includes("free")) return "free";
+  if (a.startsWith("blacklist") || a.startsWith("session")) return "security";
+  if (a.startsWith("script") || a.startsWith("node") || a.startsWith("protocol")) return "script";
   return "other";
 }
 
@@ -98,7 +104,28 @@ export function relTime(unix: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export function AuditView(): React.JSX.Element {
+// Key-target audit rows render as entity chips that jump to the Keys view.
+// Explicit allowlist of actions whose audit target IS a key id (verified
+// against the api/ audit call sites): admin.key.create targets the PROJECT
+// id and payment.refund may target an order id, so both stay plain text.
+const KEY_TARGET_ACTIONS = new Set([
+  "admin.key.update",
+  "admin.key.revoke",
+  "admin.key.reset_hwid",
+  "create_key", // free-flow claims (freekey.ts) — target = keyId
+  "payment.issue", // payments.ts — target = keyId
+  "key.create", // legacy seed rows
+  "key.revoke",
+  "key.extend",
+  "hwid.reset",
+]);
+function isKeyTargetId(action: string, target: string | null): boolean {
+  // Seed-era key ids are 27 chars (k + base36), fresh API ids are 32 hex
+  // (randomId) — both lowercase alnum; watermarks are 64 hex and excluded.
+  return target !== null && /^[a-z0-9]{24,32}$/.test(target) && KEY_TARGET_ACTIONS.has(action);
+}
+
+export function AuditView({ onOpenKey }: { onOpenKey?: (keyId: string) => void }): React.JSX.Element {
   const { data, error, refresh, lastUpdatedAt } = useApiData(() => gw<{ entries: AuditEntry[] }>("GET", "/admin/audit?limit=200"), [], { pollMs: 20000 });
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
@@ -226,7 +253,23 @@ export function AuditView(): React.JSX.Element {
                       <TableCell>
                         <ActionBadge action={r.action} />
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{r.target ? r.target.slice(0, 12) + "…" : "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {r.target !== null && isKeyTargetId(r.action, r.target) ? (
+                          <button
+                            type="button"
+                            className="group inline-flex items-center gap-1 rounded-sm border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:border-emerald-600/40 hover:bg-emerald-600/10 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:text-emerald-400"
+                            onClick={() => onOpenKey?.(r.target as string)}
+                            title="open this key in the Keys view"
+                          >
+                            {r.target.slice(0, 12)}…
+                            <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+                          </button>
+                        ) : r.target ? (
+                          <span title={r.target}>{r.target.slice(0, 12)}…</span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
                       <TableCell className="max-w-64 truncate text-xs text-muted-foreground" title={r.detail ?? undefined}>
                         {r.detail || "—"}
                       </TableCell>

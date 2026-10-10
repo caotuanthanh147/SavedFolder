@@ -278,6 +278,23 @@ body {
   box-shadow: 0 1px 0 0 var(--border);
 }
 
+/* Table density (M11 s10): compact mode tightens row height + cell padding
+   for dense data scans. Applied via data-density="compact" on <html> — the
+   toggle lives in the header + command palette; print always uses cozy. */
+[data-density="compact"] [data-slot="table-head"] {
+  height: 2rem;
+}
+
+[data-density="compact"] [data-slot="table-cell"] {
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+
+[data-density="compact"] [data-slot="table-cell"],
+[data-density="compact"] [data-slot="table-head"] {
+  font-size: 0.7188rem; /* 11.5px — keeps tabular-nums alignment stable */
+}
+
 /* Live-alert feed rows (M11 s9): keyboard focus ring matching the app style */
 .alert-row:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--primary) 55%, transparent);
@@ -342,6 +359,16 @@ body {
   /* Sticky headers make no sense on paper */
   [data-slot="table-header"] {
     position: static !important;
+  }
+
+  /* Paper always reads best at comfortable density */
+  html[data-density="compact"] [data-slot="table-head"] {
+    height: 2.25rem;
+  }
+
+  html[data-density="compact"] [data-slot="table-cell"] {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 
   /* Keep rows/cards whole across page breaks */

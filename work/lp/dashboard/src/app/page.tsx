@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -50,6 +50,9 @@ import {
   Keyboard,
   BellOff,
   BellRing,
+  Plus,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from "lucide-react";
 
 type ViewId =
@@ -82,6 +85,31 @@ const NAV: { id: ViewId; label: string; icon: React.ReactNode; group: string; hi
   { id: "nodes", label: "Nodes & protocol", icon: <ServerCog className="h-4 w-4" />, group: "System", hint: "hosts" },
   { id: "settings", label: "Settings", icon: <Settings className="h-4 w-4" />, group: "System", hint: "totp" },
 ];
+
+// Table density (M11 s10): the data-density attribute on <html> is the store.
+// Toggle writes attribute + localStorage and dispatches the event so every
+// mounted useSyncExternalStore reader re-renders.
+const DENSITY_EVENT = "yuri-density-change";
+function densitySubscribe(cb: () => void): () => void {
+  window.addEventListener(DENSITY_EVENT, cb);
+  return () => window.removeEventListener(DENSITY_EVENT, cb);
+}
+function densitySnapshot(): "cozy" | "compact" {
+  return document.documentElement.getAttribute("data-density") === "compact" ? "compact" : "cozy";
+}
+function densityServerSnapshot(): "cozy" | "compact" {
+  return "cozy";
+}
+function toggleDensity(current: "cozy" | "compact"): void {
+  const next = current === "compact" ? "cozy" : "compact";
+  document.documentElement.setAttribute("data-density", next);
+  try {
+    localStorage.setItem("yuri-density", next);
+  } catch {
+    /* private mode — session-only is fine */
+  }
+  window.dispatchEvent(new Event(DENSITY_EVENT));
+}
 
 const TITLES: Record<ViewId, { title: string; sub: string }> = {
   overview: { title: "Overview", sub: "Live analytics from the real /admin/analytics/overview endpoint" },
@@ -122,9 +150,24 @@ export default function Home(): React.JSX.Element {
   // Leak tools view. `leakTraceSession` remounts the view so the prefill lands
   // through the mount-time state initializer (no set-state-from-props).
   const [leakTrace, setLeakTrace] = useState<{ text: string; session: number } | null>(null);
-  // Keys-view prefill from the palette's entity search — same remount pattern
-  // (the KeysView initial query reads this once at mount).
-  const [keysPrefill, setKeysPrefill] = useState<{ text: string; session: number } | null>(null);
+  // Keys-view navigation (M11 s10): prefill search OR auto-open the create
+  // dialog. Same remount pattern — mount-time state initializers only.
+  const [keysNav, setKeysNav] = useState<{ text?: string; create?: boolean; session: number } | null>(null);
+  // Sessions-view prefill (M11 s10): key detail dialog → Sessions filtered by
+  // that key id (the entity-graph edge Keys → Sessions).
+  const [sessionsPrefill, setSessionsPrefill] = useState<{ text: string; session: number } | null>(null);
+  // Table density (M11 s10): cozy (default) or compact. The DOM attribute on
+  // <html> is the single source of truth, read through useSyncExternalStore
+  // (server snapshot = cozy, so the server-rendered HTML never mismatches;
+  // the localStorage restore below applies the attribute post-hydration and
+  // notifies subscribers — no setState-in-effect).
+  const density = useSyncExternalStore(densitySubscribe, densitySnapshot, densityServerSnapshot);
+  useEffect(() => {
+    if (localStorage.getItem("yuri-density") === "compact") {
+      document.documentElement.setAttribute("data-density", "compact");
+      window.dispatchEvent(new Event(DENSITY_EVENT));
+    }
+  }, []);
   // Security-alert mute (M11 s9): session-only, lifted here so the command
   // palette can toggle it while the bell owns the feed + toasts.
   const [alertsMuted, setAlertsMuted] = useState(false);
@@ -186,8 +229,23 @@ export default function Home(): React.JSX.Element {
     setMenuOpen(false);
   }, []);
 
+  // Entity-graph edges (M11 s10): everything converges on Keys (the primary
+  // entity) and Keys fans out to Sessions. Each bump remounts the target view
+  // so the prefill lands through mount-time state initializers.
   const jumpKey = useCallback((id: string) => {
-    setKeysPrefill((t) => ({ text: id, session: (t?.session ?? 0) + 1 }));
+    setKeysNav((t) => ({ text: id, session: (t?.session ?? 0) + 1 }));
+    setView("keys");
+    setMenuOpen(false);
+  }, []);
+
+  const openSessionsForKey = useCallback((keyId: string) => {
+    setSessionsPrefill((t) => ({ text: keyId, session: (t?.session ?? 0) + 1 }));
+    setView("sessions");
+    setMenuOpen(false);
+  }, []);
+
+  const openCreateKeys = useCallback(() => {
+    setKeysNav((t) => ({ create: true, session: (t?.session ?? 0) + 1 }));
     setView("keys");
     setMenuOpen(false);
   }, []);
@@ -201,6 +259,22 @@ export default function Home(): React.JSX.Element {
       icon: n.icon,
       run: () => go(n.id),
     })),
+    {
+      id: "create-keys",
+      label: "Create keys",
+      hint: "mint",
+      group: "Management",
+      icon: <Plus className="h-4 w-4" />,
+      run: openCreateKeys,
+    },
+    {
+      id: "toggle-density",
+      label: density === "compact" ? "Comfortable table density" : "Compact table density",
+      hint: "layout",
+      group: "System",
+      icon: density === "compact" ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />,
+      run: () => toggleDensity(density),
+    },
     {
       id: "open-inspector",
       label: "Open API request inspector",
@@ -307,6 +381,17 @@ export default function Home(): React.JSX.Element {
             )}
             <LiveAlertsBell muted={alertsMuted} onMutedChange={setAlertsMuted} onNavigate={go} />
             <ApiInspectorButton onClick={() => setInspectorOpen(true)} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => toggleDensity(density)}
+              aria-label={density === "compact" ? "switch to comfortable table density" : "switch to compact table density"}
+              aria-pressed={density === "compact"}
+              title={density === "compact" ? "table density: compact (click for comfortable)" : "table density: comfortable (click for compact)"}
+            >
+              {density === "compact" ? <ChevronsDownUp className="h-4 w-4" /> : <ChevronsUpDown className="h-4 w-4" />}
+            </Button>
             <ThemeToggle />
           </div>
         </div>
@@ -382,13 +467,15 @@ export default function Home(): React.JSX.Element {
           </div>
           <div key={view} className="view-enter">
             {view === "overview" && <OverviewView onNavigate={go} />}
-            {view === "keys" && <KeysView key={keysPrefill?.session ?? 0} prefill={keysPrefill?.text} />}
+            {view === "keys" && <KeysView key={keysNav?.session ?? 0} prefill={keysNav?.text} autoOpenCreate={keysNav?.create} onOpenSessions={openSessionsForKey} />}
             {view === "scripts" && <ScriptsView />}
-            {view === "users" && <UsersView />}
+            {view === "users" && <UsersView onOpenKey={jumpKey} />}
             {view === "resellers" && <ResellersView />}
-            {view === "sessions" && <SessionsView onTrace={traceWatermark} />}
+            {view === "sessions" && (
+              <SessionsView key={sessionsPrefill?.session ?? 0} prefill={sessionsPrefill?.text} onTrace={traceWatermark} onOpenKey={jumpKey} />
+            )}
             {view === "blacklist" && <BlacklistView />}
-            {view === "audit" && <AuditView />}
+            {view === "audit" && <AuditView onOpenKey={jumpKey} />}
             {view === "leak" && (
               <LeakToolsView key={leakTrace?.session ?? 0} prefill={leakTrace?.text} />
             )}

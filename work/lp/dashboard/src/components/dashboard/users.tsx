@@ -14,7 +14,7 @@ import { copyText } from "@/lib/export-utils";
 import { TierBadge, StatusBadge } from "@/components/dashboard/badges";
 import { AbuseScore, AbuseScoresResponse, formatTime, gw, KeyRow } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
-import { CalendarClock, Gamepad2, KeyRound, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
+import { ArrowUpRight, CalendarClock, Gamepad2, KeyRound, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
 
 interface UserRow {
   identity: string;
@@ -44,7 +44,7 @@ function RiskBadge({ score }: { score: AbuseScore }): React.JSX.Element {
 
 /** Detail dialog: fetches the key list once and joins client-side so both
  *  discord ids and roblox ids resolve (server-side q only matches discord). */
-function UserDetailDialog({ user, onClose }: { user: UserRow | null; onClose: () => void }): React.JSX.Element {
+function UserDetailDialog({ user, onClose, onOpenKey }: { user: UserRow | null; onClose: () => void; onOpenKey?: (keyId: string) => void }): React.JSX.Element {
   // Lazy fetcher: resolves empty while no user is selected (no wasted calls),
   // fetches the key list on open — then joins client-side so both discord ids
   // and roblox ids resolve (server-side q only matches discord).
@@ -143,13 +143,26 @@ function UserDetailDialog({ user, onClose }: { user: UserRow | null; onClose: ()
                       {keys.map((k) => (
                         <TableRow key={k.id}>
                           <TableCell className="font-mono text-xs">
-                            <button
-                              type="button"
-                              className="transition-colors hover:text-emerald-600 hover:underline dark:hover:text-emerald-400"
-                              onClick={() => copyText(k.id, "Key id copied")}
-                            >
-                              {k.id.slice(0, 12)}…
-                            </button>
+                            <span className="inline-flex items-center gap-1">
+                              <button
+                                type="button"
+                                className="rounded-sm transition-colors hover:text-emerald-600 hover:underline dark:hover:text-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2"
+                                onClick={() => copyText(k.id, "Key id copied")}
+                              >
+                                {k.id.slice(0, 12)}…
+                              </button>
+                              {onOpenKey !== undefined && (
+                                <button
+                                  type="button"
+                                  className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-emerald-600 dark:hover:text-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2"
+                                  onClick={() => onOpenKey(k.id)}
+                                  aria-label={`open key ${k.id.slice(0, 8)} in Keys view`}
+                                  title="open in Keys view"
+                                >
+                                  <ArrowUpRight className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <TierBadge tier={k.tier} />
@@ -184,7 +197,7 @@ function UserDetailDialog({ user, onClose }: { user: UserRow | null; onClose: ()
   );
 }
 
-export function UsersView(): React.JSX.Element {
+export function UsersView({ onOpenKey }: { onOpenKey?: (keyId: string) => void }): React.JSX.Element {
   const [query, setQuery] = useState("");
   const [detail, setDetail] = useState<UserRow | null>(null);
   const trimmed = query.trim();
@@ -260,7 +273,7 @@ export function UsersView(): React.JSX.Element {
             </div>
           ) : (
             <div className="max-h-96 overflow-auto">
-              <Table>
+              <Table className="table-sticky">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Identity</TableHead>
@@ -314,7 +327,7 @@ export function UsersView(): React.JSX.Element {
           )}
         </CardContent>
       </Card>
-      <UserDetailDialog user={detail} onClose={() => setDetail(null)} />
+      <UserDetailDialog user={detail} onClose={() => setDetail(null)} onOpenKey={onOpenKey} />
     </div>
   );
 }

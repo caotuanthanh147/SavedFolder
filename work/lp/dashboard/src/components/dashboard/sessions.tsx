@@ -8,22 +8,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatTime, gw, SessionRow, shortHash } from "@/lib/api";
+import { formatTime, gw, SessionRow, shortHash, SyncData } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
 import { copyText, csvTimestamp, exportCsv } from "@/lib/export-utils";
 import { FreshnessPill } from "@/components/dashboard/freshness";
-import { Download, Fingerprint, RefreshCw, Stamp } from "lucide-react";
+import { ArrowUpRight, Download, Fingerprint, RefreshCw, Stamp } from "lucide-react";
 
-export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => void }): React.JSX.Element {
-  const [keyFilter, setKeyFilter] = useState("");
+export function SessionsView({
+  prefill,
+  onTrace,
+  onOpenKey,
+}: {
+  prefill?: string;
+  onTrace?: (watermarkId: string) => void;
+  onOpenKey?: (keyId: string) => void;
+}): React.JSX.Element {
+  const [keyFilter, setKeyFilter] = useState(prefill ?? "");
   const trimmed = keyFilter.trim();
   const { data, error, refresh, lastUpdatedAt } = useApiData(
     () => gw<{ rows: SessionRow[]; total: number }>("GET", `/admin/sessions?limit=100${trimmed.length > 0 ? `&key_id=${encodeURIComponent(trimmed)}` : ""}`),
     [trimmed],
     { pollMs: 30000 },
   );
+  // Server clock (M11 s10): the live/expired pill is computed against /sync's
+  // st — pure data-derived, no Date.now() in render (hydration-safe).
+  const sync = useApiData(() => gw<SyncData>("GET", "/sync"), []);
+  const st = sync.data?.st ?? null;
   const rows = data?.rows ?? null;
   const total = data?.total ?? 0;
+  const liveCount = rows !== null && st !== null ? rows.filter((r) => r.expires_at > st).length : null;
 
   function exportSessionsCsv(): void {
     if (rows === null) return;
@@ -39,7 +52,7 @@ export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => v
         </Alert>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={keyFilter} onChange={(e) => setKeyFilter(e.target.value)} placeholder="filter by key id" className="w-64 font-mono" />
+        <Input value={keyFilter} onChange={(e) => setKeyFilter(e.target.value)} placeholder="filter by key id" className="w-64 font-mono" aria-label="filter sessions by key id" />
         <FreshnessPill lastUpdatedAt={lastUpdatedAt} onRefresh={refresh} pollMs={30000} />
         <Button variant="outline" size="icon" onClick={() => refresh()} aria-label="refresh">
           <RefreshCw className="h-4 w-4" />
@@ -49,6 +62,7 @@ export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => v
         </Button>
         <p className="text-sm text-muted-foreground">
           Every auth/init creates a session row with a unique watermark id — leak tracing joins from here (doc §12).
+          {liveCount !== null && <span className="ml-1 tabular-nums">· {liveCount} live of {total} listed.</span>}
         </p>
       </div>
       <Card>
@@ -65,13 +79,18 @@ export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => v
               ))}
             </div>
           ) : rows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No sessions yet — they appear when a key holder runs /auth/&lt;script&gt;/init.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {trimmed.length > 0
+                ? `No sessions for key ${trimmed.slice(0, 12)}… in the latest 100 rows.`
+                : "No sessions yet — they appear when a key holder runs /auth/<script>/init."}
+            </p>
           ) : (
             <div className="max-h-96 overflow-auto">
-              <Table>
+              <Table className="table-sticky">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Session</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Key</TableHead>
                     <TableHead>Script</TableHead>
                     <TableHead>v</TableHead>
@@ -83,14 +102,17 @@ export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => v
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((r) => (
+                  {rows.map((r) => {
+                    const live = st !== null && r.expires_at > st;
+                    const kid = r.key_id;
+                    return (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs">
                         <span className="inline-flex items-center gap-1">
                           <Stamp className="h-3 w-3 text-muted-foreground" />
                           <button
                             type="button"
-                            className="transition-colors hover:text-emerald-600 hover:underline dark:hover:text-emerald-400"
+                            className="rounded-sm transition-colors hover:text-emerald-600 hover:underline dark:hover:text-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2"
                             onClick={() => copyText(r.watermark_id, "Watermark copied")}
                             title="click to copy watermark id"
                           >
@@ -99,7 +121,7 @@ export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => v
                           {onTrace !== undefined && (
                             <button
                               type="button"
-                              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-emerald-600 dark:hover:text-emerald-400"
+                              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-emerald-600 dark:hover:text-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2"
                               onClick={() => onTrace(r.watermark_id)}
                               aria-label={`trace watermark ${r.watermark_id} in leak tools`}
                               title="trace in Leak tools"
@@ -109,12 +131,40 @@ export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => v
                           )}
                         </span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {r.key_id ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Fingerprint className="h-3 w-3 text-muted-foreground" />
-                            {shortHash(r.key_id, 8)}
+                      <TableCell>
+                        {st === null ? (
+                          <Badge variant="secondary" className="text-[10px]">…</Badge>
+                        ) : live ? (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                            <span className="pulse-dot relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 text-emerald-500" aria-hidden />
+                            live
                           </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-stone-400" aria-hidden />
+                            expired
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {kid !== null ? (
+                          onOpenKey !== undefined ? (
+                            <button
+                              type="button"
+                              className="group inline-flex items-center gap-1 rounded-sm transition-colors hover:text-emerald-600 dark:hover:text-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2"
+                              onClick={() => onOpenKey(kid)}
+                              title={`open key ${shortHash(kid, 8)} in Keys view`}
+                            >
+                              <Fingerprint className="h-3 w-3 text-muted-foreground" aria-hidden />
+                              {shortHash(kid, 8)}
+                              <ArrowUpRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <Fingerprint className="h-3 w-3 text-muted-foreground" />
+                              {shortHash(kid, 8)}
+                            </span>
+                          )
                         ) : (
                           <Badge variant="secondary">keyless</Badge>
                         )}
@@ -125,9 +175,12 @@ export function SessionsView({ onTrace }: { onTrace?: (watermarkId: string) => v
                       <TableCell className="font-mono text-xs">{shortHash(r.ip_hash, 8)}</TableCell>
                       <TableCell className="tabular-nums text-xs">{r.place_id ?? "—"}</TableCell>
                       <TableCell className="text-xs">{formatTime(r.created_at)}</TableCell>
-                      <TableCell className="text-xs">{formatTime(r.expires_at)}</TableCell>
+                      <TableCell className="text-xs">
+                        <span className={live ? "text-foreground" : "text-muted-foreground"}>{formatTime(r.expires_at)}</span>
+                      </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

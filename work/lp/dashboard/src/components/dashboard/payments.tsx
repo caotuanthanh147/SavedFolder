@@ -242,7 +242,7 @@ export function PaymentsView(): React.JSX.Element {
                 <p className="py-8 text-center text-sm text-muted-foreground">No orders — run the webhook simulator to create one.</p>
               ) : (
                 <div className="max-h-96 overflow-auto">
-                  <Table>
+                  <Table className="table-sticky">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Order</TableHead>
@@ -354,7 +354,7 @@ export function PaymentsView(): React.JSX.Element {
                 <p className="py-8 text-center text-sm text-muted-foreground">No product mappings yet.</p>
               ) : (
                 <div className="max-h-96 overflow-auto">
-                  <Table>
+                  <Table className="table-sticky">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Provider</TableHead>

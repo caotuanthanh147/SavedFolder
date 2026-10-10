@@ -141,7 +141,7 @@ export function ResellersView(): React.JSX.Element {
             </div>
           ) : (
             <div className="max-h-96 overflow-auto">
-              <Table>
+              <Table className="table-sticky">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Admin</TableHead>

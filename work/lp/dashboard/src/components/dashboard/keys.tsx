@@ -19,7 +19,7 @@ import { loggedFetch } from "@/lib/api-log";
 import { TierBadge, StatusBadge } from "@/components/dashboard/badges";
 import { formatTime, gw, KeyRow, SyncData } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CalendarPlus, Copy, Download, FileKey2, KeyRound, Pencil, Plus, RefreshCw, Search, ShieldOff, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CalendarPlus, Copy, Download, FileKey2, KeyRound, Pencil, Plus, RefreshCw, Search, ShieldOff, Stamp, Undo2, X } from "lucide-react";
 
 const DEMO_PROJECT_ID = "11111111111111111111111111111111";
 const DEMO_SCRIPT_ID = "22222222222222222222222222222222";
@@ -74,7 +74,7 @@ function SortHead({
   );
 }
 
-export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
+export function KeysView({ prefill, autoOpenCreate, onOpenSessions }: { prefill?: string; autoOpenCreate?: boolean; onOpenSessions?: (keyId: string) => void }): React.JSX.Element {
   const [actionError, setActionError] = useState<string | null>(null);
   const [query, setQuery] = useState(prefill ?? "");
   const [tier, setTier] = useState("all");
@@ -226,7 +226,7 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
     setBusy(false);
   }
 
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(autoOpenCreate ?? false);
   const [newTier, setNewTier] = useState("paid");
   const [newDays, setNewDays] = useState("30");
   const [newCount, setNewCount] = useState("1");
@@ -768,6 +768,11 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
               <DetailRow label="created by">{detail.created_by}</DetailRow>
               <Separator />
               <div className="flex flex-wrap justify-end gap-2 pt-1">
+                {onOpenSessions !== undefined && (
+                  <Button variant="outline" size="sm" onClick={() => onOpenSessions(detail.id)} title="open the Sessions view filtered to this key">
+                    <Stamp className="mr-1 h-3.5 w-3.5" /> Sessions
+                  </Button>
+                )}
                 {detail.status === "active" && (
                   <Dialog open={extendOpen} onOpenChange={setExtendOpen}>
                     <Button variant="outline" size="sm" onClick={() => openExtend(detail)} disabled={busy}>

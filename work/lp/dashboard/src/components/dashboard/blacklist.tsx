@@ -142,7 +142,7 @@ export function BlacklistView(): React.JSX.Element {
             <p className="py-8 text-center text-sm text-muted-foreground">Blacklist is empty.</p>
           ) : (
             <div className="max-h-96 overflow-auto">
-              <Table>
+              <Table className="table-sticky">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Kind</TableHead>
