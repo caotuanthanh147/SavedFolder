@@ -1,24 +1,29 @@
 # glm4 status
 
-**Updated**: 2026-10-05 (session 4 — sandbox reset x4, FW1-H claimed)
+**Updated**: 2026-10-10 (session 5 — BIG PROJECT round: LP1-M13 claimed)
 
-**Doing**: FW1-H (FNAF World Multiplayer independent real-load harness) —
-glm1's lane-split offer (FW1-H open, POT1-H pattern). FW1 (build) = glm1's
-(solo-default, all others idle since Oct 4). Building the deobf-backed mock
-world from the census (FNAF = direct FireServer/InvokeServer remotes in
-ReplicatedStorage.FnafWorldRemotes, NOT buffer-mux; + Replica 348 hits +
-Remo 58 as state-rep/container layers). Will io.open+loadstring+spawn glm1's
-delivered bytes + assert no-ERROR/toggles/wire-tuples/toggle-off/no-pcall-
-swallows (os.clock override + scope-safe upvalues + colon-safe mocks — ALL
-lessons applied). Awaiting glm1's FW1 delivery.
+**Doing**: LP1-M13 "Loader stub generator and CDN init packaging" (doc.md §5.6,
+§8; Public repo layout loader/stub/ + init build pipeline). Claimed after user
+redirect ("we are not doing webdev… you're glm4") — moving off the web lane
+(the old web-instance session in this sandbox delivered M1/M9/M11; that's
+main-agent's row now). My lane = Lua/loader side, matching my harness lineage
+(SAC1-H, FW1-H-closed).
 
-**Session arc**: sandbox reset x4 (re-cloned+bootstrapped each time, token
-still valid). Missed: POT1 delivered (glm1 4fcbc2d, 15 toggles; glm2 POT1-H
-harness 58/58), PL1 Plunder delivered (glm1 4b0000a, fallback). Both
-folders closed. FNAF World arrived Oct 5 15:13 (single-place, 88,747-line
-deobf). glm1 claimed FW1 ~15:20Z; my FW1 claim-attempt ERRORED (Python
-NameError) → no collision; claimed FW1-H instead.
+**Plan (doc READ FIRST order)**: doc.md read head-to-toe (1037 lines) ✓ →
+claim pushed ✓ → RESEARCH-M13 BEFORE code (doc's M13 research list: CF/R2
+static caching + cache-busting + executor FS APIs readfile/writefile/
+makefolder availability + safe on-disk cache validation; D12 resolution)
+→ DECISIONS-M13 → build loader/stub/ (stub generator TS + unique-per-fetch
+Lua stub template + init packaging CLI + cache validation) → tests (bun TS +
+lua5.4 Lua harness) → VERIFICATION-M13 §22.1 → deliver Public → TASKS row done
+→ msgs to glm1 (M3 interop) + main-agent (M1 /loaders integration).
 
-**Lesson APPLIED this session**: re-pull before CLAIM too (not just delivery)
-— glm1 pushed FW1 during my work window after my initial pull; the Python
-error saved me from a collision. The re-pull lesson extends to claims.
+**Past**: FW1-H closed moot 2026-10-08 (user deleted FNAF folder, 146eb30).
+SAC1-H (Steal A Car harness) — harness delivered in-session 2026-10-04,
+glm3's SAC1 notes carry the lane state; round closed with folder deletion.
+
+**Session notes**: sandbox reset x5 (fresh clone + bootstrap.sh glm4 + token
+recovered from /tmp clone remotes, wired silently per protocol). doc.md v3+
+force-push history respected: pull --rebase before every push (sync.sh does
+it). M1's stub service in api/ is placeholder-level ("stub.ts" per main-agent
+worklog) — M13's generator is the real thing behind /loaders/:id.lua.
