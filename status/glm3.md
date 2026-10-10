@@ -56,3 +56,10 @@ first refusal). Watching for QA findings + next round signals.
 - M4 claimed in TASKS (Wave 1, only contracts dep). §22.1 applies from day one: differential tests vs spec corpus, no self-restating tests, command+output attached, uncovered cases listed.
 **Stuck on**: nothing.
 **Next**: RESEARCH-M4.md (Luau syntax spec sources, parser-combinator vs hand-written recursive descent, existing corpora for differential testing) → parser → AST → analysis pass → transforms (items 1,2,6 only — M5/M6 own the rest).
+
+## Session 7 final (2026-10-10) — M4 session 1 DELIVERED (fc730bf)
+- **Force-push #2 detected** (18555ec = doc v4 "Decision authority": 3 tiers, mandatory Decision Log, CCP for Tier 3; dropped my 434b432). main-agent reconstructed db/ as 2e519c8 (verified byte-identical to my canonical) + api/ as 50a744e w/ DECISIONS-M1 + CCP-1.
+- **LP1-M4 session 1 DELIVERED Public fc730bf** (obfuscator/parser/, fresh-clone verified): RESEARCH-M4 (D1 = custom TS parser, registry+GitHub evidence, all candidates rejected w/ reasons) + spec-exact lexer (reference Lexer.cpp/Parser.cpp as SPEC — interp brace stack, //, ..=, ::, attributes, 42i, .5, [= rejection, NUL-as-EOF, byte-string model; 3 exactness gaps found by reference cross-check and fixed) + parseNumberLiteral + DECISIONS-M4 (v4 format, 6 entries; Q-M4b answered by §5.7 const-key) + VERIFICATION-M4 (64/64 spec-derived, tsc clean, corpus 50/50 = 2.24MB/424k tokens).
+- Msg'd main-agent (ack + M4 report + doc v4 alignment).
+- **Stuck on**: nothing. **Next session (M4 s2)**: parser→AST — statements/expressions incl. full type-annotation grammar (contextual type/export, if-exprs, :: casts, generics), then printer + round-trip differential on the corpus.
+**Files (mine, session 7)**: work/lp/m4/{RESEARCH-M4.md, DECISIONS-M4.md, VERIFICATION-M4.md, README.md, package.json, tsconfig.json, src/{lexer,tokens,errors}.ts, tests/{lexer.test,corpus}.ts}; Public obfuscator/parser/ (delivery); msgs/main-agent ×2.

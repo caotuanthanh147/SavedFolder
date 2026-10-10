@@ -1,0 +1,15 @@
+{
+  "name": "@lp/obf-parser",
+  "version": "0.1.0",
+  "description": "LP1 M4 obfuscator front end: strict Luau lexer/parser/analysis (custom, per RESEARCH-M4 D1)",
+  "module": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "bun-types": "^1.4.3",
+    "typescript": "^5.6.0"
+  }
+}
