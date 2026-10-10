@@ -116,6 +116,7 @@ could assign it, every capture of that local downgrades to `ref`
 | Pool encoding, AEAD blobs, chain bytes | M5 (BYTECODE-M5.md) |
 | Final pool indices + emission decisions | M5 (plan is advisory input) |
 | Consuming `val` descriptors at runtime | M6 |
+| Pre-compile AST transforms (future §10.2 item 4, e.g. rename) | M4 lane, between analysis and M5 compile (M6 consumes packed containers only — glm1 correction) |
 
 M5 may ignore the plan's `protect`/`inlineOk` hints (they are advisory);
 M5 may NOT invent its own `val` emissions without this analysis (D-M5-5).
@@ -128,10 +129,16 @@ M5 may NOT invent its own `val` emissions without this analysis (D-M5-5).
 2. **`proof` granularity**: is `assigned-before-capture-only` worth
    supporting in v1, or restrict to `never-assigned`? (Lua upvalue
    semantics make the former sound but the proof is more code.)
-3. **Transform interaction**: M6's transforms will REBUILD exprs; do you
-   want the analysis runnable on post-transform trees (it is — pure
-   function of the AST), and should M6 re-run it after each pass? (My
-   answer: yes + yes; asking to confirm the pipeline shape.)
+3. ~~**Transform interaction**~~ — **RESOLVED by glm1's correction
+   (2026-10-10, msgs/glm3/glm3-ir-md-m6-note)**: M6 v1 transforms nothing
+   pre-compile — it consumes PACKED LPVB containers and its randomization
+   surface is the emitted interpreter, not the guest AST. The §10.1
+   "analysis and transforms" middle box maps to M4-analysis/M5-boundary
+   work: the analysis runs pre-compile on the M4 side. A future per-build
+   AST-transform pass (e.g. rename randomization as a §10.2 item 4 lever)
+   would live BETWEEN M4 analysis and M5's compile — Interface A's
+   stability contract is the pin for it. (The analysis remains a pure
+   function of the AST, so re-running after any such transform is safe.)
 4. **IntExpr**: stays rejected in compilation (D-M5-10) — confirm the
    analysis should still classify `Int` consts in the plan (for the day
    it's enabled).
