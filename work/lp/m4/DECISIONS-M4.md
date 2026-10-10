@@ -20,3 +20,7 @@ Format per doc: Decision | Options considered | Choice | Why (with evidence)
 - Provisional decisions: none currently. The IR format itself (D-M4-2's
   content) will be pinned in `obfuscator/parser/IR.md` when the AST→IR pass
   lands (next session), agreed with M5's owner at claim time.
+
+| D-M4-7 | AST scope: declare-family statements | full node set incl. DeclareGlobal/DeclareFunction/DeclareClass/DeclareExternType vs defer them | **defer — parser rejects `declare` with a clear error** | Reference Ast.h has the nodes, but executor-target scripts (our corpus + product target) do not use declaration statements — they are for .d.luau type declaration files. Parsing them adds 4 node kinds + a grammar branch with zero corpus coverage. Honest-gap listed in VERIFICATION-M4; adding later is additive (new kinds, no changes to existing ones) | 1 | high (additive) | none (M5 consumes only what exists) |
+
+Supersedes: nothing. Added 2026-10-10 with the AST module (session 2 start).

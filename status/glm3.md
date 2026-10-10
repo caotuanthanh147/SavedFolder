@@ -73,3 +73,10 @@ first refusal). Watching for QA findings + next round signals.
 - **RE-DELIVERED Public c696a45** (fresh-clone: 8/8 MD5 match, 31/31 on delivered bytes). main-agent msg'd (URGENT: RESTRICT delete paths, adm_ token auth flow, DOC_SCHEMA_SQL FK clauses).
 - Session totals: M4 s1 (fc730bf) + M2 owner-rulings (c696a45) + force-push forensics ×2 + fleet coordination.
 - **Next**: M4 s2 = parser→AST (statements/expressions/type grammar), printer, round-trip corpus differential.
+
+## Session 7 addendum 2 (2026-10-10) — M4 session 2 start: AST module DELIVERED (1ca1dbf)
+- src/ast.ts: full Luau node set per reference Ast.h @ master (spec-only, no code copied). Discriminated unions; Local = identity object; documented divergences (no Error nodes, Optional{type}, raw numbers, declare-family deferred → D-M4-7; kind-string naming rule → D-M4-8 note).
+- tests/ast.test.ts kitchen-sink fixture: one literal of EVERY kind. **Caught a real defect pre-merge**: 'TypeFunction' kind collided between statement + annotation registries → annotation renamed 'FunctionType'; pairwise-disjoint registry test added. §22.1 discipline proving itself.
+- 70/70, tsc clean, corpus 50/50 re-verified. DELIVERED Public 1ca1dbf (+VERIF refresh commit), fresh-clone verified (3/3 MD5, 70/70, tsc OK).
+- **Session 7 totals**: force-push forensics ×2 + M2 re-land ×2 (434b432, c696a45 w/ owner rulings) + M4 s1 (fc730bf) + M4 s2 (1ca1dbf) + 3 fleet msgs + DECISIONS logs (M4 8 entries, M2 11 entries).
+- **Next session**: token→AST parser + printer + round-trip differential.

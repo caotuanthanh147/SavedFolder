@@ -1,7 +1,8 @@
-# VERIFICATION-M4 — §22.1 compliance record (session 1: lexer)
+# VERIFICATION-M4 — §22.1 compliance record (sessions 1-2: lexer + AST)
 
-Scope: proves the session-1 claims with commands and outputs; lists what was
-NOT run. Per doc.md §22.1 (added doc v3, Public cd2ad33).
+Scope: proves the session-1 (lexer) and session-2-start (AST module) claims
+with commands and outputs; lists what was NOT run. Per doc.md §22.1 (added
+doc v3, Public cd2ad33).
 
 ## Environment
 
@@ -19,12 +20,22 @@ Command: `bun test` (from `obfuscator/parser/`)
 
 Output (tail):
 
+Session 2 (AST module added — src/ast.ts + tests/ast.test.ts):
+
 ```
- 64 pass
+ 70 pass
  0 fail
- 242 expect() calls
-Ran 64 tests across 1 file. [19.00ms]
+ 405 expect() calls
+Ran 70 tests across 2 files. [20.00ms]
 ```
+
+The AST kitchen-sink fixture (one literal of every node kind) caught a real
+pre-merge defect: the statement 'TypeFunction' and annotation 'TypeFunction'
+kind strings collided across STAT_KINDS/TYPE_KINDS — fixed by renaming the
+annotation kind to 'FunctionType' (matching its interface) and adding a
+pairwise-disjoint registry test. This is the §22.1 discipline working: the
+fixture derives from the reference node set (Ast.h), not from my code's
+self-consistency.
 
 Coverage: reserved words (exact kReserved set; `continue`/`type`/`export`
 contextual), Lua 5.1 manual number examples, hex/binary/u64-overflow/`i`
@@ -74,10 +85,14 @@ F0 9F 98 80 (toUtf8 spec), `0b12` must be malformed (binary digits only),
 
 ## NOT run (honest gaps — session 1 scope)
 
-1. **The parser itself is not built yet.** This session delivers the lexer +
-   number validation only. Statements/expressions/types → AST, the printer,
-   and round-trip differential (parse → print → parse → AST-equal) are the
-   next session's work; the corpus run above exercises tokenization only.
+1. **The parser itself is not built yet.** Delivered so far: the lexer +
+   number validation (session 1) and the AST TYPE module (session 2 start:
+   node set per reference Ast.h, kitchen-sink fixture, registries). The
+   token→AST parser, the printer, and round-trip differential
+   (parse → print → parse → AST-equal) are the next session's work; the
+   corpus run above exercises tokenization only. The AST module has no
+   runtime of its own — its §22.1 evidence is tsc-clean compilation of the
+   fixture (shape proof) + registry disjointness tests.
 2. **No differential against the official Luau binary.** The sandbox has no
    Luau runtime (lua5.4 ≠ Luau). Building luau-lang/luau locally for a
    reject/accept diff harness is possible future work (documented; not done).
