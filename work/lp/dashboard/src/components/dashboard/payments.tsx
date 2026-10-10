@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatTime, gw, shortHash } from "@/lib/api";
+import { csvTimestamp, exportCsv } from "@/lib/export-utils";
 import { useApiData } from "@/lib/use-api-data";
-import { Banknote, CircleCheck, CreditCard, Play, Plus, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Banknote, CreditCard, Download, Play, Plus, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 
 const DEMO_PROJECT_ID = "11111111111111111111111111111111";
 
@@ -77,7 +79,6 @@ function OrderStatusBadge({ status }: { status: string }): React.JSX.Element {
 }
 
 export function PaymentsView(): React.JSX.Element {
-  const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -123,9 +124,16 @@ export function PaymentsView(): React.JSX.Element {
       orders.refresh();
       products.refresh();
       const outcome = (j.response as { outcome?: string; error?: string }).outcome ?? (j.response as { error?: string }).error ?? "?";
-      setNotice(`Webhook → HTTP ${j.status} (${outcome}) — real signature verify + idempotency gate ran server-side.`);
+      const ok = j.status === 200 && outcome === "issued";
+      if (ok) {
+        toast.success(`Webhook → HTTP ${j.status} (${outcome})`, { description: "Real signature verify + idempotency gate ran server-side." });
+      } else {
+        toast.error(`Webhook → HTTP ${j.status} (${outcome})`, { description: "Rejected by the real verifier — see the response below." });
+      }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "simulation failed");
+      const msg = e instanceof Error ? e.message : "simulation failed";
+      setActionError(msg);
+      toast.error("Simulation failed", { description: msg });
     } finally {
       setBusy(false);
     }
@@ -143,7 +151,7 @@ export function PaymentsView(): React.JSX.Element {
         scripts: [],
         refund_blacklists: prodBlacklist,
       });
-      setNotice(`Product mapping ${prodRef.trim()} saved (audited).`);
+      toast.success(`Product mapping ${prodRef.trim()} saved`, { description: "Mutation audit-logged." });
       setProdOpen(false);
       setProdRef("");
       products.refresh();
@@ -159,7 +167,16 @@ export function PaymentsView(): React.JSX.Element {
     try {
       const res = await gw<ReconcileReport>("POST", "/admin/payments/reconcile", {});
       setReconcile(res);
-      setNotice(`Reconcile: ${res.counts.refunded_or_disputed_but_active} refunded-but-active, ${res.counts.paid_key_missing_or_revoked} broken, ${res.counts.keys_without_order} orphan keys.`);
+      const drift = res.counts.refunded_or_disputed_but_active + res.counts.paid_key_missing_or_revoked;
+      if (drift > 0) {
+        toast.warning(`Reconcile: ${drift} drift rows`, {
+          description: `${res.counts.refunded_or_disputed_but_active} refunded-but-active, ${res.counts.paid_key_missing_or_revoked} broken, ${res.counts.keys_without_order} orphan keys.`,
+        });
+      } else {
+        toast.success("Reconcile clean", {
+          description: `${res.counts.keys_without_order} orphan keys, 0 broken, 0 refunded-but-active.`,
+        });
+      }
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "reconcile failed");
     } finally {
@@ -167,16 +184,15 @@ export function PaymentsView(): React.JSX.Element {
     }
   }
 
+  function exportOrdersCsv(): void {
+    if (!orderRows) return;
+    exportCsv(`yuri-orders-${csvTimestamp()}`, ["order", "provider", "product", "key_id", "discord", "email", "amount_minor", "currency", "status", "created_at", "updated_at"], orderRows.map((r) => [r.provider_order_id, r.provider, r.product_ref, r.key_id ?? "", r.discord_id ?? "", r.email ?? "", r.amount_minor ?? "", r.currency ?? "", r.status, formatTime(r.created_at), formatTime(r.updated_at)]));
+    toast.info("CSV exported", { description: `${orderRows.length} order rows (current filter).` });
+  }
+
   return (
     <div className="space-y-4">
       {error0(orders.error, actionError)}
-      {notice && (
-        <Alert>
-          <CircleCheck className="h-4 w-4" />
-          <AlertTitle>OK</AlertTitle>
-          <AlertDescription>{notice}</AlertDescription>
-        </Alert>
-      )}
 
       <Tabs defaultValue="orders">
         <TabsList>
@@ -202,6 +218,9 @@ export function PaymentsView(): React.JSX.Element {
             <Button variant="outline" size="icon" onClick={() => orders.refresh()} aria-label="refresh orders">
               <RefreshCw className="h-4 w-4" />
             </Button>
+            <Button variant="outline" onClick={exportOrdersCsv} disabled={!orderRows || orderRows.length === 0}>
+              <Download className="mr-1 h-4 w-4" /> CSV
+            </Button>
             <p className="text-sm text-muted-foreground">
               Confirmed payments issue keys through the real M9-style path; refunds revoke, disputes blacklist (doc §17).
             </p>
@@ -216,7 +235,7 @@ export function PaymentsView(): React.JSX.Element {
               {orderRows === null ? (
                 <div className="space-y-2">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10" />
+                    <Skeleton key={i} className="skeleton-shimmer h-10" />
                   ))}
                 </div>
               ) : orderRows.length === 0 ? (
@@ -330,7 +349,7 @@ export function PaymentsView(): React.JSX.Element {
             </CardHeader>
             <CardContent>
               {products.data === null ? (
-                <Skeleton className="h-24" />
+                <Skeleton className="skeleton-shimmer h-24" />
               ) : products.data.rows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">No product mappings yet.</p>
               ) : (

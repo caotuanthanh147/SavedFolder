@@ -11,12 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
-    "next-env.d.ts",
-    // Not part of the dashboard package: the api/ module has its own
-    // toolchain (bun test + tsc), skills/ is read-only tooling.
-    "api/**",
-    "skills/**",
-  ]),
+    "next-env.d.ts",  ]),
 ]);
 
 export default eslintConfig;

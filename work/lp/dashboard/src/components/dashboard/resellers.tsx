@@ -137,7 +137,7 @@ export function ResellersView(): React.JSX.Element {
           {rows === null ? (
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-10" />
+                <Skeleton key={i} className="skeleton-shimmer h-10" />
               ))}
             </div>
           ) : (

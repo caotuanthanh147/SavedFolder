@@ -120,7 +120,7 @@ export function NodesView(): React.JSX.Element {
           </CardHeader>
           <CardContent className="space-y-3">
             {nodes === null ? (
-              <Skeleton className="h-24" />
+              <Skeleton className="skeleton-shimmer h-24" />
             ) : (
               <ScrollArea className="max-h-56">
                 <Table>
@@ -180,7 +180,7 @@ export function NodesView(): React.JSX.Element {
           </CardHeader>
           <CardContent className="space-y-3">
             {protocols === null ? (
-              <Skeleton className="h-24" />
+              <Skeleton className="skeleton-shimmer h-24" />
             ) : (
               <ScrollArea className="max-h-56">
                 <Table>

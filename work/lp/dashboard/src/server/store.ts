@@ -223,6 +223,87 @@ async function seedDemoData(raw: RawSqlite, devAdminToken: { id: string; secretH
   ]);
 }
 
+// 14-day analytics history (M11 s3 Overview charts). Idempotent via its own
+// actor marker so already-seeded demo DBs are enriched in place. Deterministic
+// LCG keeps the generated history stable across restarts.
+async function seedAnalyticsHistory(raw: RawSqlite, now: number): Promise<void> {
+  const marker = raw.query("SELECT COUNT(*) AS n FROM audit_log WHERE actor_id = 'seed-history'", []) as { n: number }[];
+  if ((marker[0]?.n ?? 0) > 0) return;
+
+  let s = 42;
+  const rnd = (): number => {
+    s = (s * 1103515245 + 12345) % 2147483648;
+    return s / 2147483648;
+  };
+  const pick = <T,>(arr: T[]): T => arr[Math.floor(rnd() * arr.length)]!;
+
+  const actions: { action: string; detail: string }[] = [
+    { action: "key.create", detail: "batch mint (reseller)" },
+    { action: "key.extend", detail: "support extension +14d" },
+    { action: "key.revoke", detail: "chargeback" },
+    { action: "hwid.reset", detail: "new machine" },
+    { action: "blacklist.add", detail: "hwid abuse" },
+    { action: "payment.issue", detail: "webhook confirmed" },
+    { action: "payment.refund", detail: "refund processed" },
+    { action: "free.claim", detail: "checkpoint flow complete" },
+    { action: "script.activate", detail: "version rollout" },
+  ];
+
+  let n = 0;
+  for (let d = 13; d >= 0; d--) {
+    const dayStart = now - (d + 1) * 86400;
+    const rows = 3 + Math.floor(rnd() * 6); // 3–8 audit rows per day
+    for (let i = 0; i < rows; i++) {
+      const a = pick(actions);
+      n += 1;
+      raw.run(
+        "INSERT INTO audit_log (id, actor_id, action, target, detail, created_at) VALUES (?, 'seed-history', ?, NULL, ?, ?)",
+        ["h" + String(n).padStart(7, "0") + "a".repeat(24), a.action, a.detail, dayStart + Math.floor(rnd() * 86400)],
+      );
+    }
+  }
+
+  // Validation events inside the live 24h window (drives the overview stats)
+  for (let i = 0; i < 41; i++) {
+    raw.run("INSERT INTO events (id, key_id, type, detail, created_at) VALUES (?, NULL, 'validate_ok', 'history sample', ?)", [
+      "vh" + String(i).padStart(4, "0") + "b".repeat(27),
+      now - Math.floor(rnd() * 86400),
+    ]);
+  }
+  for (let i = 0; i < 5; i++) {
+    raw.run("INSERT INTO events (id, key_id, type, detail, created_at) VALUES (?, NULL, 'validate_fail', 'proof', ?)", [
+      "vf" + String(i).padStart(4, "0") + "c".repeat(27),
+      now - Math.floor(rnd() * 86400),
+    ]);
+  }
+  raw.run("INSERT INTO events (id, key_id, type, detail, created_at) VALUES (?, NULL, 'tamper', 'history sample', ?)", [
+    "vt" + "d".repeat(30),
+    now - 3600,
+  ]);
+
+  // Extra demo keys spread over the last 14 days (tier variety for the donut
+  // + keys-created/day series). Hashes via the real machinery.
+  const extraKeys: { tier: string; days: number | null; exec: number; d: number; note: string }[] = [
+    { tier: "paid", days: 30, exec: 15, d: 13, note: "launch batch" },
+    { tier: "free", days: 3, exec: 4, d: 11, note: "free flow" },
+    { tier: "paid", days: 30, exec: 87, d: 10, note: "weekly batch" },
+    { tier: "lifetime", days: null, exec: 210, d: 8, note: "vip" },
+    { tier: "reseller", days: 30, exec: 9, d: 7, note: "reseller batch" },
+    { tier: "paid", days: 30, exec: 56, d: 5, note: "weekly batch" },
+    { tier: "free", days: 3, exec: 6, d: 4, note: "free flow" },
+    { tier: "paid", days: 90, exec: 33, d: 2, note: "quarterly" },
+  ];
+  for (const k of extraKeys) {
+    const generated = generateKey("YURI");
+    const keyId = "k" + generated.body.slice(0, 31).toLowerCase();
+    raw.run(
+      "INSERT INTO keys (id, project_id, key_hash, tier, status, note, total_executions, created_by, created_at, expires_at, first_used_at, last_used_at, discord_id, roblox_user_id) VALUES (?, ?, ?, ?, 'active', ?, ?, 'seed', ?, ?, ?, ?, ?, ?)",
+      [keyId, DEMO_PROJECT_ID, await hashKey(generated.plaintext, PEPPER), k.tier, k.note, k.exec, now - k.d * 86400, k.days ? now + (k.days - k.d) * 86400 : null, now - k.d * 86400 + 600, now - k.d * 43200, k.tier === "free" ? null : String(203040 + k.d), k.tier === "free" ? 5512345 + k.d : null],
+    );
+    raw.run("INSERT INTO key_scripts (key_id, script_id) VALUES (?, ?)", [keyId, DEMO_SCRIPT_ID]);
+  }
+}
+
 async function buildStore(): Promise<DevStore> {
   mkdirSync(DB_DIR, { recursive: true });
   const keys = await loadOrCreateKeystore();
@@ -243,6 +324,7 @@ async function buildStore(): Promise<DevStore> {
   const devAdminToken = `adm_${keys.devAdminId}.${keys.devAdminSecretB64url}`;
   const secretHash = await sha256Hex(b64urlDecode(keys.devAdminSecretB64url));
   await seedDemoData(raw, { id: keys.devAdminId, secretHash }, now);
+  await seedAnalyticsHistory(raw, now);
 
   const signer = await makeSigner(keys.signingPrivateKeyB64url);
   const blobs = new MemoryBlobStore();
