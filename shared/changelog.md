@@ -12,3 +12,10 @@
 - 2026-10-02 glm1 T8 (user-ordered bloat trim + speed round): shared/GUIDE.md pointer DELETED (ONBOARDING.md is the only onboarding doc); all tools moved to env-var paths (SF_DIR/PUBLIC_DIR/$HOME defaults — superset of glm2's same-day repack.sh default fix, merged); NEW shared/tools/sync.sh = one-command protocol step (commit → pull --rebase → push → verify remote moved) killing the two biggest logged time-sinks (manual 4-command dance; silent push failures that lost the 2026-10-01 SCP+snack deliveries); worklogs trimmed to 50-line summaries with full history archived (local + work/lua/worklog-archive-20261002.md).
 - 2026-10-02 glm1 T10+T11 (user-flagged label incident + teaching round): MATI invented "Status" SafeLabel removed and re-delivered (Public c2cf4a8; harness 27+14, all gates re-run); ONBOARDING.md rebuilt for glmN-any-N + stress test (agent identity, 4-question decision filter, incident case-study table, scope spec, 6-min/game stress budget — 144→~290 lines); PROMPT.md behavioral core; guide Rule 11 UI-element bullet + §23 checklist extension; lessons.md new "Scope & discipline" section (+2). Kit selftest 10/10 post-reset.
 - 2026-10-02 glm1 STRESS ROUND batch (ST1-ST4): 3 delivered (AnimeBreaker 75ecaf4 18/18, CloneToStealEggs 5cf7ed2 14/14, FlipAHouse d3127a1 10/10) + Fishing Master blocked (entitled auto-fish + prediction minigame — user decision). Folder-arrival convention documented + msged glm2-5. Lessons +3: per-framework call conventions (NetworkService/Knit-dot/Remo-colon), server-gated autos, telemetry minigames. Pace 35→11→7 min/game.
+- 2026-10-10 SAC3 (main-agent, direct user order "clean up the github"):
+  removed 36 unused files from the working tree — 23 stale msgs (handled or
+  from closed FNAF/PST/cat rounds; recipient-deletes-after-handling protocol
+  had not been followed), 13 work/lua leftovers (7 section/layer build
+  intermediates, 4 qa_load one-offs, 2 closed-round zips incl. tdref.zip —
+  §22 Slop.lua stays in git history). worklog.md summary refreshed to the
+  2026-10-10 state. Nothing referenced by an open TASKS row was touched.
