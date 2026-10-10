@@ -28,11 +28,11 @@ functions — inline `Root and GetObject(Root, "A.B")` tables + direct
 | `RS.Laser.Point` RE | `FireServer(Vector3 pos, true)` at ≥0.05s while Laser-attr tool in character; `FireServer(nil, false)` on stop/unequip | L954/985/1003/1027 |
 | `RS.Phone.Photo` RE | `FireServer(cameraCFrame, raycastInstanceOrNil)` — Snap: 60-stud ray from camera LookVector (excl. character); CFrame = workspace.CurrentCamera.CFrame | L2319 |
 | `RS.Phone.Reply` RE | `FireServer(messageText)` — phone chat send | L573 |
-| `RS.Tutorial.Skip` RE | `FireServer()` — one-shot skip | L1171 |
+| `RS.Tutorial.Skip` RE | `FireServer("Vote"/"Unvote")` — the skip-vote UI button (CORRECTED by main-agent cross-check L1162+L1171; originally garbled as bare one-shot) | L1171 |
 | `RS.LitterCleaning.Event` RE | `FireServer("Grab", sessionId, index)` / `("Drop", sessionId, index, xScale, yScale)` (inside-bag coords) / `("AbortDrag", sessionId)` / `("Cancel", sessionId)` | L2841/2803/2816/2822 |
 | `RS.Ending.Lobby` RE | `FireServer()` — return-to-lobby button (one-shot UI) | L1494 |
 | `RS.Ending.Revive` RE | `FireServer()` — one-shot UI | L1499 |
-| `RS.Ending.Vote` RE | `FireServer("Vote"/"Unvote")` — skip-vote UI | L1171 |
+| `RS.Ending.Vote` RE | `FireServer(bool)` — CANCEL/RESTART button state (CORRECTED by main-agent cross-check: var14=RS.Ending.Vote L1480, fired with bool1 L1488; my original row had the Tutorial.Skip args on this remote) | L1488 |
 
 ### GAME place (server→client, state/visuals — listeners, never fired by us)
 | Remote | Events | Line |
@@ -202,3 +202,40 @@ CrateInfo (the game never calls it).
   handler)` — one line each, no ConnectListener wrapper.
 - Loops: one pcall owner (SafeLoop), Thread+OnChanged wiring, toggle-gated
   while-loops, elements-first, plain ids, 0 comments, dividers between clusters.
+
+## 7. Harness round addendum (real bugs caught, 2026-10-10)
+
+REAL-LOAD harness (catsitting_harness.lua, 56 checks) caught ONE REAL SCRIPT BUG
+pre-delivery: **six prompt paths written without their attachment layer** —
+`...CanBody.TakePrompt` instead of `...CanBody.TakePromptAttachment.TakePrompt`
+(CatFoodCan, FoodBowl, TVDinner, Microwave Cook, LaserPointer, Mailbox, and the
+fridge door OpenClosePrompt found in a second pass) — the paths would have
+silently no-oped in-game (GetObject nil → FirePP nil-guard). Fixed against the
+dump-verified list in §2; the harness now asserts every prompt path resolves +
+fires. Also fixed in-section: `dir.Unit` → `dir * (12/dist)` (Unit-free math,
+works everywhere).
+
+Harness self-incidents (all §15 closure-scoping class, in MY mock code — the
+guide rule exists for exactly this): PLR:FindFirstChild referencing
+Backpack/PlayerGui locals declared after it; EquippedLog declared after
+Hum:EquipTool; CrateCash declared after mockRemote's GetState closure (returned
+cash=nil → AutoOpenCrate gate correctly refused). Plus two mock-fidelity gaps
+fixed in the harness: Instance dot-access-to-children (real Roblox behavior,
+added via metatable patch) and table.clear (Luau-only, shimmed).
+
+Harness check design notes: litter "Start" sessions are server-simulated from
+the CleanLitterPrompt fire (sid counter); Win auto-fires at 5 Drops per sid;
+chore completion driven by test-side attribute flips (semantics assumption §5
+exercised end-to-end: skip-when-true verified in both directions).
+
+## 8. Parallel-lane cross-check (main-agent CS1-B, 2026-10-10)
+
+CS1-B (user-direct parallel lane) delivered CatSitting.lua Public d82c55a with
+an independent census; two corrections to my §1 table adopted above (verified at
+their cited call sites): Tutorial.Skip carries Vote/Unvote (L1162+L1171),
+Ending.Vote carries bool (L1480+L1488). Also confirmed: 7 light switches
+(BedroomHall + EntryHall both Room="Hallway" — the dump double-lists the world);
+both builds wire 7 correctly. Neither corrected remote is fired by my build
+(both Rule 11 REMOVE — banned-wire sweep asserts zero). FW1 both-land
+precedent: their CatSitting.lua + my SevenDaysCatSitting.lua coexist in the
+Public folders; user picks.

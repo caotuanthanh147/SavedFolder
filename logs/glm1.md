@@ -323,3 +323,37 @@ standard, msg other glm to see what it need to improve".
   (glm4's dc13480 landed between my pull and push) → rebase → Public 8ed03f0,
   ls-remote verified, delivered bytes MD5-identical to canonical.
 2026-10-04T15:14:54Z glm1 session 13: Plunder round — PL1-A analysis (TEvent census) + PL1-H harness (TEvent mock world) + PL1 build fallback (glm2 offline) DELIVERED Public 4b0000a both folders MD5 fad6b893 5 toggles gates green harness 25/25 delivered-bytes; harness_lib recursive FindFirstChildWhichIsA upgrade selftest 10/10; msgs+TASKS+status wrap; cross-QA lanes open for glm2/3/4/5
+
+## 2026-10-10 session 17 — CS1 (glm1)
+- Sandbox reset #6 recovery: token via grep, re-clone both repos, bootstrap glm1,
+  lua5.4, watchers, selftest implicit via tool use. Rule 19 check first — cat/
+  folder found (Public 261c46e), STC round closed upstream same commit.
+- Rule 18: guide 590 + Template 945 re-read in full. User round directive:
+  plain next-game + CLEAN-CODING (inline resolution — no module/remote/listener
+  wrapper functions; the user's own PST-named example is the sanctioned shape).
+- CS1 claim 7187017 before any work. Analysis 5f0e223 (wire table all
+  call-site-verified; ESC §26 full census — headline: workspace attributes are
+  a complete server-state oracle: 6 Chore_* + 11 anomaly flags + PetCount +
+  Night + CreepyStare; tool-attr forging checked-not-viable; save surface
+  server-authoritative; Phone.Reply \255 candidate documented-not-wired).
+- Build: template head 873 verbatim + 527-line section + tail 18; 7 toggles
+  (AutoChores 6 flows + litter minigame session driver, AutoPet, AutoAnomalies
+  attr-transition responders with state-attr-gated toggle prompts (On/
+  BlindsClosed/Locked), AutoPhoto direct Phone.Photo wires, AutoSleep fail-safe
+  gate, lobby AutoQueue + AutoOpenCrate). Unit-free direction math.
+- Harness 56 checks real-load; iterative debugging found: (a) REAL bug — 7
+  prompt paths missing attachment layers (silent no-op class), (b) harness
+  mock-fidelity gaps (Instance dot-access-to-children, table.clear shim),
+  (c) THREE §15 closure bugs in my own mock code, (d) pcall interceptor
+  dropping successful results, (e) ipairs nil-first path list. All fixed;
+  56/56 ×3 deterministic.
+- Parallel lane: main-agent CS1-B (user-direct) delivered CatSitting.lua
+  (d82c55a) mid-build — git add/add on the canonical; resolved by renaming my
+  canonical to SevenDaysCatSitting.lua (delivery filename convention), taking
+  origin's file as theirs. My delivery: Public 1d5c1b0, both folders,
+  MD5-verified + ls-remote-verified. Their 2 census corrections adopted
+  (Tutorial.Skip Vote/Unvote; Ending.Vote bool) after verifying at the cited
+  call sites; reply msg sent with the harness-class intel (attachment-layer
+  paths) + protocol note.
+- Wrap: TASKS CS1 done + PL1-H closed retroactively, TASK_SOURCE row,
+  lessons +6, status session 17, this log.

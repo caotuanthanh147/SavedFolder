@@ -93,3 +93,43 @@ Append what worked / failed / what to do differently. Mark "trusted" only after 
 
 - **Deobf renders `ipairs(X)` as `in X, nil` — module returns that the game iterates must be ipairs'd in our scripts too (tested: PST harness hang + real bug)**: EnclosureMaintenance.featuresOf returns an ARRAY (deobf L60270), but its call sites read `for k1, v1 in tbl1.featuresOf(...)` (the deobf's rendering of `ipairs(...)`) — porting that as a raw generic-for makes OUR script error "'for' iterator must be a function" against the real module (the harness caught it because my first mock faithfully returned an iterator and the world check hung — the mock/real divergence inverted). Rule: when a deobf call site shows `for k, v in <expr>` with no visible iterator function, check whether <expr> is an array-returning function and use `ipairs(<expr>)` in the port. Verify the module's return shape at its definition before writing any for-in over it.
 - **ESC-first analysis order works (tested: PST round)**: running the §26 census BEFORE the wire table surfaced Boxes.Report (client-authoritative box CFrames — the round's only server-trusting client-value channel) in the first hour, and correctly de-prioritized the attr/save/mutable classes (all server-authoritative negatives) before any build effort was spent on them. The census negatives are as valuable as the positives — they stopped me from wasting a build cycle on the Cash-attr forgery (client-gate only) that the fnaf critique would have tempted.
+
+
+## Lessons 2026-10-10 (CS1 round — 7 Days Cat-Sitting)
+
+- **Attachment-layer prompt paths (silent no-op class)**: this game's house
+  ProximityPrompt paths ALWAYS carry their attachment layer
+  (`...CanBody.TakePromptAttachment.TakePrompt`, never `...CanBody.TakePrompt`).
+  A truncated path resolves nil -> FirePP nil-guard swallows it -> the feature
+  silently no-ops with zero errors. Real-load harness MUST assert every prompt
+  path RESOLVES (not just counts fires) — 7 caught pre-delivery in CS1 (glm1)
+  + 1 in CS1-B (main-agent). Write paths from the DUMP listing, then diff
+  against the harness resolution trace.
+- **§15 closure-scoping bites mock-writers too**: three instances in ONE
+  harness draft (PLR:FindFirstChild vs later locals; EquippedLog after
+  Hum:EquipTool; CrateCash after mockRemote's GetState -> cash=nil silently
+  gating AutoOpenCrate off). Harness mock code deserves the same §15 audit as
+  game scripts. Fingerprint: a mock returns nil-by-accident and the feature
+  under test "correctly" skips.
+- **Harness pcall interceptor must pass results through**: returning `ok, err`
+  instead of the full xpcall pack silently turns every successful
+  `pcall(f) -> true, result` into `result = nil` — SafeInvoke-based features
+  die quietly. Pack/unpack the results table.
+- **ipairs dies on nil-first tables**: `local paths = { arg_and_arg1, ... }`
+  with a nil first element iterates ZERO times while the file sits right there.
+  Never seed a list with a possibly-nil element; build via table.insert.
+- **User clean-coding directive (CS1 round, verbatim intent)**: "making an
+  entire new function to get the module/remote like ensuremodule and populate
+  remotes or even connectlistener when you can just inline them" — sanctioned
+  shape = the user's example: `local RemotesRoot = GetObject(RS, "Remotes")`
+  + one inline table of `Root and GetObject(Root, "A.B")` entries +
+  `GetSafeModule` entries; listeners via direct
+  `SafeConnect(key, function() return ev.OnClientEvent end, handler)`.
+  No EnsureModules/PopulateRemotes/ConnectListeners wrappers. PST-era scripts
+  used the wrapper shape — do not port it forward.
+- **Parallel user-direct lanes**: main-agent delivered the same game from a
+  direct user launch while glm1's claimed lane was mid-build. FW1 both-land +
+  DISTINCT FILENAMES avoided both the git add/add and delivery collisions;
+  corrections flowed via msgs/ both ways. On git add/add on a work/lua
+  canonical: rename YOUR canonical to the delivery filename, take origin's
+  file as theirs.
