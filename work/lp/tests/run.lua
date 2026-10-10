@@ -182,6 +182,20 @@ local sign_sk = dhx("833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dc
 check("signer pubkey", hx(Signer.secret_to_public(sign_sk)), vectors.ed25519[5].pk)
 check("signer sign/verify", ed25519.verify(Signer.secret_to_public(sign_sk), "hello", Signer.sign(sign_sk, "hello")), true)
 
+-- ---------- contract vectors file (x25519/ed25519 sections, M1 cross-check source) ----------
+local vf = io.open(ROOT .. "/contracts/test_vectors.json", "r")
+if vf then
+        local vtxt = vf:read("*a")
+        vf:close()
+        local vj = json.decode(vtxt)
+        check("contract json x25519 dh shared", vj and hx(x25519.shared(dhx(vj.x25519_7748_61_dh.alice_sk), dhx(vj.x25519_7748_61_dh.bob_pk))), vj and vj.x25519_7748_61_dh.shared)
+        check("contract json x25519 iterated", vj and hx(x25519.scalarmult(dhx(vj.x25519_7748_61_iterated_1.input_u), dhx(vj.x25519_7748_61_iterated_1.input_u))), vj and vj.x25519_7748_61_iterated_1.output_u)
+        check("contract json ed25519 count", vj and #vj.ed25519_8032_71, 5)
+        check("contract json ed25519 #5", vj and ed25519.verify(dhx(vj.ed25519_8032_71[5].pk), dhx(vj.ed25519_8032_71[5].msg), dhx(vj.ed25519_8032_71[5].sig)), true)
+else
+        check("contract vectors file present", false, true)
+end
+
 -- ---------- SDK + mock server flow ----------
 local files = {}
 local TestEnv = {
@@ -220,7 +234,7 @@ local server = MockServer(Crypto, TestEnv, Signer, {
         build = "build-42",
         build_hash = hx(sha2.sha256("bundle-v1")),
         bundle = "FAKE-BUNDLE-BYTES-0123456789",
-        watermark_id = "wm-17",
+        watermark_id = "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
         server_time = 1791638000 + 5,
         server_x25519_sk = dhx("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"),
         server_nonce = dhx("11111111111111111111111111111111"),
@@ -308,11 +322,14 @@ local session = h.init("TEST-AAAAA-BBBBB-CCCCC-DDDDD", 123, 456, 789)
 check("handshake session token", session ~= nil and session.session_token, encoding.b64url_encode(dhx("11111111111111111111111111111111")))
 check("handshake tier", session and session.tier, "paid")
 check("handshake payload_ref", session and session.payload_ref, "ref-1")
-check("handshake watermark from server", session and session.watermark_id, "wm-17")
+check("handshake watermark from server", session and session.watermark_id, "0f1e2d3c4b5a69788796a5b4c3d2e1f0")
+check("handshake build_hash from server", session and session.build_hash, hx(sha2.sha256("bundle-v1")))
 local payload = h.payload(session)
 check("handshake payload build_hash", payload and payload.build_hash, hx(sha2.sha256("bundle-v1")))
 check("handshake payload bundle", payload and payload.bundle, "FAKE-BUNDLE-BYTES-0123456789")
 check("handshake payload sig len", payload and #payload.bundle_sig, 64)
+local bad_wm = h.payload(session, "zz-not-hex")
+check("handshake non-hex watermark rejected", bad_wm, nil)
 
 local bad_session = h.init("TEST-WRONG", 1, 2, 3)
 check("handshake wrong key fails", bad_session, nil)
@@ -325,7 +342,7 @@ local tampered_server = MockServer(Crypto, TestEnv, Signer, {
         build = "build-42",
         build_hash = hx(sha2.sha256("bundle-v1")),
         bundle = "FAKE-BUNDLE-BYTES-0123456789",
-        watermark_id = "wm-17",
+        watermark_id = "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
         server_time = 1791638000 + 5,
         server_x25519_sk = dhx("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"),
         server_nonce = dhx("11111111111111111111111111111111"),
@@ -347,6 +364,35 @@ TestEnv.request = tampered_server.request
 local bad_payload = h.payload(session)
 TestEnv.request = saved_request
 check("handshake tampered payload rejected", bad_payload, nil)
+
+local tampered_init_server = MockServer(Crypto, TestEnv, Signer, {
+        signing_sk = signing_sk,
+        proof_key = "proof-secret-1",
+        valid_key = "TEST-AAAAA-BBBBB-CCCCC-DDDDD",
+        script_id = "0123456789abcdef0123456789abcdef",
+        build = "build-42",
+        build_hash = hx(sha2.sha256("bundle-v1")),
+        bundle = "FAKE-BUNDLE-BYTES-0123456789",
+        watermark_id = "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+        server_time = 1791638000 + 5,
+        server_x25519_sk = dhx("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"),
+        server_nonce = dhx("11111111111111111111111111111111"),
+})
+tampered_init_server.request = function(opts)
+        local r = server.request(opts)
+        if opts.Url:find("/init$") then
+                r = {
+                        StatusCode = 200,
+                        Body = r.Body:sub(1, #r.Body - 2) .. "AA",
+                        Headers = r.Headers,
+                }
+        end
+        return r
+end
+TestEnv.request = tampered_init_server.request
+local bad_init = h.init("TEST-AAAAA-BBBBB-CCCCC-DDDDD", 123, 456, 789)
+TestEnv.request = orig_request
+check("handshake tampered init rejected", bad_init, nil)
 
 -- ---------- summary ----------
 print(string.format("\n%d passed, %d failed", pass, fail))

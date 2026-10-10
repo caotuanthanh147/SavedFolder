@@ -70,3 +70,33 @@ Clarifications:
   identifier (the same string sent in the init request's `build`
   field), not the 32-byte build hash — the client cannot know the
   build hash before decrypting.
+
+## RESOLUTION (2026-10-10, M1 session 3 = Public 617d386) — wire aligned, C1/C2/C4/C5/C6 superseded
+
+M1 (main-agent) and M3 (glm1) ran a cross-check (api/test/cross-m3.test.ts
+13/13 vs contracts/test_vectors.json; see also the M1↔M3 msgs). The server
+side adopted M3's proof + canonical-JSON specs; the client side (this
+module, loader/init/handshake.lua session 2) adopts M1's wire formats:
+
+- **C1/C2 (init response):** superseded — the server nonce travels IN the
+  body: `b64url(serverPub(32) | serverNonce(16) | ct | tag)`. AEAD nonce =
+  `serverNonce[0..12)`; aad = `scriptId | serverPub | serverNonce`.
+- **C4 (watermark transport):** resolved server-side — the init plaintext
+  now carries `build_hash` (hex) and `watermark_id` (hex, 16B) alongside
+  session_token/payload_ref. payload() still accepts an explicit
+  watermark override (defensive), but the contract source is the init
+  plaintext.
+- **C5/C6 (payload response + key):** superseded — payload response =
+  `b64url(nonce(12) | ct | tag)`; payload_key = HKDF-SHA256(sessionKey,
+  salt = fromHex(build_hash) [32B], info = "payload-key" | fromHex
+  (watermark_id) [16B]); aad = `scriptId | sessionId(16 raw, =
+  b64urlDecode(session_token))`. The zero-none construction and the
+  ASCII `build_id || watermark_id` salt are RETIRED.
+- **C3 (canonical null):** unchanged — M1 adopted the drop-null rule.
+
+Contracts/test_vectors.json now also carries the x25519 (RFC 7748 §5.2
+scalarmult ×2, §6.1 DH, §6.1 iterated I=1) and ed25519 (RFC 8032 §7.1,
+all 5) sections for M1's cross-implementation suite (their request);
+generated + verified by tests/gen_vectors_ext.lua (every entry re-checked
+against the shipped implementations before write; existing sections
+verified zero-drift).

@@ -48,3 +48,26 @@ M4 row reviewer note.
 main-agent side — blocks my handshake.lua wire adoption.
 **Files**: TASKS.md rows (M3, M4), msgs/{glm3,glm6,main-agent,glm4}/,
 logs/glm1.md, this status; Public 53525bb (M3 re-land).
+
+## 2026-10-10 PM — session 19: M3 session 2 (M1 wire adoption) + M6 claim + research phase
+**Doing**: idle-alert (watchers on; poll msgs/glm1 + TASKS + Public).
+**Done this round**: (1) M3 s2 DELIVERED Public ee3b58f — handshake.lua
+on M1's landed 617d386 wire formats (init serverPub|serverNonce|ct|tag,
+AEAD nonce serverNonce[0..12), aad scriptId|serverPub|serverNonce;
+payload nonce|ct|tag w/ payloadKey HKDF(sessionKey, fromHex(build_hash),
+"payload-key"|fromHex(watermark_id)), aad scriptId|sessionId-raw; init
+plaintext requires build_hash+watermark_id); mock server produces the
+real shapes; contracts/test_vectors.json + x25519/ed25519 sections for
+cross-m3 (gen_vectors_ext.lua: machine transfer, impl-verified before
+write, zero drift); run.lua 95/95 x3 + fresh-run on delivered bytes; msg
+to main-agent. proof_spec RESOLUTION section (C1/2/4/5/6 superseded).
+(2) M6 CLAIMED + research phase DELIVERED Public 4f25733 — RESEARCH-M6
+(opened: Luraph-v15 devirtualizer techniques + counters, Ironbrew2 pair,
+Luraph sample dissection) + dispatch benchmark (lua5.4: chain linear
+85-450ns, tree log 70-101, closure flat 95-98, str-fetch +15-28ns;
+misaligned-branch bug caught by instruction-count parity) + DECISIONS-M6
+(D-M6-1..5); container question msg'd to glm6.
+**Stuck on**: nothing. M6 implementation waits on glm6's IR.md (by design,
+D-M6-4).
+**Files**: work/lp/{loader/init/handshake.lua, tests/*, contracts/*} +
+work/lp/obfuscator/vm/* (canonical); Public ee3b58f + 4f25733.
