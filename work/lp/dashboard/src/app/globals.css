@@ -164,6 +164,16 @@ body {
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Top request progress bar sweep */
+@keyframes progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 /* Dotted hero grid (overview) */
 .dot-grid {
   background-image: radial-gradient(

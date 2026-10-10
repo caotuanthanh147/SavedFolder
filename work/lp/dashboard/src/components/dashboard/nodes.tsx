@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { NodeRow, ProtocolVersionRow, gw } from "@/lib/api";
@@ -122,7 +121,7 @@ export function NodesView(): React.JSX.Element {
             {nodes === null ? (
               <Skeleton className="skeleton-shimmer h-24" />
             ) : (
-              <ScrollArea className="max-h-56">
+              <div className="max-h-56 overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -153,7 +152,7 @@ export function NodesView(): React.JSX.Element {
                     ))}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             )}
             <div className="flex flex-wrap items-end gap-2 border-t pt-3">
               <div className="space-y-1">
@@ -182,7 +181,7 @@ export function NodesView(): React.JSX.Element {
             {protocols === null ? (
               <Skeleton className="skeleton-shimmer h-24" />
             ) : (
-              <ScrollArea className="max-h-56">
+              <div className="max-h-56 overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -215,7 +214,7 @@ export function NodesView(): React.JSX.Element {
                     ))}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             )}
             <div className="flex flex-wrap items-end gap-2 border-t pt-3">
               <div className="space-y-1">

@@ -2,7 +2,10 @@
 
 // Typed client for the dashboard's gateway to the REAL admin API
 // (modules M1 + M9). All calls are relative (sandbox rule) and hit the
-// in-process router via /api/gw/*.
+// in-process router via /api/gw/*. Every call is recorded in the live API
+// request log (lib/api-log) that powers the request inspector panel.
+
+import { loggedFetch } from "@/lib/api-log";
 
 export interface Envelope {
   code: string;
@@ -11,7 +14,7 @@ export interface Envelope {
 }
 
 export async function gw<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api/gw${path}`, {
+  const res = await loggedFetch(`/api/gw${path}`, {
     method,
     headers: body !== undefined ? { "content-type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,

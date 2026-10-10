@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { loggedFetch } from "@/lib/api-log";
 import { KeyRound, ShieldCheck, Copy } from "lucide-react";
 import { useApiData } from "@/lib/use-api-data";
 
@@ -28,8 +29,8 @@ interface TotpState {
 export function SettingsView(): React.JSX.Element {
   const { data: fetched, error, refresh } = useApiData(async () => {
     const [i, t] = await Promise.all([
-      fetch("/api/dash/info", { cache: "no-store" }).then((r) => r.json() as Promise<DashInfo>),
-      fetch("/api/dash/totp", { cache: "no-store" }).then((r) => r.json() as Promise<TotpState>),
+      loggedFetch("/api/dash/info", { cache: "no-store" }).then((r) => r.json() as Promise<DashInfo>),
+      loggedFetch("/api/dash/totp", { cache: "no-store" }).then((r) => r.json() as Promise<TotpState>),
     ]);
     return { info: i, totp: t };
   }, []);
@@ -47,7 +48,7 @@ export function SettingsView(): React.JSX.Element {
   async function totpAction(action: "enroll" | "verify" | "disable"): Promise<void> {
     setBusy(true);
     try {
-      const res = await fetch("/api/dash/totp", {
+      const res = await loggedFetch("/api/dash/totp", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action, code }),

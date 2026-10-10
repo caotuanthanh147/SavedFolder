@@ -74,5 +74,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   } catch {
     parsed = { raw: text };
   }
-  return NextResponse.json({ status: res.status, event, response: parsed });
+  // Propagate the inner webhook status as this route's HTTP status so the
+  // live API inspector (and any monitoring) sees the true outcome — a
+  // tampered signature surfaces as 400, not a masked 200.
+  return NextResponse.json({ status: res.status, event, response: parsed }, { status: res.status });
 }

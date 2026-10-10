@@ -15,13 +15,20 @@ export interface Command {
   run: () => void;
 }
 
+// Normalized matching: strip punctuation/spaces from both sides so "freekey"
+// matches "Free-key flow", "nodes" matches "Nodes & protocol", etc.
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 function matches(query: string, cmd: Command): boolean {
   if (query.length === 0) return true;
-  const q = query.toLowerCase();
+  const q = norm(query);
+  if (q.length === 0) return true;
   return (
-    cmd.label.toLowerCase().includes(q) ||
-    cmd.group.toLowerCase().includes(q) ||
-    (cmd.hint?.toLowerCase().includes(q) ?? false)
+    norm(cmd.label).includes(q) ||
+    norm(cmd.group).includes(q) ||
+    (cmd.hint !== undefined && norm(cmd.hint).includes(q))
   );
 }
 

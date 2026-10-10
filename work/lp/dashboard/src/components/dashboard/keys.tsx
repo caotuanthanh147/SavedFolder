@@ -9,46 +9,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { copyText, csvTimestamp, exportCsv } from "@/lib/export-utils";
+import { loggedFetch } from "@/lib/api-log";
+import { TierBadge, StatusBadge } from "@/components/dashboard/badges";
 import { formatTime, gw, KeyRow } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
 import { CalendarClock, Copy, Download, FileKey2, KeyRound, Plus, RefreshCw, Search, ShieldOff, Undo2 } from "lucide-react";
 
 const DEMO_PROJECT_ID = "11111111111111111111111111111111";
 const DEMO_SCRIPT_ID = "22222222222222222222222222222222";
-
-const TIER_STYLES: Record<string, string> = {
-  paid: "border-emerald-600/30 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400",
-  lifetime: "border-teal-600/30 bg-teal-600/10 text-teal-700 dark:text-teal-400",
-  free: "border-amber-600/30 bg-amber-600/10 text-amber-700 dark:text-amber-400",
-  reseller: "border-rose-600/30 bg-rose-600/10 text-rose-700 dark:text-rose-400",
-};
-
-function TierBadge({ tier }: { tier: string }): React.JSX.Element {
-  return (
-    <Badge variant="outline" className={`gap-1 ${TIER_STYLES[tier] ?? ""}`}>
-      <span className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-70" aria-hidden />
-      {tier}
-    </Badge>
-  );
-}
-
-function StatusBadge({ status }: { status: string }): React.JSX.Element {
-  if (status === "active")
-    return (
-      <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">
-        <span className="pulse-dot relative inline-flex h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
-        {status}
-      </Badge>
-    );
-  if (status === "revoked") return <Badge variant="destructive">{status}</Badge>;
-  return <Badge variant="secondary">{status}</Badge>;
-}
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
   return (
@@ -151,7 +124,7 @@ export function KeysView(): React.JSX.Element {
     if (validateKey.trim().length === 0) return;
     setValidating(true);
     try {
-      const res = await fetch("/api/dash/validate-key", {
+      const res = await loggedFetch("/api/dash/validate-key", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ key: validateKey.trim() }),
@@ -312,7 +285,7 @@ export function KeysView(): React.JSX.Element {
               <p className="text-xs text-muted-foreground">Clear the search or create a new batch.</p>
             </div>
           ) : (
-            <ScrollArea className="max-h-96">
+            <div className="max-h-96 overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
@@ -376,7 +349,7 @@ export function KeysView(): React.JSX.Element {
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           )}
         </CardContent>
       </Card>

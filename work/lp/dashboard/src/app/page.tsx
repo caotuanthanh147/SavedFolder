@@ -20,6 +20,7 @@ import { FreeKeyView } from "@/components/dashboard/freekey";
 import { SettingsView } from "@/components/dashboard/settings";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { CommandPalette, type Command } from "@/components/dashboard/command-palette";
+import { ApiInspectorButton, ApiInspectorPanel, ApiProgressBar } from "@/components/dashboard/api-inspector";
 import {
   ShieldCheck,
   BarChart3,
@@ -38,6 +39,7 @@ import {
   Lock,
   Search,
   Command as CommandIcon,
+  Activity,
 } from "lucide-react";
 
 type ViewId =
@@ -89,6 +91,7 @@ export default function Home(): React.JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/dash/info", { cache: "no-store" })
@@ -97,12 +100,15 @@ export default function Home(): React.JSX.Element {
       .catch(() => setDevMode(false));
   }, []);
 
-  // ⌘K / Ctrl+K opens the palette
+  // ⌘K / Ctrl+K opens the palette; ⌘I / Ctrl+I opens the API inspector
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((o) => !o);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        setInspectorOpen((o) => !o);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -114,20 +120,31 @@ export default function Home(): React.JSX.Element {
     setMenuOpen(false);
   }, []);
 
-  const commands: Command[] = NAV.map((n) => ({
-    id: `view-${n.id}`,
-    label: n.label,
-    hint: n.hint,
-    group: n.group,
-    icon: n.icon,
-    run: () => go(n.id),
-  }));
+  const commands: Command[] = [
+    ...NAV.map((n) => ({
+      id: `view-${n.id}`,
+      label: n.label,
+      hint: n.hint,
+      group: n.group,
+      icon: n.icon,
+      run: () => go(n.id),
+    })),
+    {
+      id: "open-inspector",
+      label: "Open API request inspector",
+      hint: "live log",
+      group: "System",
+      icon: <Activity className="h-4 w-4" />,
+      run: () => setInspectorOpen(true),
+    },
+  ];
 
   const groups = Array.from(new Set(NAV.map((n) => n.group)));
   const current = TITLES[view];
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <ApiProgressBar />
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenuOpen((o) => !o)} aria-label="toggle navigation">
@@ -189,6 +206,7 @@ export default function Home(): React.JSX.Element {
                 </TooltipContent>
               </Tooltip>
             )}
+            <ApiInspectorButton onClick={() => setInspectorOpen(true)} />
             <ThemeToggle />
           </div>
         </div>
@@ -244,8 +262,7 @@ export default function Home(): React.JSX.Element {
 
             <div className="hidden rounded-lg border border-dashed p-3 lg:block">
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Press <Kbd className="border bg-background px-1 font-mono">⌘K</Kbd> anywhere to jump between views or toggle the
-                theme.
+                <Kbd className="border bg-background px-1 font-mono">⌘K</Kbd> palette · <Kbd className="border bg-background px-1 font-mono">⌘I</Kbd> API inspector
               </p>
             </div>
           </div>
@@ -293,6 +310,7 @@ export default function Home(): React.JSX.Element {
       </footer>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
+      <ApiInspectorPanel open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
     </div>
   );
 }

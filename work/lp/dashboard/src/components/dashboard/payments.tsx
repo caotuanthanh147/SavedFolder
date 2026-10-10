@@ -9,13 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatTime, gw, shortHash } from "@/lib/api";
 import { csvTimestamp, exportCsv } from "@/lib/export-utils";
+import { loggedFetch } from "@/lib/api-log";
 import { useApiData } from "@/lib/use-api-data";
 import { Banknote, CreditCard, Download, Play, Plus, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 
@@ -109,7 +109,7 @@ export function PaymentsView(): React.JSX.Element {
   async function runSim(tamper: boolean): Promise<void> {
     setBusy(true);
     try {
-      const res = await fetch("/api/dash/simulate-webhook", {
+      const res = await loggedFetch("/api/dash/simulate-webhook", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -195,7 +195,7 @@ export function PaymentsView(): React.JSX.Element {
       {error0(orders.error, actionError)}
 
       <Tabs defaultValue="orders">
-        <TabsList>
+        <TabsList variant="line" className="mb-1 gap-4">
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="webhook">Webhook simulator</TabsTrigger>
@@ -241,7 +241,7 @@ export function PaymentsView(): React.JSX.Element {
               ) : orderRows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">No orders — run the webhook simulator to create one.</p>
               ) : (
-                <ScrollArea className="max-h-96">
+                <div className="max-h-96 overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -279,7 +279,7 @@ export function PaymentsView(): React.JSX.Element {
                       ))}
                     </TableBody>
                   </Table>
-                </ScrollArea>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -353,7 +353,7 @@ export function PaymentsView(): React.JSX.Element {
               ) : products.data.rows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">No product mappings yet.</p>
               ) : (
-                <ScrollArea className="max-h-96">
+                <div className="max-h-96 overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -396,7 +396,7 @@ export function PaymentsView(): React.JSX.Element {
                       ))}
                     </TableBody>
                   </Table>
-                </ScrollArea>
+                </div>
               )}
             </CardContent>
           </Card>

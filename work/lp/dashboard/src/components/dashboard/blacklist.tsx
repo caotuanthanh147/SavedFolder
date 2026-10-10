@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -132,7 +131,7 @@ export function BlacklistView(): React.JSX.Element {
           ) : rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Blacklist is empty.</p>
           ) : (
-            <ScrollArea className="max-h-96">
+            <div className="max-h-96 overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -157,7 +156,7 @@ export function BlacklistView(): React.JSX.Element {
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           )}
         </CardContent>
       </Card>

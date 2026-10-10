@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatTime, gw, SessionRow, shortHash } from "@/lib/api";
@@ -56,7 +55,7 @@ export function SessionsView(): React.JSX.Element {
           ) : rows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No sessions yet — they appear when a key holder runs /auth/&lt;script&gt;/init.</p>
           ) : (
-            <ScrollArea className="max-h-96">
+            <div className="max-h-96 overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -101,7 +100,7 @@ export function SessionsView(): React.JSX.Element {
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           )}
         </CardContent>
       </Card>
