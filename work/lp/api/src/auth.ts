@@ -78,8 +78,16 @@ async function sessionKeyFrom(shared: Uint8Array, clientNonce: Uint8Array, serve
   return hkdfSha256(shared, concatBytes(clientNonce, serverNonce), HKDF_SESSION_INFO, 32);
 }
 
-async function payloadKeyFrom(sessionKey: Uint8Array, buildHash: Uint8Array, watermark: Uint8Array): Promise<Uint8Array> {
-  return hkdfSha256(sessionKey, buildHash, concatBytes(HKDF_PAYLOAD_INFO, watermark), 32);
+async function payloadKeyFrom(
+  sessionKey: Uint8Array,
+  buildHash: Uint8Array,
+  watermark: Uint8Array,
+  // CCP-M6 (ruled ACCEPT, D-M7-4): per-fetch value `s` extends the salt —
+  // salt = buildHash || s (raw bytes, 0..64). Empty s degrades to the M1
+  // original formula (byte-identical, backward compatible by construction).
+  fetchValue: Uint8Array = new Uint8Array(0),
+): Promise<Uint8Array> {
+  return hkdfSha256(sessionKey, concatBytes(buildHash, fetchValue), concatBytes(HKDF_PAYLOAD_INFO, watermark), 32);
 }
 
 function leU64(value: number): Uint8Array {
@@ -341,7 +349,7 @@ export async function handleAuthInit(ctx: AppContext, config: ApiConfig, input: 
   return textResponse(wire, ctx.nowSec);
 }
 
-interface SealedRef {
+export interface SealedRef {
   sessionIdRaw: Uint8Array;
   sessionKey: Uint8Array;
   buildHashRaw: Uint8Array;
@@ -349,7 +357,8 @@ interface SealedRef {
   expiresAt: number;
 }
 
-function openRef(refB64: string, sealKey: Uint8Array, scriptId: string): SealedRef | null {
+// Exported for M7's leak extractor (sealed-ref watermark recovery).
+export function openRef(refB64: string, sealKey: Uint8Array, scriptId: string): SealedRef | null {
   let raw: Uint8Array;
   try {
     raw = b64urlDecode(refB64);
@@ -417,6 +426,23 @@ export async function handleAuthPayload(ctx: AppContext, config: ApiConfig, inpu
     return deny(ctx, config, null, "BAD_REQUEST", "validate_fail", "payload_ref");
   }
 
+  // CCP-M6: optional per-fetch value forwarded by the init (base64url,
+  // 0..64 decoded bytes). Absent/empty => legacy salt (backward compatible).
+  let fetchValue: Uint8Array = new Uint8Array(0);
+  if (body.s !== undefined && body.s !== null && body.s !== "") {
+    if (typeof body.s !== "string" || body.s.length > 128) {
+      return deny(ctx, config, null, "BAD_REQUEST", "validate_fail", "s");
+    }
+    try {
+      fetchValue = b64urlDecode(body.s);
+    } catch {
+      return deny(ctx, config, null, "BAD_REQUEST", "validate_fail", "s");
+    }
+    if (fetchValue.length > 64) {
+      return deny(ctx, config, null, "BAD_REQUEST", "validate_fail", "s");
+    }
+  }
+
   const ref = openRef(body.payload_ref, config.refSealKey, scriptId);
   if (ref === null) return deny(ctx, config, null, "BAD_REQUEST", "validate_fail", "ref");
   if (!constantTimeEqual(ref.sessionIdRaw, sessionIdRaw)) {
@@ -476,7 +502,7 @@ export async function handleAuthPayload(ctx: AppContext, config: ApiConfig, inpu
     bundle_sig: b64urlEncode(bundleSig),
   });
 
-  const payloadKey = await payloadKeyFrom(ref.sessionKey, buildHashRaw, ref.watermarkRaw);
+  const payloadKey = await payloadKeyFrom(ref.sessionKey, buildHashRaw, ref.watermarkRaw, fetchValue);
   const nonce = randomBytes(12);
   const aad = concatBytes(utf8(scriptId), sessionIdRaw);
   const sealed = aeadSeal(payloadKey, nonce, utf8(responseJson), aad);
@@ -512,6 +538,18 @@ export async function handleAuthHeartbeat(ctx: AppContext, config: ApiConfig, in
   );
   if (!session || session.script_id !== scriptId) {
     return deny(ctx, config, null, "KEY_INVALID", "validate_fail", "session");
+  }
+
+  // M7 §11 silent tamper reporting (D-M7-6): the client reports a failed
+  // environment check as an event; the response stays a normal heartbeat
+  // envelope — no signal that the report was acted on. Recorded before the
+  // kill check so tamper signals survive dying sessions.
+  if (body.tamper !== undefined && body.tamper !== null) {
+    const t = body.tamper as { check?: unknown; detail?: unknown };
+    if (typeof t === "object" && t !== null && typeof t.check === "string" && t.check.length > 0 && t.check.length <= 64) {
+      const detail = typeof t.detail === "string" && t.detail.length > 0 && t.detail.length <= 128 ? t.detail : "";
+      await recordEvent(ctx, session.key_id, "tamper", `client:${t.check}${detail ? ":" + detail : ""}`);
+    }
   }
 
   const kill = await killCheck(ctx, session);

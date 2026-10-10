@@ -35,6 +35,7 @@ import {
   handleAdminUpsertProduct,
   handleAdminReconcile,
 } from "./payments";
+import { handleAdminLeakLookup, handleAdminLeakRevoke, handleAdminAbuseScores } from "./leak";
 
 export interface RouteHandlerArgs {
   ctx: AppContext;
@@ -125,6 +126,9 @@ export function buildRoutes(): Route[] {
     { method: "GET", pattern: "/admin/payments/orders", handler: ({ ctx, config, input }) => handleAdminListOrders(ctx, config, input) },
     { method: "GET", pattern: "/admin/payments/products", handler: ({ ctx, config, input }) => handleAdminListProducts(ctx, config, input) },
     { method: "POST", pattern: "/admin/payments/products", handler: ({ ctx, config, input }) => handleAdminUpsertProduct(ctx, config, input) },
+    { method: "GET", pattern: "/admin/abuse-scores", handler: ({ ctx, config, input }) => handleAdminAbuseScores(ctx, config, input) },
+    { method: "POST", pattern: "/admin/leak/lookup", handler: ({ ctx, config, input }) => handleAdminLeakLookup(ctx, config, input) },
+    { method: "POST", pattern: "/admin/leak/revoke", handler: ({ ctx, config, input }) => handleAdminLeakRevoke(ctx, config, input) },
     { method: "POST", pattern: "/admin/payments/reconcile", handler: ({ ctx, config, input }) => handleAdminReconcile(ctx, config, input) },
   ];
 }
