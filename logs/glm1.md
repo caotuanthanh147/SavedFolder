@@ -357,3 +357,18 @@ standard, msg other glm to see what it need to improve".
   paths) + protocol note.
 - Wrap: TASKS CS1 done + PL1-H closed retroactively, TASK_SOURCE row,
   lessons +6, status session 17, this log.
+
+## 2026-10-10 (retroactive) — LP1-M3 session (bookkeeping repair: session ended context-exhausted before logging)
+- doc.md v2 read head-to-toe after Public 2a56aa9 (doc.md + HTTPSpy). Claimed LP1-M3. RESEARCH-M3 first (RFC texts downloaded, donna-32 ported to Python as oracle), then code.
+- Built loader/crypto/ (11 modules, 16-bit-limb bignum < 2^53), loader/sdk/ (sync/check_key, x-proof + x-sig, key cache), loader/init/handshake.lua, contracts/ (machine-extracted vectors, proof_spec C1-C6 + M1 cross-check). Tests 88/88 x3 lua5.4.
+- DELIVERED Public ed8d843 (loader/ + contracts/ + tests/ at root). Canonical work/lp/. Msgs out to main-agent/glm2/glm3. M1 payload-key divergence flagged in proof_spec (client can't derive payloadKey — needs 2 init-plaintext fields).
+- Gap found this session: that session never updated status/glm1.md or this log, and left the TASKS M3 row at claim text ("in-progress") — both repaired 2026-10-10 PM.
+
+## 2026-10-10 PM — session: force-push #3 response + obfuscator corpus reviewer-run (user ask)
+- User: "continue, also you can test your obfuscator on one these files <SavedFolder work/lua URL>".
+- Sync + inbox: read glm3 forcepush-relend + M2 msg, main-agent wire formats (CCP-1), glm4 M13 entry contract (D-M13-6: init returns entry fn; ack sent).
+- Force-push #3 forensics: user pushed 21:17-21:24 +0700 (6b2a876 +luagrapheg.lua; 4e974c3 +obfsucatortest/ 131 scripts; 94e337d -obfsucatortest/). All module trees dropped from origin/main (M1 api/, M2 db/, M4 obfuscator/, M3 loader/+contracts/+tests/, M13 loader/stub/). Canonicals in SavedFolder work/lp/ all safe.
+- luagrapheg.lua = 1.1MB REAL Luraph sample ("protected using Luraph Obfuscator"): 6 lines, giant string literals + small pure-Lua VM (string.byte/char + 2^n table bit engine). Still at Public root — reference for M4 transforms + M5 container/VM.
+- Obfuscator test (M4 = the delivered front end; parser/back end not yet built): baseline bun test 70/70 + tsc clean on work/lp/m4 canonical; then corpus.ts over (1) work/lua 50/50, 2,240,420 B / 424,026 tok (matches glm3 s1 report); (2) obfsucatortest corpus 129/130 — sole reject Dupe.lua 465:23 "Malformed string" = raw \n inside quoted string = corrupt file (od-verified), NOT a lexer bug; (3) luagrapheg.lua accepted 2,036 tok / 75ms. Zero lexer defects across ~12MB / 1.95M tokens.
+- M3 re-land: Public 53525bb (single clean commit on 94e337d, bytes git-diff-verified identical to ed8d843, no force-push, ls-remote verified). TASKS M3 row flipped to done with full record (bookkeeping repair). M4 row: reviewer-run note appended.
+- Msgs: glm3 (forcepush + corpus results + Luraph heads-up), glm6 (corpus + Luraph for M5), main-agent (forcepush), glm4 (forcepush + entry-contract ack).
