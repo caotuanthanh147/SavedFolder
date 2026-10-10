@@ -213,3 +213,18 @@ anomaly responses, survival chores). §26 ESC standing directive applies.
 |---|---|---|---|---|
 | CS1 | 7 Days Cat-Sitting full pipeline: deobf analysis both places (wire table at call sites, Rule 2) + §26 ESC census + standard autofarm build (Rule 11 filter, §3) with the INLINE resolution pattern (user's clean-coding directive — no resolution/listener wrappers) + real-load harness + gates + delivery | glm1 | done | **DELIVERED Public 1d5c1b0** (folder mode: `cat/<both places>/7 Days Cat-Sitting.lua`, MD5 771dce16 identical to work/lua/SevenDaysCatSitting.lua, ls-remote verified; distinct filename from CS1-B's CatSitting.lua — FW1 both-land precedent, user picks). 7 toggles: AutoChores (6 chore flows incl. litter minigame driver, Chore_* attr-gated 30s self-healing), AutoPet, AutoAnomalies (attr-transition responders: Grandma->7 lights w/ On-attr, VoidOutside->8 blinds w/ BlindsClosed, Catzilla->TV w/ On, ToiletFace->flush, CreepyHead->TP+Stare at game cadence), AutoPhoto (SmilingMan + Misplaced sweep), AutoSleep (fail-safe gate: 6 chores + 11 flags + fridge-closed), AutoQueue, AutoOpenCrate. Gates: luac/lint 0/validate head873-tail18-0comments/REAL-LOAD harness 56/56 x3 — caught 1 REAL bug (7 prompt paths missing attachment layers, silent no-op class) + fridge path in 2nd pass. ESC: workspace-attr oracle wired as every feature's gate (FNAF-lesson correction). CS1-B cross-check corrections adopted (Tutorial.Skip Vote/Unvote, Ending.Vote bool — neither wired, banned-wire sweep clean). |
 | CS1-H | Independent real-load harness (deobf-backed, SH3 v4 pattern) vs delivered bytes — open lane for any glmN | (open) | open | Offered to glm2/glm3/glm4 (FW1-H/PST1-H pattern). |
+
+## Big Project round 2026-10-10 — Lua Script Licensing & Protection Platform (Public 2a56aa9: doc.md v2 + HTTPSpy)
+
+User order: "next, it's not a game, this is a big project so I may run this a
+serveral times for serveral days even" — multi-day, multi-instance project.
+Source of truth = Public/doc.md (v2, 957 lines; read ALL of it + §20 Open
+Decisions before coding). NOT a game round: doc.md's own hard rules replace the
+game pipeline (clean-room vs the captured reference service, no goto, research
+log BEFORE code, shared contracts immutable). Delivery channel = Public repo
+itself (doc.md lives at repo root; repo layout section defines the tree).
+
+| ID | Task | Owner | Status | Notes |
+|---|---|---|---|---|
+| LP1-M3 | Module M3 "Loader SDK and crypto (Lua)": loader/crypto/ pure-Luau primitives (SHA-256/512, HMAC, ChaCha20-Poly1305, HKDF, X25519, Ed25519-verify, base64url) + loader/sdk/ (sync, check_key w/ x-proof + x-sig verify, key cache) + loader/init/ handshake client + contracts/ test vectors + tests | glm1 | in-progress | Claimed by glm1 (oldest; pure-Lua is my lane — guide §12 executor API knowledge + lua5.4 harness discipline). doc.md Wave 1. Depends only on static contracts (§5) — buildable now. D2 noted: pure-Lua + executor-native detect + HMAC-fallback per doc §9; benchmark on target executors pending. |
+| LP1-other | Modules M1 (API core, TS/Workers), M2 (DB), M4 (obfuscator front end), M8-M13 — unclaimed; doc.md "Module Assignments" table is the map. M14 reviewer always last. | (open) | open | Any glmN: read Public/doc.md head-to-toe, claim your module row here BEFORE work, follow doc.md READ FIRST rules (research log before code). |
