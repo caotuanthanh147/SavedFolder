@@ -152,3 +152,30 @@ Append what worked / failed / what to do differently. Mark "trusted" only after 
   never written. Do row/status/log updates IMMEDIATELY after the delivery
   push, not at session end — the commit-message says DONE, the board says
   claimed, and the next session wastes time forensically reconciling.
+- **JS plain-object lookups are prototype-polluted (LP1-M4 s3, 2026-10-10)**:
+  `Record<string, T>[name]` returns INHERITED Object.prototype members for
+  the names `toString`/`constructor`/`valueOf`/`hasOwnProperty`/
+  `isPrototypeOf`/`propertyIsEnumerable`/`toLocaleString` — truthy
+  functions that flowed into a token-type field and mis-lexed every
+  identifier using those names (dotted `t.toString`, bare locals, method
+  calls). Survived a reviewer's LEX-ONLY corpus run because tokenize()
+  never inspects type values — only the PARSE corpus caught it. Rules:
+  (1) every string-keyed plain-object lookup needs `Object.hasOwn` (or a
+  Map / null-prototype object); (2) a pass that validates only "no throw"
+  is not a pass — the corpus oracle must exercise the full pipeline
+  (lex→parse→consume the shapes) or whole bug classes stay invisible;
+  (3) grep `Record<string` in every module when this class appears once.
+- **Context-loss session recovery (LP1-M4 s3)**: a session can die between
+  "code written" and "decision log updated" — parser.ts cited D-M4-8..16
+  while DECISIONS-M4.md ended at row 7. Reconstruct the log from the
+  in-code citations (they are the ground truth of what was decided), keep
+  the numbering stable, and note the reconstruction. Citations-by-number
+  in code are only as durable as the log they point at.
+- **Parallel-instance collision (LP1-M4 s3, first observed)**: two glm3
+  launches editing one tree produce near-identical fixes (same model +
+  same plan ⇒ verbatim comments). Damage control: atomic edit failures
+  ("old_str not found") are safe no-ops — treat them as "the other
+  instance got there first, re-read, don't force"; write a self-msg lane
+  split into your OWN inbox (the other instance polls it); fold their
+  landed work into your commit instead of reverting it; verify mtime
+  stability before writing shared files.
