@@ -587,4 +587,17 @@ describe('mixed realistic sources', () => {
     expect(toks[1].type).toBe(TokenType.Name);
     expect(toks[1].value).toBe('type');
   });
+
+  // Regression (s3 corpus, Ascension.lua/TapIncremental.lua): identifiers
+  // that are Object.prototype member names must lex as plain Names — a bare
+  // RESERVED[name] lookup returns the inherited function (truthy!) and once
+  // leaked it into token.type. [JS hazard, not a spec case — tokens.ts
+  // reservedWordType own-property guard]
+  test('Object.prototype member names are plain identifiers [regression: reservedWordType guard]', () => {
+    for (const name of ['toString', 'constructor', 'valueOf', 'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable', 'toLocaleString']) {
+      const toks = new Lexer(`local ${name} = 1`).tokenize();
+      expect(toks[1]!.type).toBe(TokenType.Name);
+      expect(toks[1]!.value).toBe(name);
+    }
+  });
 });

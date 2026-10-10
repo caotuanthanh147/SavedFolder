@@ -1,82 +1,41 @@
 # glm3 status
 
-**Updated**: 2026-10-08 ~04:50Z (session 5 — PST1 DELIVERED Public 96fe758)
+**Updated**: 2026-10-10 16:48Z (LP1 M4 session 3 — parser build)
 
-**Doing**: idle-alert — PST1 QA window (glm1's lane — awaiting their audit).
-Watcher note: sandbox reaps background processes BETWEEN Bash tool invocations
-(setsid does not survive it — verified 2026-10-08: poll.sh alive 33s within one
-command, dead by the next). Mitigation = manual fetch discipline: every sync.sh
-pull --rebase + inbox check at each action point (doing). Watchers restarted
-best-effort each session command.
+**Doing**: M4 s3 = token→AST parser. src/parser.ts (1751 lines): FULL grammar
+(stmts/exprs/type grammar, contextual continue/type/export, attributes,
+generics w/ defaults, function types, repeat-scope, loop/vararg context
+tracking). 2026-10-10 16:45:50Z: tsc EXIT 0 + 70/70 after the narrowing-fix
+batch (curType() helper vs TS's method-call property-narrowing soundness
+hole — 25 errors fixed; 21 by a PARALLEL glm3 instance detected 16:40-16:42,
+4 finished by me; see msgs/glm3/parallel-instance-coordination-20261010T1647Z.md
+for the lane split + lock rule). NEXT: tests/parser.test.ts (my claim) →
+corpus full-parse extension → DECISIONS/VERIFICATION refresh → s3 commit.
+glm6 is BLOCKED on this (M5 corpus end-to-end + IR.md pin D-M4-2) — top of
+the project critical path.
 
-**Last**: Pet Store Tycoon round (user order "next game" + fnaf critique):
-- ESC protocol codified FIRST (guide §26 + lessons entry, 1d3acfd) — the user's
-  exploit-surface directive (attributes/save/mutable-state/hooks/NaN/\255)
-  internet-researched (TheGreatSageEqualToHeaven DataStore gist + devforum
-  UTF8/NaN thread) and protocolized for ALL instances
-- PST1-A analysis (f3d757b): 27-remote wire table, world model, first full §26
-  ESC census — **Boxes.Report = client-authoritative box CFrames** (the round's
-  headline ESC find, wired as the AutoStock transport accelerator); Replica
-  layer verified server-authoritative (client never fires Replica* events);
-  RenameSlot \255 persistence candidate documented-not-wired (server sanitize
-  unknown from client deobf)
-- Parallel-claim collision with glm1 resolved clean (same-minute claims, mine
-  03:49:37 first on origin — theirs withdrawn, they took PST1-QA; cross-check
-  msg'd: my Boxes.Report was their census miss, their SubmitCashChange read
-  corrected to counts-table by my CashTray trace)
-- Build: 7 features, template head 846 verbatim, harness 43/43 ×3 + 43/43 on
-  delivered bytes (Public path). Harness caught featuresOf-array bug (ipairs)
-  pre-delivery
-- **DELIVERED Public 96fe758** (folder mode, MD5 verified, ls-remote verified)
+**Checkpoint (multi-day big project = LP1 Lua obfuscator; user: "this is a
+big project so I may run this several times for several days")**:
+- Lane: LP1-M4 "Obfuscator front end" (claimed, TASKS row 245). s1 lexer +
+  s2 AST DELIVERED (Public fc730bf/1ca1dbf; re-landed after user force-push
+  #3 — glm1 msg). Canonical tree: ~/SavedFolder/work/lp/m4 (bun, tsc,
+  bun test). Spec: Luau Lexer.cpp/Parser.cpp @ master (MIT, used as SPEC).
+- Deliverables live in BOTH work/lp/m4 (canonical) and Public
+  obfuscator/parser/ (delivery copy) — sync on commit.
+- DEPENDENTS: glm6 M5 (delivered, waits on my parser for corpus + IR pin);
+  glm1 M6 (waits on M5 ISA). My parser = current project bottleneck.
+- Parallel-instance event 2026-10-10 16:40Z: second glm3 launch detected
+  editing the same files. Protocol written (coordination msg above). Watch
+  mtimes before writes; atomic-edit failures = yield and re-read.
+- Continuous-operation discipline (user, 3rd warning, "that's bad"): pending
+  list must be driven to empty + poll/watch between items. Never stop while
+  tasks remain.
 
-**Files (mine, session 5)**: work/lua/{PetStoreTycoon.lua, pst_harness.lua,
-pst-analysis.md}; guide §26 + lessons entries; TASKS PST rows; msgs; status/logs.
+**Last (PST1, 2026-10-08)**: Pet Store Tycoon DELIVERED Public 96fe758
+(Boxes.Report client-authoritative ESC find; harness 43/43 ×3 + delivered
+bytes). Full detail in git history of this file @ 13:31Z today.
 
-**Lanes**: PST1 = glm3 DONE. PST1-QA = glm1 (go msg'd). PST1-H = open (glm4
-first refusal). Watching for QA findings + next round signals.
-
-## Session 6 — 2026-10-10 (BIG PROJECT: Lua Licensing Platform)
-**Updated**: 2026-10-10 (session 6)
-**Doing**: LP1-M2 Database module (claimed): research log FIRST (doc mandate), then db/ migrations + indexes + seed + backup notes → Public db/ folder.
-**Context**: multi-day multi-instance project. Source of truth = Public/doc.md (958 lines, read fully). glm1=M3 (Lua crypto), main-agent=M1 (API core). glm1's big-project inbox msg consumed.
-**Stuck on**: nothing.
-
-## Session 6 final (2026-10-10) — LP1-M2 DELIVERED
-- **DELIVERED Public 50dfbc3**: db/ = RESEARCH-M2.md (12 opened primary sources, written BEFORE code) + migrations/0001 (15 §6 tables verbatim + STRICT) + migrations/0002 (doc index list) + seed/seed.ts (config-driven, idempotent, owner bootstrap token hashed) + tests/run_tests.py **26/26 PASS**.
-- D3 = D1 resolved with sources (batch transactions, Time Travel, wrangler migrations). Integration notes for M1 in db/README.md (batch() atomicity, FK defaults, STRICT conversions, 100-param chunks).
-- Canonical synced to work/lp/db/. Sandbox worklog session 6 written. Watchers running.
-- Next: M4 (obfuscator front end) next session if unclaimed; awaiting doc-owner answers to Q1-Q4 (RESEARCH-M2.md).
-
-## Session 7 — 2026-10-10 (BIG PROJECT cont.: force-push response + M2 re-land + M4 claim)
-**Updated**: 2026-10-10 (session 7)
-**Doing**: LP1-M4 Obfuscator front end (claimed): research log FIRST, then Luau parser/AST/analysis/transforms per doc §10.1-10.2 items 1,2,6.
-**Context**: user live order "continue don't just stop when you're done" + force-push forensics:
-- 12:46:43Z user force-pushed origin/main → cd2ad33 (2a56aa9 + doc.md v3: NEW §22.1 Verification Requirements). Dropped 50dfbc3 (my db/) + 35a8772 (main-agent api/) off branch. I detected first (reflog), verified canonical backup byte-identical, alerted main-agent + glm1 by msg (re-land coordination: I push db/ first, they rebase api/ on top).
-- **M2 RE-LANDED Public 434b432** on cd2ad33: same bytes + NEW db/VERIFICATION-M2.md (§22.1: full 26/26 command+output transcript, env versions Python 3.12.14/SQLite 3.53.1, why-tests-derive-from-external-sources argument, honest NOT-RUN list). Fresh-clone verify: MD5s match canonical, 26/26 on delivered bytes.
-- M4 claimed in TASKS (Wave 1, only contracts dep). §22.1 applies from day one: differential tests vs spec corpus, no self-restating tests, command+output attached, uncovered cases listed.
-**Stuck on**: nothing.
-**Next**: RESEARCH-M4.md (Luau syntax spec sources, parser-combinator vs hand-written recursive descent, existing corpora for differential testing) → parser → AST → analysis pass → transforms (items 1,2,6 only — M5/M6 own the rest).
-
-## Session 7 final (2026-10-10) — M4 session 1 DELIVERED (fc730bf)
-- **Force-push #2 detected** (18555ec = doc v4 "Decision authority": 3 tiers, mandatory Decision Log, CCP for Tier 3; dropped my 434b432). main-agent reconstructed db/ as 2e519c8 (verified byte-identical to my canonical) + api/ as 50a744e w/ DECISIONS-M1 + CCP-1.
-- **LP1-M4 session 1 DELIVERED Public fc730bf** (obfuscator/parser/, fresh-clone verified): RESEARCH-M4 (D1 = custom TS parser, registry+GitHub evidence, all candidates rejected w/ reasons) + spec-exact lexer (reference Lexer.cpp/Parser.cpp as SPEC — interp brace stack, //, ..=, ::, attributes, 42i, .5, [= rejection, NUL-as-EOF, byte-string model; 3 exactness gaps found by reference cross-check and fixed) + parseNumberLiteral + DECISIONS-M4 (v4 format, 6 entries; Q-M4b answered by §5.7 const-key) + VERIFICATION-M4 (64/64 spec-derived, tsc clean, corpus 50/50 = 2.24MB/424k tokens).
-- Msg'd main-agent (ack + M4 report + doc v4 alignment).
-- **Stuck on**: nothing. **Next session (M4 s2)**: parser→AST — statements/expressions incl. full type-annotation grammar (contextual type/export, if-exprs, :: casts, generics), then printer + round-trip differential on the corpus.
-**Files (mine, session 7)**: work/lp/m4/{RESEARCH-M4.md, DECISIONS-M4.md, VERIFICATION-M4.md, README.md, package.json, tsconfig.json, src/{lexer,tokens,errors}.ts, tests/{lexer.test,corpus}.ts}; Public obfuscator/parser/ (delivery); msgs/main-agent ×2.
-
-## Session 7 addendum (2026-10-10) — doc owner rulings implemented (M2 → c696a45)
-- msgs/docowner.txt (USER direct upload 65b8f33, 20:01+0700): answers to my M2 Q1-Q4. Implemented ALL:
-  - 0001: sessions.key_id/script_id FKs ON DELETE RESTRICT (key_id nullable); checkpoints+free_attempts.project_id ON DELETE CASCADE; events FK-less w/ rationale comment
-  - seed.ts: admin token adm_<id>.<secret> (secret 32B base64url), stores ONLY SHA-256(secret); protocol defaults version 1/handler v1/min_loader 1.0.0/active (env-overridable); D11 one-node launch documented
-  - tests: 31/31 (+5 owner-ruling cases)
-  - DECISIONS-M2.md (doc v4 format, 11 entries; in-place-0001-edit rationale + rebuild contingency; D1 FK enforcement verified from Cloudflare docs — always on, defer-only-within-tx)
-- **RE-DELIVERED Public c696a45** (fresh-clone: 8/8 MD5 match, 31/31 on delivered bytes). main-agent msg'd (URGENT: RESTRICT delete paths, adm_ token auth flow, DOC_SCHEMA_SQL FK clauses).
-- Session totals: M4 s1 (fc730bf) + M2 owner-rulings (c696a45) + force-push forensics ×2 + fleet coordination.
-- **Next**: M4 s2 = parser→AST (statements/expressions/type grammar), printer, round-trip corpus differential.
-
-## Session 7 addendum 2 (2026-10-10) — M4 session 2 start: AST module DELIVERED (1ca1dbf)
-- src/ast.ts: full Luau node set per reference Ast.h @ master (spec-only, no code copied). Discriminated unions; Local = identity object; documented divergences (no Error nodes, Optional{type}, raw numbers, declare-family deferred → D-M4-7; kind-string naming rule → D-M4-8 note).
-- tests/ast.test.ts kitchen-sink fixture: one literal of EVERY kind. **Caught a real defect pre-merge**: 'TypeFunction' kind collided between statement + annotation registries → annotation renamed 'FunctionType'; pairwise-disjoint registry test added. §22.1 discipline proving itself.
-- 70/70, tsc clean, corpus 50/50 re-verified. DELIVERED Public 1ca1dbf (+VERIF refresh commit), fresh-clone verified (3/3 MD5, 70/70, tsc OK).
-- **Session 7 totals**: force-push forensics ×2 + M2 re-land ×2 (434b432, c696a45 w/ owner rulings) + M4 s1 (fc730bf) + M4 s2 (1ca1dbf) + 3 fleet msgs + DECISIONS logs (M4 8 entries, M2 11 entries).
-- **Next session**: token→AST parser + printer + round-trip differential.
+**Session log index**: logs/glm3/ (s8 inbox-consume note; earlier sessions
+in git history). Watchers: poll.sh + watch_public.sh running since 12:26/
+12:40Z (verify with ps; sandbox reaps between tool calls — restart
+best-effort each session).

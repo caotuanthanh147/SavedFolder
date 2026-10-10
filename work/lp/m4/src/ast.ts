@@ -393,6 +393,8 @@ export interface GenericType {
 export interface GenericTypePack {
   readonly name: string;
   readonly location: Location;
+  /** `P = ...T` default pack value (master generics-with-defaults). */
+  readonly defaultValue?: TypePack;
 }
 
 /** Reference: AstTypeList — head types plus an optional tail pack. */
@@ -421,7 +423,10 @@ export interface TableIndexer {
   readonly location: Location;
 }
 
-/** `{ x: T, [K]: V }`; isExact when written with `|` separators (`{| |}`). */
+/** `{ x: T, [K]: V }` — {T} arrays desugar to `{[number]: T}`. isExact is
+ *  reserved for the exact-table `{| |}` syntax: REMOVED from reference
+ *  master (replaced by default-exact direction under a Debug flag, off in
+ *  release) — always false here (D-M4-16). */
 export interface TableType extends NodeBase {
   readonly kind: 'TypeTable';
   readonly props: readonly TableProp[];

@@ -3,11 +3,18 @@
  * captured material). Lexes every .lua file in the corpus root and reports
  * accept/reject per file with error positions for rejects.
  *
- * Run: bun run corpus.ts <corpus-root>
+ * Modes:
+ *   bun run corpus.ts <corpus-root>          — lexer pass (token counts)
+ *   bun run corpus.ts <corpus-root> --parse  — FULL parse pass (tokens→AST),
+ *                                              counts nodes per file; every
+ *                                              lex-accept that parse-rejects
+ *                                              is a parser gap to triage
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Lexer } from '../src/lexer';
+import { parse } from '../src/parser';
+import type { Chunk } from '../src/ast';
 
 function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir)) {
@@ -17,17 +24,32 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
+/** Count every AST node (kind field walk — works for exprs/stats/types). */
+function countNodes(node: unknown): number {
+  if (Array.isArray(node)) return node.reduce<number>((n, v) => n + countNodes(v), 0);
+  if (node === null || typeof node !== 'object') return 0;
+  const obj = node as Record<string, unknown>;
+  let n = typeof obj.kind === 'string' ? 1 : 0;
+  for (const key of Object.keys(obj)) {
+    if (key === 'kind' || key === 'location') continue;
+    n += countNodes(obj[key]);
+  }
+  return n;
+}
+
 const root = process.argv[2];
 if (!root) {
-  console.error('usage: bun run corpus.ts <corpus-root>');
+  console.error('usage: bun run corpus.ts <corpus-root> [--parse]');
   process.exit(2);
 }
+const parseMode = process.argv.includes('--parse');
 
 let total = 0;
 let accepted = 0;
 const rejects: Array<{ file: string; error: string }> = [];
 let totalBytes = 0;
 let totalTokens = 0;
+let totalNodes = 0;
 
 for (const file of walk(root)) {
   const buf = readFileSync(file);
@@ -38,17 +60,23 @@ for (const file of walk(root)) {
   try {
     const tokens = new Lexer(source).tokenize();
     totalTokens += tokens.length;
+    if (parseMode) {
+      const chunk: Chunk = parse(source);
+      totalNodes += countNodes(chunk);
+    }
     accepted++;
   } catch (e) {
     rejects.push({ file, error: e instanceof Error ? e.message : String(e) });
   }
 }
 
-console.log(`corpus files: ${total}`);
-console.log(`accepted:     ${accepted}`);
-console.log(`rejected:     ${rejects.length}`);
-console.log(`total bytes:  ${totalBytes}`);
-console.log(`total tokens: ${totalTokens}`);
+console.log(`mode:          ${parseMode ? 'parse (tokens→AST)' : 'lex'}`);
+console.log(`corpus files:  ${total}`);
+console.log(`accepted:      ${accepted}`);
+console.log(`rejected:      ${rejects.length}`);
+console.log(`total bytes:   ${totalBytes}`);
+console.log(`total tokens:  ${totalTokens}`);
+if (parseMode) console.log(`total nodes:   ${totalNodes}`);
 if (rejects.length > 0) {
   console.log('\nrejects:');
   for (const r of rejects.slice(0, 25)) console.log(`  ${r.file}: ${r.error}`);

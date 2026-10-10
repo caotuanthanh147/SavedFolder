@@ -103,6 +103,7 @@ export enum TokenType {
   Pipe,
   Bang,
   QuestionMark,
+  Arrow,
 }
 
 export interface Token {
@@ -142,8 +143,16 @@ const RESERVED: Readonly<Record<string, TokenType>> = {
   while: TokenType.While,
 };
 
+/**
+ * Reserved-word lookup. MUST use an own-property guard: a plain
+ * `RESERVED[name]` returns inherited Object.prototype members for
+ * identifiers like `toString` / `constructor` / `valueOf` (truthy
+ * functions!), which once leaked into token.type as a bogus "keyword"
+ * — caught by the s3 parse-corpus run (Ascension.lua/TapIncremental.lua
+ * `.toString` fields).
+ */
 export function reservedWordType(name: string): TokenType | undefined {
-  return RESERVED[name];
+  return Object.hasOwn(RESERVED, name) ? RESERVED[name] : undefined;
 }
 
 const TOKEN_NAMES: Readonly<Record<TokenType, string>> = {
@@ -220,6 +229,7 @@ const TOKEN_NAMES: Readonly<Record<TokenType, string>> = {
   [TokenType.Pipe]: "'|'",
   [TokenType.Bang]: "'!'",
   [TokenType.QuestionMark]: "'?'",
+  [TokenType.Arrow]: "'->'",
 };
 
 export function tokenTypeName(type: TokenType): string {

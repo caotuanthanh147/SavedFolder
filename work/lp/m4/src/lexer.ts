@@ -628,6 +628,11 @@ export class Lexer {
 
   private readMinus(start: number): Token {
     this.advance();
+    if (this.peek() === 0x3e) {
+      // '->' SkinnyArrow [Lexer.cpp case '-']
+      this.advance();
+      return this.make(TokenType.Arrow, start);
+    }
     if (this.peek() === 0x3d) {
       this.advance();
       return this.make(TokenType.MinusAssign, start);
