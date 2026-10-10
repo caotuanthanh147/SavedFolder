@@ -871,476 +871,6 @@ Toggles.AntiAFK:OnChanged(function(state)
     end
 end)
 if Toggles.AntiAFK.Value then RunAntiAFK() end
-local Remotes = {
-    Pet = GetObject(RS, "Cat.Pet"),
-    Stare = GetObject(RS, "Cat.Stare"),
-    Eat = GetObject(RS, "Meal.Eat"),
-    Laser = GetObject(RS, "Laser.Point"),
-    Photo = GetObject(RS, "Phone.Photo"),
-    Litter = GetObject(RS, "LitterCleaning.Event"),
-    GetState = GetObject(RS, "Shop.GetState"),
-    OpenCrate = GetObject(RS, "Shop.OpenCrate"),
-}
-
-local CHORE_INTERVAL = 30
-local LASER_PLAY_SECONDS = 20
-local CHORES = { "Feed", "Eat", "Litter", "Mail", "Play", "Lock" }
-local ANOMALIES = { "Catzilla", "CreepyHead", "FakeDoor", "Grandma", "Misplaced", "Seeker", "SmilingMan", "StalkerInBedroom", "ToiletFace", "VoidOutside", "WindowMonster" }
-local LIGHT_SWITCHES = {
-    "House.Important.RoomLighting.Switches.BathroomSwitch",
-    "House.Important.RoomLighting.Switches.BedroomHallSwitch",
-    "House.Important.RoomLighting.Switches.BedroomSwitch",
-    "House.Important.RoomLighting.Switches.EntryHallSwitch",
-    "House.Important.RoomLighting.Switches.KitchenSwitch",
-    "House.Important.RoomLighting.Switches.LaundrySwitch",
-    "House.Important.RoomLighting.Switches.LivingRoomSwitch",
-}
-local BLINDS = {
-    "House.Parts.InteriorLayout.Curtains.01_BathroomBack_Glass",
-    "House.Parts.InteriorLayout.Curtains.02_BedroomBack_Glass",
-    "House.Parts.InteriorLayout.Curtains.03_East_Glass",
-    "House.Parts.InteriorLayout.Curtains.04_Front_Glass",
-    "House.Parts.InteriorLayout.Curtains.05_Front_Glass",
-    "House.Parts.InteriorLayout.Curtains.06_UtilityBack_Glass",
-    "House.Parts.InteriorLayout.Curtains.07_West_Glass",
-    "House.Parts.InteriorLayout.Curtains.08_West_Glass",
-}
-
-Shared.Litter = { Session = nil, Collected = {}, Won = false }
-
-local function Attr(name)
-    return workspace:GetAttribute(name)
-end
-
-local function FirePrompt(path)
-    FirePP(GetObject(workspace, path), true)
-end
-
-local function BagSpot()
-    local bag = GetObject(Plr, "PlayerGui.LitterCleaningGui.Panel.Board.Bag")
-    if not bag then
-        return 0.5, 0.5
-    end
-    return bag.Position.X.Scale + bag.Size.X.Scale / 2, bag.Position.Y.Scale + bag.Size.Y.Scale / 2
-end
-
-local function SleepReady()
-    for _, name in ipairs(CHORES) do
-        if Attr("Chore_" .. name) ~= true then
-            return false
-        end
-    end
-    for _, name in ipairs(ANOMALIES) do
-        if Attr(name) == true then
-            return false
-        end
-    end
-    return true
-end
-
-local ChoreFlows = {
-    Feed = function()
-        FirePrompt("House.Important.Kitchen.Cabinets.Base_N1.CatFoodCan.CanBody.TakePromptAttachment.TakePrompt")
-        task.wait(0.4)
-        FirePrompt("House.Important.Kitchen.FoodBowl.Food Bowl.Cylinder.FillPromptAttachment.FillPrompt")
-    end,
-    Eat = function()
-        FirePrompt("House.Important.Kitchen.Fridge.TVDinner.Tray.TakePromptAttachment.TakePrompt")
-        task.wait(0.5)
-        local bp = Plr:FindFirstChild("Backpack")
-        local char = GetCharacter()
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if bp and hum then
-            for _, t in ipairs(bp:GetChildren()) do
-                if t:IsA("Tool") and t:GetAttribute("Meal") then
-                    hum:EquipTool(t)
-                    break
-                end
-            end
-        end
-        task.wait(0.3)
-        FirePrompt("House.Important.Kitchen.Cabinets.Microwave.Carcass.Turntable.CookPromptAttachment.CookPrompt")
-        task.wait(10)
-        FirePrompt("House.Important.Kitchen.Cabinets.Microwave.Carcass.Turntable.CookPromptAttachment.CookPrompt")
-        task.wait(1)
-        if bp and hum then
-            for _, t in ipairs(bp:GetChildren()) do
-                if t:IsA("Tool") and t:GetAttribute("Meal") and t:GetAttribute("Hot") then
-                    hum:EquipTool(t)
-                    task.wait(0.3)
-                    if Remotes.Eat then
-                        Remotes.Eat:FireServer()
-                    end
-                    break
-                end
-            end
-        end
-    end,
-    Litter = function()
-        FirePrompt("House.Parts.Laundry.LitterBox.LitterInteraction.CleanLitterPrompt")
-    end,
-    Mail = function()
-        FirePrompt("Neighborhood.Parts.PetsitFrontYard.Mailbox.Body.MailboxPromptAttachment.MailboxPrompt")
-    end,
-    Play = function()
-        FirePrompt("House.Important.LivingRoom.LaserPointer.Body.TakePromptAttachment.TakePrompt")
-        task.wait(0.5)
-        local bp = Plr:FindFirstChild("Backpack")
-        local char = GetCharacter()
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local cat = workspace:FindFirstChild("Cat")
-        local anchor = cat and (cat.PrimaryPart or cat:FindFirstChildWhichIsA("BasePart"))
-        if bp and hum and anchor then
-            for _, t in ipairs(bp:GetChildren()) do
-                if t:IsA("Tool") and t:GetAttribute("Laser") then
-                    hum:EquipTool(t)
-                    break
-                end
-            end
-            task.wait(0.3)
-            local deadline = os.clock() + LASER_PLAY_SECONDS
-            while os.clock() < deadline and Attr("Chore_Play") ~= true do
-                if Remotes.Laser then
-                    Remotes.Laser:FireServer(anchor.Position + Vector3.new(math.random(-6, 6), -1.5, math.random(-6, 6)), true)
-                end
-                task.wait(0.12)
-            end
-            if Remotes.Laser then
-                Remotes.Laser:FireServer(nil, false)
-            end
-            hum:UnequipTools()
-        end
-    end,
-    Lock = function()
-        local door = GetObject(workspace, "House.Important.Doors.Front Door")
-        if door and door:GetAttribute("Locked") ~= true then
-            FirePrompt("House.Important.Doors.Front Door.Leaf.Deadbolt.LockPromptAttachment.LockPrompt")
-        end
-    end,
-}
-
-local function StepChores()
-    if not workspace:FindFirstChild("House") then
-        return
-    end
-    for _, name in ipairs(CHORES) do
-        if Attr("Chore_" .. name) ~= true then
-            ChoreFlows[name]()
-            task.wait(0.4)
-        end
-    end
-end
-
-local function Func_AutoChores()
-    while Toggles.AutoChores.Value do
-        local ok, err = pcall(StepChores)
-        if not ok then
-            notyuri("AutoChores", err)
-        end
-        task.wait(CHORE_INTERVAL)
-    end
-end
-
-local function Func_AutoPet()
-    while Toggles.AutoPet.Value do
-        local ok, err = pcall(function()
-            local cat = workspace:FindFirstChild("Cat")
-            local char = GetCharacter()
-            if cat and char and Remotes.Pet then
-                local part = cat.PrimaryPart or cat:FindFirstChildWhichIsA("BasePart")
-                if part and (part.Position - char.HumanoidRootPart.Position).Magnitude <= 40 then
-                    Remotes.Pet:FireServer()
-                end
-            end
-        end)
-        if not ok then
-            notyuri("AutoPet", err)
-        end
-        task.wait(0.4)
-    end
-end
-
-local function Func_AutoSleep()
-    while Toggles.AutoSleep.Value do
-        local ok, err = pcall(function()
-            if not workspace:FindFirstChild("House") or not SleepReady() then
-                return
-            end
-            local fridgeDoor = GetObject(workspace, "House.Important.Kitchen.Fridge.FridgeDoor")
-            if fridgeDoor and fridgeDoor:GetAttribute("Open") == true then
-                FirePrompt("House.Important.Kitchen.Fridge.FridgeDoor.Leaf.Panel.OpenClosePromptAttachment.OpenClosePrompt")
-                task.wait(0.4)
-            end
-            FirePrompt("House.Parts.Bedroom.Mattress.SleepPromptAttachment.SleepPrompt")
-        end)
-        if not ok then
-            notyuri("AutoSleep", err)
-        end
-        task.wait(10)
-    end
-end
-
-local function Func_AutoQueue()
-    while Toggles.AutoQueue.Value do
-        local ok, err = pcall(function()
-            local zone = GetObject(workspace, "Lobby.Important.TeleportPod.Zone")
-            if zone then
-                TPTo(zone)
-                FireTI(zone)
-            end
-        end)
-        if not ok then
-            notyuri("AutoQueue", err)
-        end
-        task.wait(3)
-    end
-end
-
-local function Func_AutoOpenCrate()
-    while Toggles.AutoOpenCrate.Value do
-        local ok, err = pcall(function()
-            if not (Remotes.GetState and Remotes.OpenCrate) then
-                return
-            end
-            local state = SafeInvoke(Remotes.GetState)
-            if type(state) ~= "table" or type(state.cash) ~= "number" then
-                return
-            end
-            while state.cash >= 10 do
-                local result = SafeInvoke(Remotes.OpenCrate)
-                if type(result) ~= "table" or not result.ok then
-                    break
-                end
-                if type(result.state) == "table" and type(result.state.cash) == "number" then
-                    state = result.state
-                end
-                task.wait(0.5)
-            end
-        end)
-        if not ok then
-            notyuri("AutoOpenCrate", err)
-        end
-        task.wait(5)
-    end
-end
-
-SafeConnect("Litter", function()
-    return Remotes.Litter and Remotes.Litter.OnClientEvent
-end, function(action, sid, data)
-    if action == "Start" then
-        Shared.Litter.Session = sid
-        Shared.Litter.Collected = {}
-        Shared.Litter.Won = false
-        Thread("LitterDrive", function()
-            local deadline = os.clock() + 60
-            while os.clock() < deadline and Shared.Litter.Session == sid and not Shared.Litter.Won do
-                local bx, by = BagSpot()
-                for i = 1, 5 do
-                    if Shared.Litter.Session ~= sid or Shared.Litter.Won then
-                        break
-                    end
-                    if not Shared.Litter.Collected[i] then
-                        if Remotes.Litter then
-                            Remotes.Litter:FireServer("Grab", sid, i)
-                            task.wait(0.15)
-                            if Shared.Litter.Session == sid and not Shared.Litter.Won then
-                                Remotes.Litter:FireServer("Drop", sid, i, bx, by)
-                            end
-                            task.wait(0.3)
-                        end
-                    end
-                end
-                task.wait(0.5)
-            end
-        end, true)
-    elseif action == "Collected" then
-        if type(data) == "table" and data.index then
-            Shared.Litter.Collected[data.index] = true
-        end
-    elseif action == "Win" or action == "End" then
-        if Shared.Litter.Session == sid then
-            Shared.Litter.Won = true
-            Shared.Litter.Session = nil
-        end
-    end
-end)
-
-SafeConnect("Grandma", function()
-    return workspace:GetAttributeChangedSignal("Grandma")
-end, function()
-    if not (Toggles.AutoAnomalies.Value and Attr("Grandma") == true) then
-        return
-    end
-    task.spawn(function()
-        for _, path in ipairs(LIGHT_SWITCHES) do
-            local model = GetObject(workspace, path)
-            if model and model:GetAttribute("On") == true then
-                FirePrompt(path .. ".Faceplate.Interaction.LightSwitchPrompt")
-                task.wait(0.1)
-            end
-        end
-    end)
-end)
-
-SafeConnect("VoidOutside", function()
-    return workspace:GetAttributeChangedSignal("VoidOutside")
-end, function()
-    if not (Toggles.AutoAnomalies.Value and Attr("VoidOutside") == true) then
-        return
-    end
-    task.spawn(function()
-        for _, path in ipairs(BLINDS) do
-            local model = GetObject(workspace, path)
-            if model and model:GetAttribute("BlindsClosed") ~= true then
-                FirePrompt(path .. ".BlindsPromptAnchor.BlindsPrompt")
-                task.wait(0.1)
-            end
-        end
-    end)
-end)
-
-SafeConnect("Catzilla", function()
-    return workspace:GetAttributeChangedSignal("Catzilla")
-end, function()
-    if not (Toggles.AutoAnomalies.Value and Attr("Catzilla") == true) then
-        return
-    end
-    task.spawn(function()
-        local tv = GetObject(workspace, "House.Important.LivingRoom.TV")
-        if tv and tv:GetAttribute("On") ~= true then
-            FirePrompt("House.Important.LivingRoom.TV.Screen.TogglePromptAttachment.TogglePrompt")
-        end
-    end)
-end)
-
-SafeConnect("ToiletFace", function()
-    return workspace:GetAttributeChangedSignal("ToiletFace")
-end, function()
-    if not (Toggles.AutoAnomalies.Value and Attr("ToiletFace") == true) then
-        return
-    end
-    task.spawn(function()
-        FirePrompt("House.Important.Bathroom.Toilet.Flush.Lever.FlushPromptAttachment.FlushPrompt")
-    end)
-end)
-
-SafeConnect("CreepyHead", function()
-    return workspace:GetAttributeChangedSignal("CreepyHead")
-end, function()
-    if not (Toggles.AutoAnomalies.Value and Attr("CreepyHead") == true) then
-        return
-    end
-    Thread("CreepyStare", function()
-        while Toggles.AutoAnomalies.Value and Attr("CreepyHead") == true do
-            local cat = workspace:FindFirstChild("Cat")
-            local head = cat and cat:FindFirstChild("CreepyCatHead")
-            local hp = head and (head.PrimaryPart or head:FindFirstChildWhichIsA("BasePart"))
-            if hp then
-                TPTo(hp, Vector3.new(0, 0, 15))
-                if Remotes.Stare then
-                    Remotes.Stare:FireServer(0.4)
-                end
-            end
-            task.wait(0.4)
-        end
-    end, true)
-end)
-
-SafeConnect("SmilingMan", function()
-    return workspace:GetAttributeChangedSignal("SmilingMan")
-end, function()
-    if not (Toggles.AutoPhoto.Value and Attr("SmilingMan") == true) then
-        return
-    end
-    Thread("PhotoSmilingMan", function()
-        while Toggles.AutoPhoto.Value and Attr("SmilingMan") == true do
-            local model = workspace:FindFirstChild("SmilingMan")
-            local part = model and (model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true))
-            if part and Remotes.Photo then
-                local char = GetCharacter()
-                local base = char and char.HumanoidRootPart.Position or part.Position + Vector3.new(12, 2, 0)
-                local dir = base - part.Position
-                local dist = dir.Magnitude
-                local eye = part.Position + (dist >= 0.01 and dir * (12 / dist) or Vector3.new(12, 2, 0))
-                TPTo(CFrame.new(eye))
-                Remotes.Photo:FireServer(CFrame.lookAt(eye, part.Position), part)
-            end
-            task.wait(1)
-        end
-    end, true)
-end)
-
-SafeConnect("Misplaced", function()
-    return workspace:GetAttributeChangedSignal("Misplaced")
-end, function()
-    if not (Toggles.AutoPhoto.Value and Attr("Misplaced") == true) then
-        return
-    end
-    Thread("PhotoMisplaced", function()
-        local shot = {}
-        while Toggles.AutoPhoto.Value and Attr("Misplaced") == true do
-            local house = workspace:FindFirstChild("House")
-            if house then
-                for _, rootName in ipairs({ "Important", "Parts" }) do
-                    local root = house:FindFirstChild(rootName)
-                    if root then
-                        for _, room in ipairs(root:GetChildren()) do
-                            for _, item in ipairs(room:GetChildren()) do
-                                if item:IsA("Model") and not shot[item] and Attr("Misplaced") == true then
-                                    local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
-                                    if part and Remotes.Photo then
-                                        shot[item] = true
-                                        local char = GetCharacter()
-                                        local base = char and char.HumanoidRootPart.Position or part.Position + Vector3.new(10, 2, 0)
-                                        local dir = base - part.Position
-                                        local dist = dir.Magnitude
-                                        local eye = part.Position + (dist >= 0.01 and dir * (10 / dist) or Vector3.new(10, 2, 0))
-                                        TPTo(CFrame.new(eye))
-                                        Remotes.Photo:FireServer(CFrame.lookAt(eye, part.Position), part)
-                                        task.wait(0.4)
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    if Attr("Misplaced") ~= true then
-                        return
-                    end
-                end
-            end
-            task.wait(10)
-        end
-    end, true)
-end)
-
-TB_Tabs.Autofarm.T1:AddDivider()
-TB_Tabs.Autofarm.T1:AddToggle("AutoChores", { Text = "Auto Chores" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoPet", { Text = "Auto Pet" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoAnomalies", { Text = "Auto Anomalies" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoPhoto", { Text = "Auto Photo" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoSleep", { Text = "Auto Sleep" })
-TB_Tabs.Autofarm.T1:AddDivider()
-TB_Tabs.Autofarm.T1:AddToggle("AutoQueue", { Text = "Auto Queue" })
-TB_Tabs.Autofarm.T1:AddToggle("AutoOpenCrate", { Text = "Auto Open Crate" })
-
-Toggles.AutoChores:OnChanged(function(state)
-    if not state and Shared.Litter.Session and Remotes.Litter then
-        Remotes.Litter:FireServer("Cancel", Shared.Litter.Session)
-    end
-    Thread("AutoChores", SafeLoop("AutoChores", Func_AutoChores), state)
-end)
-Toggles.AutoPet:OnChanged(function(state)
-    Thread("AutoPet", SafeLoop("AutoPet", Func_AutoPet), state)
-end)
-Toggles.AutoSleep:OnChanged(function(state)
-    Thread("AutoSleep", SafeLoop("AutoSleep", Func_AutoSleep), state)
-end)
-Toggles.AutoQueue:OnChanged(function(state)
-    Thread("AutoQueue", SafeLoop("AutoQueue", Func_AutoQueue), state)
-end)
-Toggles.AutoOpenCrate:OnChanged(function(state)
-    Thread("AutoOpenCrate", SafeLoop("AutoOpenCrate", Func_AutoOpenCrate), state)
-end)
 local MenuGroup = Tabs.Config:AddLeftGroupbox("Menu")
 MenuGroup:AddToggle("AutoShowUI", {
     Text = "Auto Show UI",
@@ -1390,6 +920,460 @@ MenuGroup:AddButton("Unload", function()
         Library:Unload()
 end)
 Library.ToggleKeybind = Options.MenuKeybind
+local Remotes = {
+    Pet = GetObject(RS, "Cat.Pet"),
+    Stare = GetObject(RS, "Cat.Stare"),
+    Eat = GetObject(RS, "Meal.Eat"),
+    LaserPoint = GetObject(RS, "Laser.Point"),
+    Photo = GetObject(RS, "Phone.Photo"),
+    Litter = GetObject(RS, "LitterCleaning.Event"),
+    GetState = GetObject(RS, "Shop.GetState"),
+    OpenCrate = GetObject(RS, "Shop.OpenCrate"),
+}
+
+local ChoreFlags = { "Chore_Feed", "Chore_Eat", "Chore_Litter", "Chore_Lock", "Chore_Mail", "Chore_Play" }
+local AnomalyFlags = { "Catzilla", "CreepyHead", "FakeDoor", "Grandma", "Misplaced", "Seeker", "SmilingMan", "StalkerInBedroom", "ToiletFace", "VoidOutside", "WindowMonster" }
+
+Shared.LitterSid = nil
+Shared.LitterDone = {}
+Shared.CurtainsClosed = nil
+Shared.TVOn = nil
+Shared.Staring = nil
+Shared.PhotoBusy = {}
+
+local function FindTool(attr)
+    local containers = {}
+    local backpack = Plr:FindFirstChildOfClass("Backpack")
+    if backpack then table.insert(containers, backpack) end
+    local char = GetCharacter()
+    if char then table.insert(containers, char) end
+    for _, container in ipairs(containers) do
+        for _, tool in ipairs(container:GetChildren()) do
+            if tool:IsA("Tool") and tool:GetAttribute(attr) then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+local function FirePrompt(path)
+    local prompt = GetObject(workspace, path)
+    if prompt then
+        FirePP(prompt, true)
+    end
+end
+
+local function ChoresDone()
+    for _, flag in ipairs(ChoreFlags) do
+        if workspace:GetAttribute(flag) ~= true then
+            return false
+        end
+    end
+    return true
+end
+
+local function AnomaliesClear()
+    for _, flag in ipairs(AnomalyFlags) do
+        if workspace:GetAttribute(flag) == true then
+            return false
+        end
+    end
+    return true
+end
+
+local function CloseAllCurtains()
+    local curtains = GetObject(workspace, "House.Parts.InteriorLayout.Curtains")
+    if not curtains then return end
+    for _, model in ipairs(curtains:GetChildren()) do
+        local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt then
+            FirePP(prompt, true)
+            task.wait(0.3)
+        end
+    end
+end
+
+local function LightsOff()
+    local switches = GetObject(workspace, "House.Important.RoomLighting.Switches")
+    local rooms = GetObject(workspace, "House.Important.RoomLighting.Rooms")
+    if not switches or not rooms then return end
+    for _, switch in ipairs(switches:GetChildren()) do
+        local prompt = switch:FindFirstChildWhichIsA("ProximityPrompt", true)
+        local room = prompt and prompt:GetAttribute("Room")
+        local folder = room and rooms:FindFirstChild(room)
+        if prompt and folder and folder:GetAttribute("On") == true then
+            FirePP(prompt, true)
+            task.wait(0.3)
+        end
+    end
+end
+
+local function PhotoAt(target)
+    local part = target:IsA("BasePart") and target or target:FindFirstChildWhichIsA("BasePart")
+    local char = GetCharacter()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not part or not hrp or not Remotes.Photo then return end
+    local pos = part.Position
+    local eye = pos + (hrp.Position - pos).Unit * 12
+    hrp.CFrame = CFrame.new(eye)
+    workspace.CurrentCamera.CFrame = CFrame.lookAt(eye, pos)
+    task.wait(0.05)
+    Remotes.Photo:FireServer(CFrame.lookAt(eye, pos), part)
+end
+
+local function ResolveStare()
+    local cat = workspace:FindFirstChild("Cat")
+    local head = cat and cat:FindFirstChild("CreepyCatHead")
+    TPTo(head or cat)
+    local deadline = os.clock() + 20
+    while os.clock() < deadline and workspace:GetAttribute("CreepyHead") == true and Toggles.AutoAnomalies.Value do
+        if Remotes.Stare then
+            Remotes.Stare:FireServer(5)
+        end
+        task.wait(0.4)
+    end
+end
+
+local function ResolvePhoto(flag)
+    local deadline = os.clock() + 45
+    while os.clock() < deadline and workspace:GetAttribute(flag) == true and Toggles.AutoAnomalies.Value do
+        if flag == "Misplaced" then
+            local roots = { GetObject(workspace, "House.Important"), GetObject(workspace, "House.Parts") }
+            for _, root in ipairs(roots) do
+                if root then
+                    for _, inst in ipairs(root:GetDescendants()) do
+                        if workspace:GetAttribute(flag) ~= true then break end
+                        if inst:IsA("Model") then
+                            PhotoAt(inst)
+                            task.wait(0.1)
+                        end
+                    end
+                end
+            end
+        else
+            local target = workspace:FindFirstChild(flag)
+            if target then
+                PhotoAt(target)
+            end
+        end
+        task.wait(0.5)
+    end
+end
+
+local function Func_AutoChores()
+    while Toggles.AutoChores.Value do
+        local ok, err = pcall(function()
+            if workspace:GetAttribute("Chore_Feed") ~= true then
+                FirePrompt("House.Important.Kitchen.Cabinets.Base_N1.CatFoodCan.CanBody.TakePromptAttachment.TakePrompt")
+                task.wait(0.4)
+                FirePrompt("House.Important.Kitchen.FoodBowl.Food Bowl.Cylinder.FillPromptAttachment.FillPrompt")
+                task.wait(0.4)
+            end
+            if workspace:GetAttribute("Chore_Eat") ~= true then
+                local meal = FindTool("Meal")
+                if meal then
+                    if meal:GetAttribute("Hot") then
+                        local char = GetCharacter()
+                        local hum = char and char:FindFirstChildOfClass("Humanoid")
+                        if hum and meal.Parent ~= char then
+                            hum:EquipTool(meal)
+                            task.wait(0.3)
+                        end
+                        if Remotes.Eat then
+                            Remotes.Eat:FireServer()
+                        end
+                    else
+                        FirePrompt("House.Important.Kitchen.Cabinets.Microwave.Door.Leaf.Panel.OpenClosePromptAttachment.OpenClosePrompt")
+                        task.wait(0.4)
+                        FirePrompt("House.Important.Kitchen.Cabinets.Microwave.Carcass.Turntable.CookPromptAttachment.CookPrompt")
+                    end
+                else
+                    FirePrompt("House.Important.Kitchen.Fridge.TVDinner.Tray.TakePromptAttachment.TakePrompt")
+                end
+                task.wait(0.5)
+            end
+            if workspace:GetAttribute("Chore_Mail") ~= true then
+                FirePrompt("Neighborhood.Parts.PetsitFrontYard.Mailbox.Body.MailPromptAttachment.MailboxPrompt")
+                task.wait(0.5)
+            end
+            if workspace:GetAttribute("Chore_Lock") ~= true then
+                FirePrompt("House.Important.Doors.Front Door.Leaf.Deadbolt.LockPromptAttachment.LockPrompt")
+                task.wait(0.4)
+            end
+            if workspace:GetAttribute("Chore_Litter") ~= true and Shared.LitterSid == nil then
+                FirePrompt("House.Parts.Laundry.LitterBox.LitterInteraction.CleanLitterPrompt")
+                task.wait(1)
+            end
+        end)
+        if not ok then
+            notyuri("AutoChores:", err)
+        end
+        task.wait(1)
+    end
+end
+
+local function Func_AutoPlay()
+    while Toggles.AutoPlay.Value do
+        local ok, err = pcall(function()
+            if workspace:GetAttribute("Chore_Play") == true then
+                if Remotes.LaserPoint then
+                    Remotes.LaserPoint:FireServer(nil, false)
+                end
+                task.wait(2)
+                return
+            end
+            local cat = workspace:FindFirstChild("Cat")
+            if not cat then
+                task.wait(1)
+                return
+            end
+            local tool = FindTool("Laser")
+            if not tool then
+                FirePrompt("House.Important.LivingRoom.LaserPointer.Body.TakePromptAttachment.TakePrompt")
+                task.wait(0.5)
+                return
+            end
+            local char = GetCharacter()
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and tool.Parent ~= char then
+                hum:EquipTool(tool)
+                task.wait(0.3)
+            end
+            local base = cat:GetPivot().Position
+            while Toggles.AutoPlay.Value and workspace:GetAttribute("Chore_Play") ~= true do
+                local offset = Vector3.new(math.sin(os.clock() * 1.2) * 4, 0.1, 1.5)
+                if Remotes.LaserPoint then
+                    Remotes.LaserPoint:FireServer(base + offset, true)
+                end
+                task.wait(0.1)
+            end
+            if Remotes.LaserPoint then
+                Remotes.LaserPoint:FireServer(nil, false)
+            end
+        end)
+        if not ok then
+            notyuri("AutoPlay:", err)
+        end
+        task.wait(0.5)
+    end
+    if Remotes.LaserPoint then
+        pcall(function()
+            Remotes.LaserPoint:FireServer(nil, false)
+        end)
+    end
+end
+
+local function Func_AutoPet()
+    while Toggles.AutoPet.Value do
+        local ok, err = pcall(function()
+            if not Remotes.Pet then
+                task.wait(1)
+                return
+            end
+            local cat = workspace:FindFirstChild("Cat")
+            local char = GetCharacter()
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if cat and hrp then
+                local pos = cat:GetPivot().Position
+                if (hrp.Position - pos).Magnitude <= 40 then
+                    Remotes.Pet:FireServer()
+                else
+                    TPTo(cat)
+                end
+            end
+        end)
+        if not ok then
+            notyuri("AutoPet:", err)
+        end
+        task.wait(0.4)
+    end
+end
+
+local function Func_AutoSleep()
+    while Toggles.AutoSleep.Value do
+        local ok, err = pcall(function()
+            if ChoresDone() and AnomaliesClear() then
+                FirePrompt("House.Parts.Bedroom.Mattress.SleepPromptAttachment.SleepPrompt")
+            end
+        end)
+        if not ok then
+            notyuri("AutoSleep:", err)
+        end
+        task.wait(2)
+    end
+end
+
+local function Func_AutoAnomalies()
+    while Toggles.AutoAnomalies.Value do
+        local ok, err = pcall(function()
+            if workspace:GetAttribute("Grandma") == true then
+                LightsOff()
+            end
+            if workspace:GetAttribute("VoidOutside") == true or workspace:GetAttribute("WindowMonster") == true then
+                if not Shared.CurtainsClosed then
+                    Shared.CurtainsClosed = true
+                    CloseAllCurtains()
+                end
+            else
+                Shared.CurtainsClosed = nil
+            end
+            if workspace:GetAttribute("Catzilla") == true and not Shared.TVOn then
+                Shared.TVOn = true
+                FirePrompt("House.Important.LivingRoom.TV.Screen.TogglePromptAttachment.TogglePrompt")
+            end
+            if workspace:GetAttribute("Catzilla") ~= true then
+                Shared.TVOn = nil
+            end
+            if workspace:GetAttribute("ToiletFace") == true then
+                FirePrompt("House.Important.Bathroom.Toilet.Flush.Lever.FlushPromptAttachment.FlushPrompt")
+            end
+            if workspace:GetAttribute("CreepyHead") == true and not Shared.Staring then
+                Shared.Staring = true
+                task.spawn(function()
+                    ResolveStare()
+                    Shared.Staring = nil
+                end)
+            end
+            for _, flag in ipairs({ "SmilingMan", "Misplaced" }) do
+                if workspace:GetAttribute(flag) == true and not Shared.PhotoBusy[flag] then
+                    Shared.PhotoBusy[flag] = true
+                    task.spawn(function()
+                        ResolvePhoto(flag)
+                        Shared.PhotoBusy[flag] = nil
+                    end)
+                end
+            end
+        end)
+        if not ok then
+            notyuri("AutoAnomalies:", err)
+        end
+        task.wait(2)
+    end
+end
+
+local function Func_AutoQueue()
+    while Toggles.AutoQueue.Value do
+        local ok, err = pcall(function()
+            local zone = GetObject(workspace, "Lobby.Important.TeleportPod.Zone")
+            if zone then
+                TPTo(zone)
+                FireTI(zone)
+            end
+        end)
+        if not ok then
+            notyuri("AutoQueue:", err)
+        end
+        task.wait(1)
+    end
+end
+
+local function Func_AutoCrate()
+    while Toggles.AutoCrate.Value do
+        local ok, err = pcall(function()
+            if not Remotes.OpenCrate then
+                task.wait(2)
+                return
+            end
+            local state = SafeInvoke(Remotes.GetState)
+            local cash = type(state) == "table" and type(state.cash) == "number" and state.cash or 0
+            while cash >= 10 and Toggles.AutoCrate.Value do
+                local result = SafeInvoke(Remotes.OpenCrate)
+                local nextCash = type(result) == "table" and type(result.state) == "table" and type(result.state.cash) == "number" and result.state.cash or nil
+                if nextCash then
+                    cash = nextCash
+                else
+                    break
+                end
+                task.wait(0.8)
+            end
+        end)
+        if not ok then
+            notyuri("AutoCrate:", err)
+        end
+        task.wait(1)
+    end
+end
+
+TB_Tabs.Autofarm.T1:AddDivider()
+TB_Tabs.Autofarm.T1:AddToggle("AutoChores", { Text = "Auto Chores" })
+TB_Tabs.Autofarm.T1:AddToggle("AutoPlay", { Text = "Auto Play" })
+TB_Tabs.Autofarm.T1:AddToggle("AutoPet", { Text = "Auto Pet" })
+TB_Tabs.Autofarm.T1:AddToggle("AutoSleep", { Text = "Auto Sleep" })
+TB_Tabs.Autofarm.T1:AddToggle("AutoAnomalies", { Text = "Auto Anomalies" })
+TB_Tabs.Autofarm.T1:AddDivider()
+TB_Tabs.Autofarm.T1:AddToggle("AutoQueue", { Text = "Auto Queue" })
+TB_Tabs.Autofarm.T1:AddToggle("AutoCrate", { Text = "Auto Crate" })
+
+Toggles.AutoChores:OnChanged(function(state)
+    Thread("AutoChores", SafeLoop("AutoChores", Func_AutoChores), state)
+end)
+Toggles.AutoPlay:OnChanged(function(state)
+    Thread("AutoPlay", SafeLoop("AutoPlay", Func_AutoPlay), state)
+end)
+Toggles.AutoPet:OnChanged(function(state)
+    Thread("AutoPet", SafeLoop("AutoPet", Func_AutoPet), state)
+end)
+Toggles.AutoSleep:OnChanged(function(state)
+    Thread("AutoSleep", SafeLoop("AutoSleep", Func_AutoSleep), state)
+end)
+Toggles.AutoAnomalies:OnChanged(function(state)
+    Thread("AutoAnomalies", SafeLoop("AutoAnomalies", Func_AutoAnomalies), state)
+end)
+Toggles.AutoQueue:OnChanged(function(state)
+    Thread("AutoQueue", SafeLoop("AutoQueue", Func_AutoQueue), state)
+end)
+Toggles.AutoCrate:OnChanged(function(state)
+    Thread("AutoCrate", SafeLoop("AutoCrate", Func_AutoCrate), state)
+end)
+
+do
+    SafeConnect("Litter", function()
+        return Remotes.Litter and Remotes.Litter.OnClientEvent
+    end, function(op, sid, data)
+        if op == "Start" then
+            Shared.LitterSid = sid
+            table.clear(Shared.LitterDone)
+            task.spawn(function()
+                task.wait(0.6)
+                for i = 1, 5 do
+                    if Shared.LitterSid ~= sid then break end
+                    if not Toggles.AutoChores.Value then
+                        if Remotes.Litter then
+                            Remotes.Litter:FireServer("Cancel", sid)
+                        end
+                        break
+                    end
+                    if not Shared.LitterDone[i] then
+                        local bag = GetObject(Plr, "PlayerGui.LitterCleaningGui.Panel.Board.Bag")
+                        if bag then
+                            Remotes.Litter:FireServer("Grab", sid, i)
+                            task.wait(0.2)
+                            Remotes.Litter:FireServer("Drop", sid, i, bag.Position.X.Scale + bag.Size.X.Scale * 0.5, bag.Position.Y.Scale + bag.Size.Y.Scale * 0.5)
+                            task.wait(0.2)
+                        end
+                    end
+                end
+            end)
+        elseif op == "Retry" and sid == Shared.LitterSid then
+            task.spawn(function()
+                if Toggles.AutoChores.Value and Remotes.Litter and type(data) == "number" then
+                    local bag = GetObject(Plr, "PlayerGui.LitterCleaningGui.Panel.Board.Bag")
+                    if bag then
+                        Remotes.Litter:FireServer("Grab", sid, data)
+                        task.wait(0.2)
+                        Remotes.Litter:FireServer("Drop", sid, data, bag.Position.X.Scale + bag.Size.X.Scale * 0.5, bag.Position.Y.Scale + bag.Size.Y.Scale * 0.5)
+                    end
+                end
+            end)
+        elseif op == "Collected" and sid == Shared.LitterSid and type(data) == "table" then
+            Shared.LitterDone[data.index] = true
+        elseif (op == "Win" or op == "End") and sid == Shared.LitterSid then
+            Shared.LitterSid = nil
+            table.clear(Shared.LitterDone)
+        end
+    end)
+end
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
