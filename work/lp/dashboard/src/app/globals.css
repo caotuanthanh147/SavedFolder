@@ -216,6 +216,9 @@ body {
   inset: 0;
   border-radius: 9999px;
   background: currentColor;
+  /* decorative ring: never intercept pointer events, even if a future
+     usage forgets `relative` and the ring escapes its containing block */
+  pointer-events: none;
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
@@ -261,6 +264,24 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in oklab, var(--foreground) 34%, transparent);
+}
+
+/* Sticky headers for the scrollable data tables (M11 s9): the header row
+   pins to the top of its max-h scroll container so columns stay labeled
+   while scanning long key/audit/session lists. Opaque --card background
+   hides scrolling rows underneath; the hairline only reads as a divider. */
+.table-sticky thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--card);
+  box-shadow: 0 1px 0 0 var(--border);
+}
+
+/* Live-alert feed rows (M11 s9): keyboard focus ring matching the app style */
+.alert-row:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--primary) 55%, transparent);
+  outline-offset: 1px;
 }
 
 /* Focus visibility for keyboard users */

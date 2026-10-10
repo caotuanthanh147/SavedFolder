@@ -52,7 +52,7 @@ export function FreshnessPill({
       )}
       <span className={`tabular-nums ${stale ? "text-amber-600 dark:text-amber-400" : ""}`}>{label}</span>
       {pollMs !== undefined && (
-        <span className={`inline-block h-1.5 w-1.5 rounded-full ${stale ? "bg-amber-500" : "pulse-dot bg-emerald-500"}`} aria-hidden />
+        <span className={`relative inline-block h-1.5 w-1.5 rounded-full ${stale ? "bg-amber-500" : "pulse-dot bg-emerald-500"}`} aria-hidden />
       )}
     </button>
   );

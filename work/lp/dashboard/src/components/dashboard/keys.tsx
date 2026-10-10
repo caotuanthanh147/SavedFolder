@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { copyText, csvTimestamp, exportCsv } from "@/lib/export-utils";
 import { loggedFetch } from "@/lib/api-log";
 import { TierBadge, StatusBadge } from "@/components/dashboard/badges";
-import { formatTime, gw, KeyRow } from "@/lib/api";
+import { formatTime, gw, KeyRow, SyncData } from "@/lib/api";
 import { useApiData } from "@/lib/use-api-data";
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, CalendarPlus, Copy, Download, FileKey2, KeyRound, Pencil, Plus, RefreshCw, Search, ShieldOff, Undo2, X } from "lucide-react";
 
@@ -122,6 +122,21 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
     setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: k === "created" || k === "resets" ? "desc" : "asc" }));
   }
 
+  // "Expiring ≤ 7d" ops preset (M11 s9): a client-side layer on top of the
+  // server filters + sort. The /sync server clock is the time base — pure,
+  // no Date.now() in render. Matches the Overview watchlist definition.
+  const [expiringOnly, setExpiringOnly] = useState(false);
+  const sync = useApiData(() => gw<SyncData>("GET", "/sync"), []);
+  const st = sync.data?.st ?? null;
+  const visibleRows = useMemo(() => {
+    if (sortedRows === null || !expiringOnly || st === null) return sortedRows;
+    return sortedRows.filter((r) => r.status === "active" && r.expires_at !== null && r.expires_at - st <= 7 * 86400);
+  }, [sortedRows, expiringOnly, st]);
+  const expiringCount = useMemo(() => {
+    if (sortedRows === null || st === null) return null;
+    return sortedRows.filter((r) => r.status === "active" && r.expires_at !== null && r.expires_at - st <= 7 * 86400).length;
+  }, [sortedRows, st]);
+
   // Multi-select + bulk operations. Requests run sequentially (SQLite writes,
   // one in-flight request) with a single summary toast per batch.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -141,17 +156,17 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
   }
   function toggleAll(): void {
     setSelected((s) => {
-      if (sortedRows === null) return s;
-      const allSelected = sortedRows.every((r) => s.has(r.id));
+      if (visibleRows === null) return s;
+      const allSelected = visibleRows.every((r) => s.has(r.id));
       const next = new Set(s);
-      for (const r of sortedRows) {
+      for (const r of visibleRows) {
         if (allSelected) next.delete(r.id);
         else next.add(r.id);
       }
       return next;
     });
   }
-  const allSelected = (sortedRows?.length ?? 0) > 0 && sortedRows!.every((r) => selected.has(r.id));
+  const allSelected = (visibleRows?.length ?? 0) > 0 && visibleRows!.every((r) => selected.has(r.id));
   const someSelected = !allSelected && selected.size > 0;
 
   async function bulkRevoke(): Promise<void> {
@@ -358,9 +373,9 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
   }
 
   function exportKeysCsv(): void {
-    if (!sortedRows) return;
-    exportCsv(`yuri-keys-${csvTimestamp()}`, ["id", "tier", "status", "note", "executions", "hwid_bound", "hwid_resets", "discord_id", "roblox_user_id", "created_at", "expires_at", "last_used_at", "created_by"], sortedRows.map((r) => [r.id, r.tier, r.status, r.note ?? "", r.total_executions, r.hwid_bound ? "bound" : "unbound", r.hwid_resets, r.discord_id ?? "", r.roblox_user_id ?? "", formatTime(r.created_at), formatTime(r.expires_at), formatTime(r.last_used_at), r.created_by]));
-    toast.info("CSV exported", { description: `${sortedRows.length} key rows (current filters + sort).` });
+    if (!visibleRows) return;
+    exportCsv(`yuri-keys-${csvTimestamp()}`, ["id", "tier", "status", "note", "executions", "hwid_bound", "hwid_resets", "discord_id", "roblox_user_id", "created_at", "expires_at", "last_used_at", "created_by"], visibleRows.map((r) => [r.id, r.tier, r.status, r.note ?? "", r.total_executions, r.hwid_bound ? "bound" : "unbound", r.hwid_resets, r.discord_id ?? "", r.roblox_user_id ?? "", formatTime(r.created_at), formatTime(r.expires_at), formatTime(r.last_used_at), r.created_by]));
+    toast.info("CSV exported", { description: `${visibleRows.length} key rows (current filters + sort).` });
   }
 
   return (
@@ -421,10 +436,24 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
             <SelectItem value="revoked">revoked</SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          variant={expiringOnly ? "default" : "outline"}
+          onClick={() => setExpiringOnly((o) => !o)}
+          aria-pressed={expiringOnly}
+          className="gap-1.5"
+          title="active keys expiring within 7 days (server clock) — matches the Overview watchlist"
+        >
+          <CalendarClock className="h-4 w-4" /> expiring ≤7d
+          {expiringCount !== null && (
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
+              {expiringCount}
+            </Badge>
+          )}
+        </Button>
         <Button variant="outline" size="icon" onClick={() => refresh()} aria-label="refresh">
           <RefreshCw className="h-4 w-4" />
         </Button>
-        <Button variant="outline" onClick={exportKeysCsv} disabled={!sortedRows || sortedRows.length === 0}>
+        <Button variant="outline" onClick={exportKeysCsv} disabled={!visibleRows || visibleRows.length === 0}>
           <Download className="mr-1 h-4 w-4" /> CSV
         </Button>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -556,27 +585,29 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
           <CardTitle className="text-sm text-muted-foreground">
             {rows === null
               ? "loading…"
-              : `${total} key${total === 1 ? "" : "s"} · hash-only storage, plaintext never returned after creation`}
+              : expiringOnly
+                ? `${visibleRows?.length ?? 0} of ${total} keys · expiring ≤7d preset`
+                : `${total} key${total === 1 ? "" : "s"} · hash-only storage, plaintext never returned after creation`}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {sortedRows === null ? (
+          {visibleRows === null ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="skeleton-shimmer h-10" />
               ))}
             </div>
-          ) : sortedRows.length === 0 ? (
+          ) : visibleRows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                 <KeyRound className="h-6 w-6 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium">No keys match the filters</p>
-              <p className="text-xs text-muted-foreground">Clear the search or create a new batch.</p>
+              <p className="text-sm font-medium">{expiringOnly ? "No keys expire within 7 days" : "No keys match the filters"}</p>
+              <p className="text-xs text-muted-foreground">{expiringOnly ? "The watchlist is clear — nothing needs a renewal nudge yet." : "Clear the search or create a new batch."}</p>
             </div>
           ) : (
             <div className="max-h-96 overflow-auto">
-              <Table>
+              <Table className="table-sticky">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-9 pr-0">
@@ -598,7 +629,7 @@ export function KeysView({ prefill }: { prefill?: string }): React.JSX.Element {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedRows.map((r) => {
+                  {visibleRows.map((r) => {
                     const isSel = selected.has(r.id);
                     return (
                     <TableRow

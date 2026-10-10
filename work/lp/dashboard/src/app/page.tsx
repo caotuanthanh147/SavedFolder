@@ -22,6 +22,7 @@ import { SettingsView } from "@/components/dashboard/settings";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { CommandPalette, type Command } from "@/components/dashboard/command-palette";
 import { ApiInspectorButton, ApiInspectorPanel, ApiProgressBar } from "@/components/dashboard/api-inspector";
+import { LiveAlertsBell } from "@/components/dashboard/live-alerts";
 import { ShortcutsDialog } from "@/components/dashboard/shortcuts";
 import { useApiData } from "@/lib/use-api-data";
 import { KeyRow, gw } from "@/lib/api";
@@ -47,6 +48,8 @@ import {
   Fingerprint,
   Printer,
   Keyboard,
+  BellOff,
+  BellRing,
 } from "lucide-react";
 
 type ViewId =
@@ -122,6 +125,9 @@ export default function Home(): React.JSX.Element {
   // Keys-view prefill from the palette's entity search — same remount pattern
   // (the KeysView initial query reads this once at mount).
   const [keysPrefill, setKeysPrefill] = useState<{ text: string; session: number } | null>(null);
+  // Security-alert mute (M11 s9): session-only, lifted here so the command
+  // palette can toggle it while the bell owns the feed + toasts.
+  const [alertsMuted, setAlertsMuted] = useState(false);
 
   // Keys index for the palette's global entity search (id / note / discord /
   // roblox). One fetch on mount + 60s poll — the palette filters client-side,
@@ -222,6 +228,14 @@ export default function Home(): React.JSX.Element {
       icon: <Keyboard className="h-4 w-4" />,
       run: () => setHelpOpen(true),
     },
+    {
+      id: "toggle-alerts",
+      label: alertsMuted ? "Unmute security alerts" : "Mute security alerts",
+      hint: "live ops",
+      group: "System",
+      icon: alertsMuted ? <BellOff className="h-4 w-4" /> : <BellRing className="h-4 w-4" />,
+      run: () => setAlertsMuted((m) => !m),
+    },
   ];
 
   const groups = Array.from(new Set(NAV.map((n) => n.group)));
@@ -291,6 +305,7 @@ export default function Home(): React.JSX.Element {
                 </TooltipContent>
               </Tooltip>
             )}
+            <LiveAlertsBell muted={alertsMuted} onMutedChange={setAlertsMuted} onNavigate={go} />
             <ApiInspectorButton onClick={() => setInspectorOpen(true)} />
             <ThemeToggle />
           </div>

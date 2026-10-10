@@ -6,7 +6,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
-import { CornerDownLeft, Keyboard, MousePointerClick, Printer, Search } from "lucide-react";
+import { Bell, CornerDownLeft, Keyboard, MousePointerClick, Printer, Search } from "lucide-react";
 
 interface Row {
   keys: React.ReactNode;
@@ -27,6 +27,7 @@ const INTERACTION_ROWS: Row[] = [
   { keys: <Kbd className="border bg-background">click</Kbd>, label: "Overview stat cards drill down (keys / sessions / tamper)", icon: <MousePointerClick className="h-4 w-4" aria-hidden /> },
   { keys: <Kbd className="border bg-background">click</Kbd>, label: "Hashes and ids copy to clipboard (toast confirms)", icon: <MousePointerClick className="h-4 w-4" aria-hidden /> },
   { keys: <Kbd className="border bg-background">click</Kbd>, label: "Freshness pill refreshes the view's data now", icon: <MousePointerClick className="h-4 w-4" aria-hidden /> },
+  { keys: <Kbd className="border bg-background">bell</Kbd>, label: "Header bell rings on tamper/leak/blacklist events — palette toggles mute", icon: <Bell className="h-4 w-4" aria-hidden /> },
   { keys: <Kbd className="border bg-background">print</Kbd>, label: "Palette → “Print / save as PDF” renders a clean report (chrome hidden, tables expanded)", icon: <Printer className="h-4 w-4" aria-hidden /> },
 ];
 

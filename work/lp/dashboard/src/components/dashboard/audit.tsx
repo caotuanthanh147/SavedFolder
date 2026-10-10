@@ -25,6 +25,16 @@ const CATEGORIES = [
   { value: "script", label: "scripts" },
 ];
 
+// Quick time-range chips (M11 s9). "now" reference = the newest entry's
+// created_at (the API returns DESC) — pure data-derived, no Date.now() in
+// render. "all" skips filtering.
+const RANGES: { v: string; label: string; secs: number }[] = [
+  { v: "1h", label: "1h", secs: 3600 },
+  { v: "24h", label: "24h", secs: 86400 },
+  { v: "7d", label: "7d", secs: 7 * 86400 },
+  { v: "all", label: "all", secs: 0 },
+];
+
 // Reused by the Overview timeline to pick dot colors (timeline-cat-*).
 export function categorize(action: string): string {
   if (action.startsWith("key.") || action.startsWith("hwid")) return "key";
@@ -92,19 +102,25 @@ export function AuditView(): React.JSX.Element {
   const { data, error, refresh, lastUpdatedAt } = useApiData(() => gw<{ entries: AuditEntry[] }>("GET", "/admin/audit?limit=200"), [], { pollMs: 20000 });
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
+  const [range, setRange] = useState("all");
 
   const rows: AuditEntry[] | null = data?.entries ?? null;
   const filtered = useMemo(() => {
     if (!rows) return null;
     let out = rows;
     if (category !== "all") out = out.filter((r) => categorize(r.action) === category);
+    const r = RANGES.find((x) => x.v === range);
+    if (r !== undefined && r.secs > 0 && out.length > 0) {
+      const nowRef = rows[0]!.created_at; // API returns DESC — rows[0] is newest
+      out = out.filter((row) => nowRef - row.created_at <= r.secs);
+    }
     const q = query.trim().toLowerCase();
     if (q.length > 0)
       out = out.filter(
-        (r) => r.action.toLowerCase().includes(q) || (r.detail ?? "").toLowerCase().includes(q) || (r.target ?? "").toLowerCase().includes(q) || r.actor_id.toLowerCase().includes(q),
+        (row) => row.action.toLowerCase().includes(q) || (row.detail ?? "").toLowerCase().includes(q) || (row.target ?? "").toLowerCase().includes(q) || row.actor_id.toLowerCase().includes(q),
       );
     return out;
-  }, [rows, category, query]);
+  }, [rows, category, query, range]);
 
   function exportAuditCsv(): void {
     if (!filtered) return;
@@ -151,6 +167,23 @@ export function AuditView(): React.JSX.Element {
           <CardTitle className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <ScrollText className="h-4 w-4" />
             {filtered === null ? "loading…" : `${filtered.length} of ${rows?.length ?? 0} audit entries`}
+            <span className="flex items-center gap-1" role="group" aria-label="filter by time range">
+              {RANGES.map((r) => (
+                <button
+                  key={r.v}
+                  type="button"
+                  onClick={() => setRange(r.v)}
+                  aria-pressed={range === r.v}
+                  className={`h-6 rounded-full px-2 text-[11px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                    range === r.v
+                      ? "bg-secondary text-secondary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </span>
             <Button variant="outline" size="sm" className="ml-auto h-7" onClick={exportAuditCsv} disabled={!filtered || filtered.length === 0}>
               <Download className="mr-1 h-3.5 w-3.5" /> CSV
             </Button>
@@ -173,7 +206,7 @@ export function AuditView(): React.JSX.Element {
             </div>
           ) : (
             <div className="max-h-96 overflow-auto">
-              <Table>
+              <Table className="table-sticky">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Time</TableHead>
