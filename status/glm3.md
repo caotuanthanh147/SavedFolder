@@ -1,41 +1,56 @@
 # glm3 status
 
-**Updated**: 2026-10-10 16:48Z (LP1 M4 session 3 — parser build)
+**Updated**: 2026-10-10 17:25Z (LP1 M4 session 3 DELIVERED — Public baf0958)
 
-**Doing**: M4 s3 = token→AST parser. src/parser.ts (1751 lines): FULL grammar
-(stmts/exprs/type grammar, contextual continue/type/export, attributes,
-generics w/ defaults, function types, repeat-scope, loop/vararg context
-tracking). 2026-10-10 16:45:50Z: tsc EXIT 0 + 70/70 after the narrowing-fix
-batch (curType() helper vs TS's method-call property-narrowing soundness
-hole — 25 errors fixed; 21 by a PARALLEL glm3 instance detected 16:40-16:42,
-4 finished by me; see msgs/glm3/parallel-instance-coordination-20261010T1647Z.md
-for the lane split + lock rule). NEXT: tests/parser.test.ts (my claim) →
-corpus full-parse extension → DECISIONS/VERIFICATION refresh → s3 commit.
-glm6 is BLOCKED on this (M5 corpus end-to-end + IR.md pin D-M4-2) — top of
-the project critical path.
+**Doing**: M4 s3 = token→AST parser DELIVERED (Public baf0958, canonical
+e29d090): 1756-line parser, full grammar, 101 new spec-cited tests (package
+220/220 with glm6's M5, tsc clean on merged tree, fresh-run on delivered
+bytes). Corpus --parse: private 49/50 (reject = Lua 5.3 bitwise, out of
+spec), 131-corpus 127/130 (rejects = broken files), luagrapheg = Lua 5.1
+vararg-main reject (out of spec). 3 bugs found+fixed+regression-tested
+(lone T? union wrap D-M4-15; dead != branch Equal-vs-Assign;
+reservedWordType prototype pollution — toString et al mis-lexed; lesson
+logged). DECISIONS D-M4-8..16 reconstructed post-context-loss. glm6 msg'd
+(corpus + IR pin unblocked). TASKS row + lessons + this status committed
+(6be5751).
 
-**Checkpoint (multi-day big project = LP1 Lua obfuscator; user: "this is a
-big project so I may run this several times for several days")**:
-- Lane: LP1-M4 "Obfuscator front end" (claimed, TASKS row 245). s1 lexer +
-  s2 AST DELIVERED (Public fc730bf/1ca1dbf; re-landed after user force-push
-  #3 — glm1 msg). Canonical tree: ~/SavedFolder/work/lp/m4 (bun, tsc,
-  bun test). Spec: Luau Lexer.cpp/Parser.cpp @ master (MIT, used as SPEC).
-- Deliverables live in BOTH work/lp/m4 (canonical) and Public
-  obfuscator/parser/ (delivery copy) — sync on commit.
-- DEPENDENTS: glm6 M5 (delivered, waits on my parser for corpus + IR pin);
-  glm1 M6 (waits on M5 ISA). My parser = current project bottleneck.
-- Parallel-instance event 2026-10-10 16:40Z: second glm3 launch detected
-  editing the same files. Protocol written (coordination msg above). Watch
-  mtimes before writes; atomic-edit failures = yield and re-read.
-- Continuous-operation discipline (user, 3rd warning, "that's bad"): pending
-  list must be driven to empty + poll/watch between items. Never stop while
-  tasks remain.
+**NEXT (s4)**: printer (AST→source, all node kinds, byte-exact raw
+preservation for numbers/strings) + round-trip corpus differential
+(parse→print→parse→AST-equal) — the doc §10.3 fuzzing oracle pairs with
+this. Then: semantic analysis (item 2), const extraction (item 6, §5.7
+const-key chain), IR.md pin (D-M4-2) w/ glm6 (they may have started —
+CHECK msgs/glm6 + glm1 before writing).
 
-**Last (PST1, 2026-10-08)**: Pet Store Tycoon DELIVERED Public 96fe758
-(Boxes.Report client-authoritative ESC find; harness 43/43 ×3 + delivered
-bytes). Full detail in git history of this file @ 13:31Z today.
+**Checkpoint (multi-day big project = LP1 Lua obfuscator)**:
+- Lane: LP1-M4 (TASKS row 245). s1 lexer + s2 AST + s3 parser DELIVERED.
+  Canonical: ~/SavedFolder/work/lp/m4. Public: obfuscator/ (FLAT package —
+  parser src/tests + glm6's compiler/vm share one package.json; run
+  `bun test` from obfuscator/ for the merged 220).
+- Dependencies RESOLVED by s3: glm6's corpus end-to-end + IR pin. My next
+  bottleneck-creating items: printer (M6/glm1 may want source-emitting
+  transforms), IR.md.
+- **Parallel-instance protocol ACTIVE**: a second glm3 launch was detected
+  2026-10-10 16:40-16:42Z editing my tree (21/25 of the same fixes,
+  verbatim comment). Lane-split msg in msgs/glm3/. Before ANY write to
+  m4 files: re-read msgs/glm3/ + check mtimes vs last read; atomic edit
+  failure = other instance won, re-read. Fold, don't revert. Its status:
+  silent since 16:42 — possibly context-dead; if it wakes, the TASKS row
+  + status now document s3 done (it should see them and yield or take
+  review lane).
+- Continuous-operation discipline (user, 3 warnings, last: "that's bad"):
+  drive pending to empty + poll between items. Current pending: s4 printer
+  (next), poll/watch active.
+- Force-push risk: user force-pushes Public periodically; canonical in
+  SavedFolder is the recovery source (lessons.md pattern). Last known
+  user tip behavior: dropped module trees, doc.md + samples survive.
 
-**Session log index**: logs/glm3/ (s8 inbox-consume note; earlier sessions
-in git history). Watchers: poll.sh + watch_public.sh running since 12:26/
-12:40Z (verify with ps; sandbox reaps between tool calls — restart
-best-effort each session).
+**Last session summary (s3)**: tsc-25-error batch (TS property-narrowing
+soundness hole — curType() helper; overloads; parseIf(): IfStat) co-done
+with the parallel instance; spec-derived test suite caught 2 parser bugs +
+corpus caught 1 lexer bug (prototype pollution — invisible to lex-only
+review); DECISIONS log reconstructed D-M4-8..16.
+
+**Watchers**: poll.sh + watch_public.sh — restart best-effort each session
+command (sandbox reaps between Bash calls). Msg protocol: consume via rm +
+keep .gitkeep; msgs/glm6/ now exists (I created it — glm6 had no inbox
+dir before).
