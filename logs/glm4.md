@@ -164,3 +164,34 @@
 - Lesson APPLIED this session: coordinate FIRST (msg'd glm1 before acting),
   treat <15min claims as active (didn't take over POT1), don't repeat the
   session-2 premature-delivery mistake.
+
+## Session 5 — 2026-10-10: BIG PROJECT LP1-M13 (full module build+delivery)
+
+- User redirect at session start: "we are not doing webdev… you're glm4" →
+  left the web lane to main-agent, claimed LP1-M13 in TASKS.md (0bfcd40,
+  pushed BEFORE work per protocol; token recovered from /tmp clone remotes
+  after sandbox reset x5 — bootstrap.sh grep found nothing, wired silently).
+- doc.md read head-to-toe (1037 lines) + SavedFolder protocol docs
+  (PROMPT/ONBOARDING/guide §12 Potassium=UNC executor API standard).
+- Research BEFORE code (doc hard rule): CF default-cache-behavior (`.lua`
+  NOT default-cached — the key finding driving D-M13-3), Workers Cache API,
+  R2 public buckets, Potassium FS+request docs (UNC), Solara docs (2nd
+  executor; readfile errors on missing), draft-eastlake-fnv KATs (fetched
+  via reader service — datatracker curl was CF-challenged), MDN
+  Cache-Control (immutable). Local hash benchmark (lua5.4): FNV ~148ns/B,
+  DJB2 ~136ns/B, SHA-256 ~936ns/B → dual-32-bit chosen (D-M13-5).
+- Built loader/stub/: initpack (content-addressed builds), generator+template
+  (unique per fetch), routes (mountable, EdgeCache-injectable), Lua harness
+  (executor-env simulator, 10 scenarios). Bug caught+fixed during tests:
+  MY OWN test vectors were initially wrong (TextEncoder re-encodes >0x7F
+  code points — the FNV "Hello!\xFF\xED" vector needed raw-byte
+  construction; two fabricated expected constants replaced with BigInt
+  ground truth; Lua harness gmatch consumed the trailing \n so every other
+  constant line was skipped — [^\n]* fix). This is exactly the §22.1
+  "tests must come from outside sources" lesson — the draft vectors caught
+  the TextEncoder issue, the harness caught the extraction issue.
+- Delivered Public a7beaa4 (sync.sh verified). TASKS row → done. Msgs sent:
+  glm1 (M3 entry contract, D-M13-6), main-agent (M1 route mounting).
+  Fleet moved during the build: glm1 delivered M3 (ed8d843), glm6 claimed
+  M5 — interop checked: M3 handshake.lua is a module factory; assembled
+  init needs the entry wrapper per my msg.

@@ -1,29 +1,32 @@
 # glm4 status
 
-**Updated**: 2026-10-10 (session 5 — BIG PROJECT round: LP1-M13 claimed)
+**Updated**: 2026-10-10 (session 5 — BIG PROJECT round: LP1-M13 DONE)
 
-**Doing**: LP1-M13 "Loader stub generator and CDN init packaging" (doc.md §5.6,
-§8; Public repo layout loader/stub/ + init build pipeline). Claimed after user
-redirect ("we are not doing webdev… you're glm4") — moving off the web lane
-(the old web-instance session in this sandbox delivered M1/M9/M11; that's
-main-agent's row now). My lane = Lua/loader side, matching my harness lineage
-(SAC1-H, FW1-H-closed).
+**Done this session**: LP1-M13 "Loader stub generator and CDN init packaging"
+delivered Public a7beaa4 (claim-first 0bfcd40 pushed before work, per
+protocol). loader/stub/ = content-addressed init packaging (b+sha256[0:12],
+immutable caching, URL-is-cache-buster) + unique-per-fetch stub generator
+(time/8B stub-id/32B per-stub random + exact-size + FNV-1a32/DJB2 of served
+bytes, no-store) + plain-5.1 Lua stub (feature-checked UNC APIs, bit32-
+optional DJB2 path, generic failures, no goto) + mountable /loaders and
+/static routes (injectable EdgeCache, no-store on errors). D12 RESOLVED
+(folder lp/, init_<build>.lua, dual-hash+exact-size, best-effort write).
+RESEARCH-M13 (CF extension list, UNC FS/request on Potassium+Solara docs,
+FNV draft vectors, local hash benchmark) → DECISIONS-M13 (10 rows) →
+VERIFICATION-M13 §22.1 (42/42 bun + tsc clean + luac gate + 10-scenario
+lua5.4 executor-env harness + stale-hash negative fails closed).
 
-**Plan (doc READ FIRST order)**: doc.md read head-to-toe (1037 lines) ✓ →
-claim pushed ✓ → RESEARCH-M13 BEFORE code (doc's M13 research list: CF/R2
-static caching + cache-busting + executor FS APIs readfile/writefile/
-makefolder availability + safe on-disk cache validation; D12 resolution)
-→ DECISIONS-M13 → build loader/stub/ (stub generator TS + unique-per-fetch
-Lua stub template + init packaging CLI + cache validation) → tests (bun TS +
-lua5.4 Lua harness) → VERIFICATION-M13 §22.1 → deliver Public → TASKS row done
-→ msgs to glm1 (M3 interop) + main-agent (M1 /loaders integration).
+**Interop sent**: msg glm1 (M3): assembled init must return entry fn; stub
+calls entry({api, script_id, build, t, s, r}) — D-M13-6 Tier 2. Msg
+main-agent (M1): mount /loaders + /static routes (README snippet).
 
-**Past**: FW1-H closed moot 2026-10-08 (user deleted FNAF folder, 146eb30).
-SAC1-H (Steal A Car harness) — harness delivered in-session 2026-10-04,
-glm3's SAC1 notes carry the lane state; round closed with folder deletion.
+**Next candidates** (if the user runs more rounds): M5 back end is glm6's
+(now-claimed); M6/M7 wait on M5/M6 outputs; M8 (Discord bot), M10 (payments
+webhooks), M12 (ops runbooks) remain open per TASKS LP1-other. Also
+pending fleet-wide: real-executor §22.1 tests (human), M14 review after
+merge. I stay OFF the web lane per the user's directive.
 
-**Session notes**: sandbox reset x5 (fresh clone + bootstrap.sh glm4 + token
-recovered from /tmp clone remotes, wired silently per protocol). doc.md v3+
-force-push history respected: pull --rebase before every push (sync.sh does
-it). M1's stub service in api/ is placeholder-level ("stub.ts" per main-agent
-worklog) — M13's generator is the real thing behind /loaders/:id.lua.
+**Past**: FW1-H closed moot 2026-10-08 (FNAF folder deleted 146eb30).
+SAC1-H delivered 2026-10-04 (Steal A Car harness lane, round closed).
+Sandbox resets: x5 (this session re-cloned + bootstrapped + token recovered
+from /tmp clone remotes, wired silently per protocol).
