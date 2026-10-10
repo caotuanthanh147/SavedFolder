@@ -20,7 +20,8 @@
     "SESSION_TTL_SEC": "3600",
     "FREE_KEY_DAYS": "3",
     "FREE_ATTEMPT_TTL_SEC": "7200",
-    "FREE_CLAIM_WINDOW_SEC": "900"
+    "FREE_CLAIM_WINDOW_SEC": "900",
+    "PAYMENTS_SIG_TOLERANCE_SEC": "300"
   }
   // Secrets (wrangler secret put, never in this file):
   //   SERVER_PEPPER            — server-wide pepper for key/hwid/ip hashes
@@ -28,6 +29,9 @@
   //   PROOF_KEY_B64URL         — HMAC key for x-proof checking
   //   SESSION_SEAL_KEY         — seals the opaque payload_ref (auth sessions)
   //   PROJECT_SIGNING_KEYS     — optional JSON map {signing_key_id: PKCS8 b64url}
+  //   PAYMENTS_STRIPE_SECRET   — module M10: Stripe webhook secret (whsec_…), comma-list for rotation
+  //   PAYMENTS_CUSTOM_SECRET   — module M10: custom-provider webhook secret (dev/bot-driven sales)
+  //   PAYMENTS_PROVIDER_BASE / PAYMENTS_PROVIDER_API_KEY — optional provider API for reconciliation
   //                              for per-project bundle_sig keys (doc §18);
   //                              absent → the default signing key is used
   //   FREE_SECRET              — HMAC key for free-flow step secrets (M9)

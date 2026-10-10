@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { canonicalJson, b64urlDecode, b64urlEncode, fromHex, toHex } from "../src/contracts";
-import { hmacSha256, hkdfSha256, sha256, utf8 } from "../src/crypto";
+import { hmacSha256, hkdfSha256, makeSigner, makeVerifier, sha256, utf8 } from "../src/crypto";
 import { chacha20Block, chacha20Xor, poly1305, aeadSeal, aeadOpen } from "../src/chacha";
+import { X25519_BASEPOINT, generateX25519KeyPair, x25519, x25519SharedSecret } from "../src/x25519";
 
 // Cross-implementation verification (doc.md §22.1: "second implementation"):
 // these vectors were produced by glm1's M3 Lua implementation
@@ -152,3 +153,69 @@ function atobHex(h: string): string {
   const bytes = fromHex(h);
   return new TextDecoder().decode(bytes);
 }
+
+// Session-4 additions: glm1's M3 session 2 (Public ee3b58f) published the
+// x25519 (RFC 7748) and ed25519 (RFC 8032) sections M1 asked for — the M1
+// side (this TS implementation, used by the real auth handshake) must
+// reproduce them byte-for-byte.
+
+describe.skipIf(!have)("M3 cross-vectors: X25519 (RFC 7748 §5.2 / §6.1) — M1's pure-TS impl vs glm1's Lua vectors", () => {
+  test("§5.2 scaltermult vectors ×2", async () => {
+    const cases = V.x25519_7748_52_scalarmult as { out: string; scalar: string; u: string }[];
+    for (const c of cases) {
+      expectEqualHex(x25519(hex(c.scalar), hex(c.u)), c.out, `scalarmult(${c.scalar.slice(0, 8)}…, ${c.u.slice(0, 8)}…)`);
+    }
+  });
+
+  test("§6.1 Diffie-Hellman: both directions converge on glm1's shared secret", async () => {
+    const dh = V.x25519_7748_61_dh as { alice_pk: string; alice_sk: string; bob_pk: string; bob_sk: string; shared: string };
+    expectEqualHex(x25519SharedSecret(hex(dh.alice_sk), hex(dh.bob_pk)), dh.shared, "alice(sk) × bob(pk)");
+    expectEqualHex(x25519SharedSecret(hex(dh.bob_sk), hex(dh.alice_pk)), dh.shared, "bob(sk) × alice(pk)");
+  });
+
+  test("§6.1 iterated (I=1): basepoint self-multiplication", async () => {
+    const it = V.x25519_7748_61_iterated_1 as { input_u: string; output_u: string };
+    expectEqualHex(x25519(hex(it.input_u), hex(it.input_u)), it.output_u, "iterated 1");
+    // the basepoint constant itself must be the RFC 9 fixed point
+    expect(toHex(X25519_BASEPOINT)).toBe("0900000000000000000000000000000000000000000000000000000000000000");
+  });
+
+  test("keypair generation from seed matches RFC 7748 §6.1 derived keys (pk = sk · basepoint)", async () => {
+    const dh = V.x25519_7748_61_dh as { alice_pk: string; alice_sk: string; bob_pk: string; bob_sk: string };
+    const alice = generateX25519KeyPair(hex(dh.alice_sk));
+    expectEqualHex(alice.publicKey, dh.alice_pk, "alice pk from seed");
+    const bob = generateX25519KeyPair(hex(dh.bob_sk));
+    expectEqualHex(bob.publicKey, dh.bob_pk, "bob pk from seed");
+  });
+});
+
+describe.skipIf(!have)("M3 cross-vectors: Ed25519 (RFC 8032 §7.1) — WebCrypto sign/verify vs glm1's Lua vectors", () => {
+  // RFC 8032 raw 32-byte seed → PKCS#8 DER wrapper for WebCrypto import:
+  // SEQUENCE { INTEGER 0, SEQUENCE { OID ed25519 }, OCTET STRING { OCTET STRING seed } }
+  function seedToPkcs8(seed: Uint8Array): Uint8Array {
+    return new Uint8Array([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20, ...seed]);
+  }
+
+  test("all 5 TEST vectors verify through M1's verifier", async () => {
+    const cases = V.ed25519_8032_71 as { msg: string; pk: string; sig: string; sk: string }[];
+    for (const c of cases) {
+      const verifier = await makeVerifier(b64urlEncode(hex(c.pk)));
+      const ok = await verifier.verify(hex(c.msg), hex(c.sig));
+      expect(ok, `verify(TEST msg=0x${c.msg.slice(0, 16)}…)`).toBe(true);
+      // tampered message must fail
+      if (c.msg.length >= 2) {
+        const flip = c.msg.slice(0, -2) + (c.msg.endsWith("00") ? "01" : "00");
+        expect(await verifier.verify(hex(flip), hex(c.sig))).toBe(false);
+      }
+    }
+  });
+
+  test("deterministic signing: M1's WebCrypto signer reproduces the RFC 8032 signatures from the seeds", async () => {
+    const cases = V.ed25519_8032_71 as { msg: string; pk: string; sig: string; sk: string }[];
+    for (const c of cases) {
+      const signer = await makeSigner(b64urlEncode(seedToPkcs8(hex(c.sk))));
+      const sig = await signer.sign(hex(c.msg));
+      expectEqualHex(sig, c.sig, `sign(TEST msg=0x${c.msg.slice(0, 16)}…)`);
+    }
+  });
+});

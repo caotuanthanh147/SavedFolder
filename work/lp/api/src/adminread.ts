@@ -182,3 +182,49 @@ export async function handleAdminListAdmins(ctx: AppContext, _config: ApiConfig,
     rows: rows.map((r) => ({ ...r, keys_created: counts.find((c) => c.created_by === r.id)?.n ?? 0 })),
   });
 }
+
+// CCP-2 addition for the doc §16 "Users (Discord link, HWID and session
+// history)" page: end-user identity aggregation over keys + sessions. A user
+// row = a discord identity when the key carries one, else the roblox user.
+// Read-only, owner/admin-gated, no hashes beyond what /admin/keys exposes.
+export async function handleAdminListUsers(ctx: AppContext, _config: ApiConfig, input: RequestInput): Promise<Response> {
+  const admin = await authenticate(ctx, _config, input);
+  if (!admin || (admin.role !== "owner" && admin.role !== "admin")) return json({ error: admin ? "forbidden" : "unauthorized" }, admin ? 403 : 401);
+  const q = queryOf(input);
+  const search = q.q && q.q.length <= 64 ? q.q : null;
+  const likeDiscord = search !== null ? " AND discord_id LIKE ? " : "";
+  const likeRoblox = search !== null ? " AND CAST(roblox_user_id AS TEXT) LIKE ? " : "";
+  const paramsD = search !== null ? [search + "%"] : [];
+  const paramsR = search !== null ? [search + "%"] : [];
+  const rows = await ctx.db.all<{
+    identity: string;
+    kind: string;
+    key_count: number;
+    active_keys: number;
+    hwids: number;
+    total_executions: number;
+    first_seen: number;
+    last_used: number | null;
+  }>(
+    `SELECT * FROM (
+      SELECT discord_id AS identity, 'discord' AS kind, COUNT(*) AS key_count,
+             SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_keys,
+             COUNT(DISTINCT hwid_hash) AS hwids,
+             SUM(total_executions) AS total_executions,
+             MIN(created_at) AS first_seen,
+             MAX(last_used_at) AS last_used
+      FROM keys WHERE discord_id IS NOT NULL${likeDiscord} GROUP BY discord_id
+      UNION ALL
+      SELECT CAST(roblox_user_id AS TEXT) AS identity, 'roblox' AS kind, COUNT(*) AS key_count,
+             SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_keys,
+             COUNT(DISTINCT hwid_hash) AS hwids,
+             SUM(total_executions) AS total_executions,
+             MIN(created_at) AS first_seen,
+             MAX(last_used_at) AS last_used
+      FROM keys WHERE discord_id IS NULL AND roblox_user_id IS NOT NULL${likeRoblox} GROUP BY roblox_user_id
+    ) ORDER BY last_used IS NULL, last_used DESC
+    LIMIT 200`,
+    [...paramsD, ...paramsR],
+  );
+  return json({ rows: rows.map((r) => ({ ...r, hwids: r.hwids ?? 0, total_executions: r.total_executions ?? 0 })) });
+}

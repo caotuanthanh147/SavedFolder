@@ -14,6 +14,7 @@ import {
   handleAdminRevokeKey,
   handleAdminScriptActivate,
   handleAdminScriptVersion,
+  handleAdminCreateReseller,
 } from "./admin";
 import { handleAuthHeartbeat, handleAuthInit, handleAuthPayload } from "./auth";
 import { handleFreeClaim, handleFreeStart, handleFreeStep } from "./freekey";
@@ -25,7 +26,15 @@ import {
   handleAdminListProtocolVersions,
   handleAdminListSessions,
   handleAdminListAdmins,
+  handleAdminListUsers,
 } from "./adminread";
+import {
+  handlePaymentsWebhook,
+  handleAdminListOrders,
+  handleAdminListProducts,
+  handleAdminUpsertProduct,
+  handleAdminReconcile,
+} from "./payments";
 
 export interface RouteHandlerArgs {
   ctx: AppContext;
@@ -92,6 +101,7 @@ export function buildRoutes(): Route[] {
     { method: "POST", pattern: "/free/start", handler: ({ ctx, config, input }) => handleFreeStart(ctx, config, input) },
     { method: "POST", pattern: "/free/step", handler: ({ ctx, config, input }) => handleFreeStep(ctx, config, input) },
     { method: "POST", pattern: "/free/claim", handler: ({ ctx, config, input }) => handleFreeClaim(ctx, config, input) },
+    { method: "POST", pattern: "/webhooks/payments/:provider", handler: (a) => handlePaymentsWebhook(a.ctx, a.config, a.input, a.params.provider) },
     { method: "GET", pattern: "/admin/keys", handler: ({ ctx, config, input }) => handleAdminListKeys(ctx, config, input) },
     { method: "GET", pattern: "/admin/scripts", handler: ({ ctx, config, input }) => handleAdminListScripts(ctx, config, input) },
     { method: "GET", pattern: "/admin/blacklist", handler: ({ ctx, config, input }) => handleAdminListBlacklist(ctx, config, input) },
@@ -99,6 +109,7 @@ export function buildRoutes(): Route[] {
     { method: "GET", pattern: "/admin/protocol-versions", handler: ({ ctx, config, input }) => handleAdminListProtocolVersions(ctx, config, input) },
     { method: "GET", pattern: "/admin/sessions", handler: ({ ctx, config, input }) => handleAdminListSessions(ctx, config, input) },
     { method: "GET", pattern: "/admin/admins", handler: ({ ctx, config, input }) => handleAdminListAdmins(ctx, config, input) },
+    { method: "GET", pattern: "/admin/users", handler: ({ ctx, config, input }) => handleAdminListUsers(ctx, config, input) },
     { method: "POST", pattern: "/admin/keys", handler: ({ ctx, config, input }) => handleAdminCreateKeys(ctx, config, input) },
     { method: "PATCH", pattern: "/admin/keys/:id", handler: (a) => handleAdminPatchKey(a.ctx, a.config, a.input, a.params.id) },
     { method: "POST", pattern: "/admin/keys/:id/revoke", handler: (a) => handleAdminRevokeKey(a.ctx, a.config, a.input, a.params.id) },
@@ -108,8 +119,13 @@ export function buildRoutes(): Route[] {
     { method: "POST", pattern: "/admin/protocol-versions", handler: ({ ctx, config, input }) => handleAdminProtocolVersions(ctx, config, input) },
     { method: "POST", pattern: "/admin/scripts/:id/versions", handler: (a) => handleAdminScriptVersion(a.ctx, a.config, a.input, a.params.id) },
     { method: "POST", pattern: "/admin/scripts/:id/activate", handler: (a) => handleAdminScriptActivate(a.ctx, a.config, a.input, a.params.id) },
+    { method: "POST", pattern: "/admin/resellers", handler: ({ ctx, config, input }) => handleAdminCreateReseller(ctx, config, input) },
     { method: "GET", pattern: "/admin/analytics/overview", handler: ({ ctx, config, input }) => handleAdminAnalytics(ctx, config, input) },
     { method: "GET", pattern: "/admin/audit", handler: ({ ctx, config, input }) => handleAdminAudit(ctx, config, input) },
+    { method: "GET", pattern: "/admin/payments/orders", handler: ({ ctx, config, input }) => handleAdminListOrders(ctx, config, input) },
+    { method: "GET", pattern: "/admin/payments/products", handler: ({ ctx, config, input }) => handleAdminListProducts(ctx, config, input) },
+    { method: "POST", pattern: "/admin/payments/products", handler: ({ ctx, config, input }) => handleAdminUpsertProduct(ctx, config, input) },
+    { method: "POST", pattern: "/admin/payments/reconcile", handler: ({ ctx, config, input }) => handleAdminReconcile(ctx, config, input) },
   ];
 }
 

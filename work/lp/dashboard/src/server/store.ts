@@ -18,10 +18,14 @@ import { MemoryBlobStore } from "@api/src/blobs";
 import { MemoryNonceStore, MemoryRateLimiter } from "@api/src/state";
 import { openRawSqlite, RawSqlite } from "./sqlite";
 import { generateKey, hashKey } from "@api/src/keys";
+import { PAYMENTS_SCHEMA_SQL } from "@api/src/payments";
 
 export const DEMO_PROJECT_ID = "11111111111111111111111111111111";
 export const DEMO_SCRIPT_ID = "22222222222222222222222222222222";
 export const DEMO_GAME_ID = 40961328;
+// Dev-only custom-provider webhook secret (M10 simulator). Never used in
+// production mode: DASH_DEV_MODE=false disables the simulator route.
+export const DEV_WEBHOOK_SECRET = "dev-payments-webhook-secret-0123456789";
 
 export interface DevStore {
   raw: RawSqlite;
@@ -133,23 +137,71 @@ async function seedDemoData(raw: RawSqlite, devAdminToken: { id: string; secretH
   ]);
 
   // Demo keys so the dashboard renders real rows (hashes via the real
-  // machinery — plaintext never stored).
-  const demoKeys: { note: string; tier: string; status: string; days: number | null; exec: number }[] = [
-    { note: "reseller batch sample", tier: "paid", status: "active", days: 30, exec: 42 },
-    { note: "vip member", tier: "lifetime", status: "active", days: null, exec: 1337 },
-    { note: "abused key — chargeback", tier: "paid", status: "revoked", days: 30, exec: 7 },
-    { note: "free flow sample", tier: "free", status: "active", days: 3, exec: 2 },
+  // machinery — plaintext never stored). discord/roblox identities make the
+  // Users view (§16) render data.
+  const demoKeys: { note: string; tier: string; status: string; days: number | null; exec: number; discord: string | null; roblox: number | null }[] = [
+    { note: "reseller batch sample", tier: "paid", status: "active", days: 30, exec: 42, discord: "203040", roblox: null },
+    { note: "vip member", tier: "lifetime", status: "active", days: null, exec: 1337, discord: "203041", roblox: null },
+    { note: "abused key — chargeback", tier: "paid", status: "revoked", days: 30, exec: 7, discord: "203042", roblox: null },
+    { note: "free flow sample", tier: "free", status: "active", days: 3, exec: 2, discord: null, roblox: 5512345 },
   ];
   for (const k of demoKeys) {
     const generated = generateKey("YURI");
     const keyHash = await hashKey(generated.plaintext, PEPPER);
     const keyId = "k" + generated.body.slice(0, 31).toLowerCase();
     raw.run(
-      "INSERT INTO keys (id, project_id, key_hash, tier, status, note, total_executions, created_by, created_at, expires_at, first_used_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'seed', ?, ?, ?, ?)",
-      [keyId, DEMO_PROJECT_ID, keyHash, k.tier, k.status, k.note, k.exec, now - 86400 * 3, k.days ? now + k.days * 86400 : null, now - 86400 * 2, now - 3600],
+      "INSERT INTO keys (id, project_id, key_hash, tier, status, note, total_executions, created_by, created_at, expires_at, first_used_at, last_used_at, discord_id, roblox_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'seed', ?, ?, ?, ?, ?, ?)",
+      [keyId, DEMO_PROJECT_ID, keyHash, k.tier, k.status, k.note, k.exec, now - 86400 * 3, k.days ? now + k.days * 86400 : null, now - 86400 * 2, now - 3600, k.discord, k.roblox],
     );
     raw.run("INSERT INTO key_scripts (key_id, script_id) VALUES (?, ?)", [keyId, DEMO_SCRIPT_ID]);
   }
+
+  // Demo sessions so the Sessions view renders rows (watermark ids unique).
+  raw.run(
+    "INSERT INTO sessions (id, key_id, script_id, version, hwid_hash, ip_hash, roblox_user_id, place_id, watermark_id, created_at, expires_at) VALUES (?, (SELECT id FROM keys WHERE note = 'vip member'), ?, 2, ?, ?, 203041, ?, ?, ?, ?)",
+    ["s" + "3".repeat(31), DEMO_SCRIPT_ID, "ab".repeat(31), "cd".repeat(31), DEMO_GAME_ID, "wm-" + "7".repeat(12), now - 7200, now + 3600],
+  );
+  raw.run(
+    "INSERT INTO sessions (id, key_id, script_id, version, hwid_hash, ip_hash, roblox_user_id, place_id, watermark_id, created_at, expires_at) VALUES (?, (SELECT id FROM keys WHERE note = 'free flow sample'), ?, 2, ?, ?, 5512345, ?, ?, ?, ?)",
+    ["s" + "4".repeat(31), DEMO_SCRIPT_ID, "ef".repeat(31), "01".repeat(31), DEMO_GAME_ID, "wm-" + "8".repeat(12), now - 5400, now + 1800],
+  );
+
+  // Demo reseller admin row (display seed; live minting goes through the
+  // real POST /admin/resellers with plaintext-once display).
+  raw.run("INSERT INTO admins (id, discord_id, role, api_token_hash, quota_keys, created_at) VALUES (?, '998001', 'reseller', ?, 50, ?)", [
+    "44444444444444444444444444444443",
+    await sha256Hex("demo-reseller-secret-not-usable-" + now),
+    now - 86400,
+  ]);
+
+  // M10 demo: payment products + one paid order (real key) + one refunded
+  // order (key revoked) so the Payments view renders data on first load.
+  raw.run("INSERT INTO payment_products (id, provider, product_ref, project_id, tier, days, scripts, refund_blacklists, active, created_at) VALUES (?, 'custom', 'prod_demo_30d', ?, 'paid', 30, '[]', 0, 1, ?)", ["pp" + "1".repeat(30), DEMO_PROJECT_ID, now - 86400]);
+  raw.run("INSERT INTO payment_products (id, provider, product_ref, project_id, tier, days, scripts, refund_blacklists, active, created_at) VALUES (?, 'custom', 'prod_demo_life', ?, 'lifetime', NULL, '[]', 1, 1, ?)", ["pp" + "2".repeat(30), DEMO_PROJECT_ID, now - 86400]);
+  const paidKey = generateKey("YURI");
+  const paidKeyId = "k" + paidKey.body.slice(0, 31).toLowerCase();
+  raw.run(
+    "INSERT INTO keys (id, project_id, key_hash, tier, status, discord_id, note, total_executions, created_by, created_at, expires_at) VALUES (?, ?, ?, 'paid', 'active', '203040', 'order ord_demo_paid_1', 0, 'm10:custom', ?, ?)",
+    [paidKeyId, DEMO_PROJECT_ID, await hashKey(paidKey.plaintext, PEPPER), now - 86400 * 2, now + 28 * 86400],
+  );
+  raw.run("INSERT INTO key_scripts (key_id, script_id) VALUES (?, ?)", [paidKeyId, DEMO_SCRIPT_ID]);
+  raw.run(
+    "INSERT INTO orders (id, provider, provider_order_id, product_ref, project_id, key_id, discord_id, email, amount_minor, currency, status, created_at, updated_at) VALUES (?, 'custom', 'ord_demo_paid_1', 'prod_demo_30d', ?, ?, '203040', 'buyer@example.test', 999, 'usd', 'paid', ?, ?)",
+    ["o" + "1".repeat(31), DEMO_PROJECT_ID, paidKeyId, now - 86400 * 2, now - 86400 * 2],
+  );
+  const refundedKey = generateKey("YURI");
+  const refundedKeyId = "k" + refundedKey.body.slice(0, 31).toLowerCase();
+  raw.run(
+    "INSERT INTO keys (id, project_id, key_hash, tier, status, discord_id, note, total_executions, created_by, created_at, expires_at) VALUES (?, ?, ?, 'paid', 'revoked', '203043', 'order ord_demo_refund_1 (refunded)', 12, 'm10:custom', ?, ?)",
+    [refundedKeyId, DEMO_PROJECT_ID, await hashKey(refundedKey.plaintext, PEPPER), now - 86400 * 9, now - 86400 * 9 + 30 * 86400],
+  );
+  raw.run("INSERT INTO key_scripts (key_id, script_id) VALUES (?, ?)", [refundedKeyId, DEMO_SCRIPT_ID]);
+  raw.run(
+    "INSERT INTO orders (id, provider, provider_order_id, product_ref, project_id, key_id, discord_id, email, amount_minor, currency, status, created_at, updated_at) VALUES (?, 'custom', 'ord_demo_refund_1', 'prod_demo_life', ?, ?, '203043', 'refund@example.test', 1999, 'usd', 'refunded', ?, ?)",
+    ["o" + "2".repeat(31), DEMO_PROJECT_ID, refundedKeyId, now - 86400 * 9, now - 86400 * 5],
+  );
+  raw.run("INSERT INTO payment_events (provider, event_id, event_type, outcome, order_id, created_at) VALUES ('custom', 'evt_seed_paid_1', 'payment.confirmed', 'issued', ?, ?)", ["o" + "1".repeat(31), now - 86400 * 2]);
+  raw.run("INSERT INTO payment_events (provider, event_id, event_type, outcome, order_id, created_at) VALUES ('custom', 'evt_seed_refund_1', 'payment.refunded', 'refunded', ?, ?)", ["o" + "2".repeat(31), now - 86400 * 5]);
 
   // Demo audit + events
   raw.run("INSERT INTO audit_log (id, actor_id, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)", [
@@ -176,6 +228,11 @@ async function buildStore(): Promise<DevStore> {
   const keys = await loadOrCreateKeystore();
   const raw = openRawSqlite(DB_PATH);
   for (const stmt of DOC_SCHEMA_SQL.split(";").map((s) => s.trim()).filter((s) => s.length > 0)) {
+    raw.exec(stmt + ";");
+  }
+  // M10 additive tables (CCP-4) — same source the payments module applies
+  // lazily; applying here too so the demo seed can insert rows.
+  for (const stmt of PAYMENTS_SCHEMA_SQL.split(";").map((s) => s.trim()).filter((s) => s.length > 0)) {
     raw.exec(stmt + ";");
   }
   // dashboard-owned state (D-M11-2): TOTP enrollment only; the rest of the
@@ -211,6 +268,11 @@ async function buildStore(): Promise<DevStore> {
       keyDays: 3,
     },
     freeSecret: b64urlDecode(keys.freeSecretB64url),
+    payments: {
+      webhookSecrets: { custom: [DEV_WEBHOOK_SECRET] },
+      signatureToleranceSec: 300,
+      requestsPerIpPerMin: 30,
+    },
   };
 
   let nowOverride: number | null = null;

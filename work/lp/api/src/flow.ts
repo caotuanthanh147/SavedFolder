@@ -29,6 +29,18 @@ export interface FreeFlowConfig {
   keyDays: number;
 }
 
+// Module M10 (optional — absent config = all payment providers disabled,
+// webhooks fail closed with 503). Secrets are a list per provider so a
+// rotation window can accept two valid secrets at once (doc §18 pattern).
+export interface PaymentsConfig {
+  webhookSecrets: Record<string, string[]>;
+  signatureToleranceSec: number;
+  requestsPerIpPerMin: number;
+  providerBase?: string;
+  providerApiKey?: string;
+  fetchImpl?: typeof fetch;
+}
+
 export interface ApiConfig {
   pepper: string;
   proofKey: Uint8Array;
@@ -41,6 +53,7 @@ export interface ApiConfig {
   bundleSignerFor: (projectId: string, signingKeyId: string) => Signer;
   free: FreeFlowConfig;
   freeSecret: Uint8Array;
+  payments?: PaymentsConfig;
 }
 
 export function headerValue(headers: Record<string, string>, name: string): string | null {

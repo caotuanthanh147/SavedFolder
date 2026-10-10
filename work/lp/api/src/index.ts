@@ -27,6 +27,11 @@ interface Env {
   FREE_KEY_DAYS: string;
   FREE_ATTEMPT_TTL_SEC: string;
   FREE_CLAIM_WINDOW_SEC: string;
+  PAYMENTS_STRIPE_SECRET: string;
+  PAYMENTS_CUSTOM_SECRET: string;
+  PAYMENTS_SIG_TOLERANCE_SEC: string;
+  PAYMENTS_PROVIDER_BASE: string;
+  PAYMENTS_PROVIDER_API_KEY: string;
 }
 
 interface RateStub {
@@ -122,6 +127,17 @@ export default {
         keyDays: Number(env.FREE_KEY_DAYS ?? "3") || 3,
       },
       freeSecret: b64urlDecode(env.FREE_SECRET ?? ""),
+      payments: {
+        // Comma-separated lists: rotation windows accept every listed secret.
+        webhookSecrets: {
+          ...(env.PAYMENTS_STRIPE_SECRET ? { stripe: env.PAYMENTS_STRIPE_SECRET.split(",").map((s) => s.trim()).filter((s) => s.length > 0) } : {}),
+          ...(env.PAYMENTS_CUSTOM_SECRET ? { custom: env.PAYMENTS_CUSTOM_SECRET.split(",").map((s) => s.trim()).filter((s) => s.length > 0) } : {}),
+        },
+        signatureToleranceSec: Number(env.PAYMENTS_SIG_TOLERANCE_SEC ?? "300") || 300,
+        requestsPerIpPerMin: 30,
+        ...(env.PAYMENTS_PROVIDER_BASE ? { providerBase: env.PAYMENTS_PROVIDER_BASE } : {}),
+        ...(env.PAYMENTS_PROVIDER_API_KEY ? { providerApiKey: env.PAYMENTS_PROVIDER_API_KEY } : {}),
+      },
     };
     const ctx: AppContext = {
       db: new D1Adapter(env.DB as never),

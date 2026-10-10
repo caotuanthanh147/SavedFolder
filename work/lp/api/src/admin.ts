@@ -1,5 +1,5 @@
-import { makeEnvelope, b64urlDecode, fromHex } from "./contracts";
-import { constantTimeEqual, randomId, sha256, sha256Hex } from "./crypto";
+import { makeEnvelope, b64urlDecode, b64urlEncode, fromHex } from "./contracts";
+import { constantTimeEqual, randomBytes, randomId, sha256, sha256Hex } from "./crypto";
 import { ApiConfig, AppContext, RequestInput, headerValue } from "./flow";
 import { generateKey, hashKey, KEY_PREFIX, projectHwidSalt, hashHwid } from "./keys";
 
@@ -429,4 +429,34 @@ function parseBody(input: RequestInput): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+// POST /admin/resellers — owner-only: mint a reseller admin (adm_<id>.<secret>
+// token per the owner Q2 scheme, only sha256(secret) stored). The plaintext
+// token is returned exactly once. Feeds the doc §16 "Resellers" dashboard
+// page (G13 "Dashboard and reseller roles").
+export async function handleAdminCreateReseller(ctx: AppContext, config: ApiConfig, input: RequestInput): Promise<Response> {
+  const admin = await authenticate(ctx, config, input);
+  if (!admin) return json({ error: "unauthorized" }, 401);
+  if (admin.role !== "owner") return json({ error: "forbidden" }, 403);
+  const body = parseBody(input);
+  if (!body) return json({ error: "bad_request" }, 400);
+  const discordId = typeof body.discord_id === "string" ? body.discord_id : null;
+  const quota = body.quota_keys === undefined || body.quota_keys === null ? null : body.quota_keys;
+  if (discordId !== null && (discordId.length === 0 || discordId.length > 32 || !/^\d+$/.test(discordId))) {
+    return json({ error: "bad_request", field: "discord_id" }, 400);
+  }
+  if (quota !== null && (typeof quota !== "number" || !Number.isInteger(quota) || quota < 1 || quota > 100000)) {
+    return json({ error: "bad_request", field: "quota_keys" }, 400);
+  }
+  const secretBytes = randomBytes(32);
+  const adminId = randomId();
+  const token = `adm_${adminId}.${b64urlEncode(secretBytes)}`;
+  const tokenHashHex = await sha256Hex(secretBytes);
+  await ctx.db.run(
+    "INSERT INTO admins (id, discord_id, role, api_token_hash, quota_keys, created_at) VALUES (?, ?, 'reseller', ?, ?, ?)",
+    [adminId, discordId, tokenHashHex, quota, Math.floor(ctx.nowSec)],
+  );
+  await audit(ctx, admin.id, "admin.reseller.create", adminId, discordId ?? "no-discord");
+  return json({ ok: true, id: adminId, token }, 201);
 }
