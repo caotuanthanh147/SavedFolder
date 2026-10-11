@@ -204,3 +204,54 @@
   FYI + glm3 M12 FYI consumed). Follow-up msg to main-agent
   (sessionconstkey wiring). Suites after addendum: obf 418/418 + vm
   84/84 + tsc ×2 + private corpus 49/49 re-run. Inbox cleared.
+
+## Session 6 — 2026-10-11 ~06:50–07:30Z (str-encoding finding: root cause + fail-loud guard + gates re-green)
+
+- Cold start (sandbox reset): re-cloned SavedFolder + Public, bootstrap glm6,
+  watchers on. Read TASKS.md head-to-toe + ONBOARDING (again, per §5) +
+  PROMPT + inbox (3 unread) + all status/.
+- Inbox: (1) glm1 M6-s2 msg — SECOND M5 finding "container str encoding
+  lossy >0xFF" (26/130 files, --wm EXPECTED-RED until my fix) + AAD sync
+  owner-ACCEPTED + 4 trivial tsc fixes he'd already made in my tree;
+  (2) glm4 sweep — compiler tsc 4 errors (same 4 glm1 fixed) + root-tsc
+  miss mechanism (root tsconfig excludes compiler/); (3) glm3 Q5 landed
+  (globalName classifier — additive, nothing needed).
+- Evidence-first investigation (BEFORE code): read container.ts str paths
+  (appendConst charCodeAt&0xFF; unpack fromCharCode) + watermark.ts junk
+  carrier + M6 emit.ts pool decode template (byte-transparent pt:sub) +
+  M4 lexer header. KEY FACT: M4's contract is the BYTE-STRING model
+  (latin1 char-per-byte — src/index.ts header; my corpus runner reads
+  latin1; the lexer expands \u{} to UTF-8 bytes). Wrote a repro (deleted
+  after evidence capture): same file — latin1 read → const = e2 80 94 →
+  round-trip byte-exact → interpreter stdout BYTE-EQUAL to real Lua 5.4;
+  utf8 read (glm1's corpus-e2e.ts L122) → const = ONE code unit 2014 →
+  truncated. Conclusion: container correct per contract; root cause = his
+  runner's input decode. BEFORE-state reproduced exactly: --wm 26 MISMATCH
+  (all "extraction failed post-pack"), exit 1.
+- Fix (D-M5-28; Lua 5.4 manual §2.1 opened via curl — strings = byte
+  sequences, 8-bit clean, encoding-agnostic): (a) container.ts appendConst
+  FAIL-LOUD on code units >0xFF (no silent &0xFF; D-M5-22 posture);
+  (b) corpus-e2e.ts L122 latin1 read + L56 latin1 write (marked, glm1's
+  file, notified); (c) differential.test.ts + watermark.test.ts oracles
+  byte-exact (spawnSync encoding:'buffer' + toString('latin1'));
+  (d) fixtures.ts: byte-strings-unicode fixture (raw em-dash/emoji/CJK/
+  bullet + \xFF/\x80 escapes + concat + #; AST consts hold UTF-8 BYTE
+  sequences — caught my own fixture bug twice: who-var c3a7 bytes, missing
+  print wrapper); (e) watermark.test.ts: 3 byte-string-contract tests
+  (pack throws on text consts plain+watermarked; high-byte pools round-trip
+  byte-exact + watermark lockstep).
+- Docs: BYTECODE-M5 §1 normative byte-string pin + §11 changelog; RESEARCH
+  #15-17 (manual + contract + repro); DECISIONS D-M5-28 (4 options, UTF-8
+  rejected with evidence); VERIFICATION §9 (commands+outputs, honest
+  NOT-RUN incl. runner stdout string-compare strictness note for glm1).
+- Gates: compiler 83/83 (+4) + root 462/462 + vm 113/113 + tsc ×3 (all
+  three tsconfigs, glm4's lesson applied) + corpus-e2e plain 0 MISMATCH +
+  --wm 0 MISMATCH exit 0 (26 → 0 — EXPECTED-RED dropped).
+- DELIVERED Public a23c636 (pull --rebase on clean d153caf, push, ls-remote
+  verified). SavedFolder: TASKS LP1-M5 row s6 note + status + this log +
+  msgs (glm1 root-cause+evidence+gate-green+drop-EXPECTED-RED; glm4 tsc
+  ack-verified-green; glm3 Q5 ack + byte-string-pin FYI). Inbox cleared.
+
+Stage: LP1-M5 s6 complete. Next lane: val-descriptor emission (M4
+analysis.ts const-plan consumption), then real-Workers CPU, then v2
+carrier 3 (Q5 globalName list).
