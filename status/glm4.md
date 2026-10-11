@@ -1,32 +1,32 @@
 # glm4 status
 
-**Updated**: 2026-10-10 (session 5 — BIG PROJECT round: LP1-M13 DONE)
+**Updated**: 2026-10-11 (session 7 — BIG PROJECT round: LP1-M8 DONE, push pending token)
 
-**Done this session**: LP1-M13 "Loader stub generator and CDN init packaging"
-delivered Public a7beaa4 (claim-first 0bfcd40 pushed before work, per
-protocol). loader/stub/ = content-addressed init packaging (b+sha256[0:12],
-immutable caching, URL-is-cache-buster) + unique-per-fetch stub generator
-(time/8B stub-id/32B per-stub random + exact-size + FNV-1a32/DJB2 of served
-bytes, no-store) + plain-5.1 Lua stub (feature-checked UNC APIs, bit32-
-optional DJB2 path, generic failures, no goto) + mountable /loaders and
-/static routes (injectable EdgeCache, no-store on errors). D12 RESOLVED
-(folder lp/, init_<build>.lua, dual-hash+exact-size, best-effort write).
-RESEARCH-M13 (CF extension list, UNC FS/request on Potassium+Solara docs,
-FNV draft vectors, local hash benchmark) → DECISIONS-M13 (10 rows) →
-VERIFICATION-M13 §22.1 (42/42 bun + tsc clean + luac gate + 10-scenario
-lua5.4 executor-env harness + stale-hash negative fails closed).
+**Done this session**: LP1-M8 "Discord bot" (doc §15) fully built:
+`bot/` = discord.js 14.27.0 on Bun (library choice live-smoke-verified —
+RESEARCH-M8 row 12), full §15 command surface (6 user + 5 admin commands,
+defer-then-edit everywhere, ephemeral policy per D-M8-4 incl. per-subcommand
+for /key), typed AdminApi client (normalizes BOTH api error shapes),
+RoleSync (grant-on-redeem + guildMemberAdd + hourly reconcile on real key
+rows), scheduler (channel-posted expiry reminders — never DM, Developer
+Policy), resethwid ownership gate (blocks cross-user resets before the
+privileged call). **CCP-M8 filed (Tier 3, main-agent pre-notified):**
+P1 /admin/keys/link, P2 GET /admin/keys/:id, P3 blacklist remove,
+**P4 = real bug found+fixed: Workers entry dropped url.search — every
+filtered admin GET was unfiltered over real HTTP** (bot is the first real
+HTTP client of the admin API; in-process tests embed the query directly so
+they never saw it). Verification §22.1: bot 44/44 + tsc clean ×2 + api
+baseline 249/249 with patch mounted; 4 dev bugs caught by tests. Canonical
+copy work/lp/bot/ (incl. api-patch/).
 
-**Interop sent**: msg glm1 (M3): assembled init must return entry fn; stub
-calls entry({api, script_id, build, t, s, r}) — D-M13-6 Tier 2. Msg
-main-agent (M1): mount /loaders + /static routes (README snippet).
+**Blocker**: PUSH PENDING — the GitHub token from the original session is
+not in this session's context (sandbox reset, /tmp clone remotes gone). All
+commits are local and ready in both repos; one `git push` each once the
+token is re-shared. Owner action needed: re-send the PAT.
 
-**Next candidates** (if the user runs more rounds): M5 back end is glm6's
-(now-claimed); M6/M7 wait on M5/M6 outputs; M8 (Discord bot), M10 (payments
-webhooks), M12 (ops runbooks) remain open per TASKS LP1-other. Also
-pending fleet-wide: real-executor §22.1 tests (human), M14 review after
-merge. I stay OFF the web lane per the user's directive.
+**Next candidates**: M14 review after merge (always last); real-token
+Discord E2E (owner checklist); possible CCP-M8 acceptance follow-ups from
+main-agent.
 
-**Past**: FW1-H closed moot 2026-10-08 (FNAF folder deleted 146eb30).
-SAC1-H delivered 2026-10-04 (Steal A Car harness lane, round closed).
-Sandbox resets: x5 (this session re-cloned + bootstrapped + token recovered
-from /tmp clone remotes, wired silently per protocol).
+**Past**: LP1-M13 delivered + re-landed after force-push #3 (42d31c5).
+FW1-H closed moot 2026-10-08. SAC1-H delivered 2026-10-04. Sandbox resets: x6.

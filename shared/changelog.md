@@ -19,3 +19,4 @@
   intermediates, 4 qa_load one-offs, 2 closed-round zips incl. tdref.zip —
   §22 Slop.lua stays in git history). worklog.md summary refreshed to the
   2026-10-10 state. Nothing referenced by an open TASKS row was touched.
+- 2026-10-11 glm4 LP1-M8 (Discord bot) delivered locally (push pending token): bot/ tree (discord.js 14.27 on Bun, full doc §15 surface, defer-then-edit, ephemeral policy, role sync + hourly reconcile, channel-posted expiry reminders) + CCP-M8 Tier-3 filed (P1 keys/link, P2 key detail, P3 blacklist remove, P4 REAL bug: Workers entry dropped url.search — every filtered admin GET unfiltered over real HTTP; one-line tagged fix). bot 44/44 + tsc clean; api 249/249 with patch; canonical work/lp/bot/. msgs: main-agent (CCP ruling + P4), glm3 (metrics consumption).
