@@ -36,6 +36,7 @@ import {
   handleAdminReconcile,
 } from "./payments";
 import { handleAdminLeakLookup, handleAdminLeakRevoke, handleAdminAbuseScores } from "./leak";
+import { handleAdminMetrics, handleAdminAlerts } from "./ops";
 
 export interface RouteHandlerArgs {
   ctx: AppContext;
@@ -122,6 +123,8 @@ export function buildRoutes(): Route[] {
     { method: "POST", pattern: "/admin/scripts/:id/activate", handler: (a) => handleAdminScriptActivate(a.ctx, a.config, a.input, a.params.id) },
     { method: "POST", pattern: "/admin/resellers", handler: ({ ctx, config, input }) => handleAdminCreateReseller(ctx, config, input) },
     { method: "GET", pattern: "/admin/analytics/overview", handler: ({ ctx, config, input }) => handleAdminAnalytics(ctx, config, input) },
+    { method: "GET", pattern: "/admin/metrics", handler: ({ ctx, config, input }) => handleAdminMetrics(ctx, config, input) },
+    { method: "GET", pattern: "/admin/alerts", handler: ({ ctx, config, input }) => handleAdminAlerts(ctx, config, input) },
     { method: "GET", pattern: "/admin/audit", handler: ({ ctx, config, input }) => handleAdminAudit(ctx, config, input) },
     { method: "GET", pattern: "/admin/payments/orders", handler: ({ ctx, config, input }) => handleAdminListOrders(ctx, config, input) },
     { method: "GET", pattern: "/admin/payments/products", handler: ({ ctx, config, input }) => handleAdminListProducts(ctx, config, input) },
@@ -144,7 +147,23 @@ export async function dispatch(routes: Route[], ctx: AppContext, config: ApiConf
   try {
     return await match.route.handler({ ctx, config, input, params: match.params });
   } catch (err) {
-    await recordEvent(ctx, null, "server_error", err instanceof Error ? err.name : "unknown");
-    return signedResponse(makeEnvelope("SERVER_ERROR", null), config.signer, ctx.nowSec);
+    // M12 chaos hardening (D-M12-9): the error path itself must survive a
+    // DB outage (recordEvent would throw inside this catch) and a broken
+    // signer (the signed fallback would reject) — otherwise Workers turns
+    // these into unhandled rejections (1101) instead of the generic
+    // envelope. Events are best-effort; the response is the contract.
+    try {
+      await recordEvent(ctx, null, "server_error", err instanceof Error ? err.name : "unknown");
+    } catch {
+      // DB down: nothing to record; still answer generically.
+    }
+    try {
+      return await signedResponse(makeEnvelope("SERVER_ERROR", null), config.signer, ctx.nowSec);
+    } catch {
+      // Signer broken (e.g. missing key): fail closed with an unsigned
+      // generic 500 — no signature means the SDK rejects it, which is the
+      // correct behavior for a response we could not authenticate.
+      return new Response(JSON.stringify({ error: "server_error" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
   }
 }

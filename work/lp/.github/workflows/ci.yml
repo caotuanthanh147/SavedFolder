@@ -1,0 +1,122 @@
+# CI (M12, D-M12-11) — doc §18 "Dependency scanning and pinned versions in
+# CI" + §22.1: this sandbox cannot execute GitHub Actions; every job has an
+# exact locally-run equivalent recorded in api/VERIFICATION-M12.md §CI.
+#
+# Pinned: bun version below; per-package bun.lock files committed (api,
+# obfuscator, obfuscator/vm, obfuscator/compiler). db/ has no package.json
+# (the seed runs as a bare bun script). dashboard/ ships no lockfile yet —
+# its job installs non-frozen; committing one is an owner follow-up (see
+# VERIFICATION-M12 §CI for the reason: the dashboard tree was developed in
+# a separate sandbox and its full dependency resolution belongs to the
+# owner's first CI run).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install (frozen)
+        working-directory: api
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        working-directory: api
+        run: bun run typecheck
+      - name: Tests (unit + integration + M12 chaos)
+        working-directory: api
+        run: bun test
+
+  obfuscator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install roots (frozen)
+        run: |
+          (cd obfuscator && bun install --frozen-lockfile)
+          (cd obfuscator/compiler && bun install --frozen-lockfile)
+          (cd obfuscator/vm && bun install --frozen-lockfile)
+      - name: Typecheck x3
+        run: |
+          (cd obfuscator && bun run typecheck)
+          (cd obfuscator/compiler && bun run typecheck)
+          (cd obfuscator/vm && bun run typecheck)
+      - name: Tests (parser/compiler/vm suites)
+        run: |
+          (cd obfuscator && bun test)
+          (cd obfuscator/compiler && bun test)
+          (cd obfuscator/vm && bun test)
+
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install lua5.4 + luac
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 lua5.4-dev
+      - name: M3 loader suite (RFC vectors + SDK flow + handshake)
+        run: lua5.4 tests/run.lua
+      - name: M7 checks suite
+        run: lua5.4 tests/m7_checks_test.lua
+
+  db-seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Seed --print smoke (deterministic fixtures)
+        run: |
+          OUT=$(bun db/seed/seed.ts --print --test-fixtures)
+          echo "$OUT" | head -5
+          [ ${#OUT} -gt 200 ] || { echo "seed output suspiciously small"; exit 1; }
+
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install (lockfile TODO: owner first CI run — see file header)
+        working-directory: dashboard
+        run: bun install
+      - name: Lint
+        working-directory: dashboard
+        run: bun run lint
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true # informational first pass; blocking = owner policy call (D-M12-11)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Audit runtime deps per package
+        run: |
+          for pkg in api obfuscator obfuscator/compiler obfuscator/vm; do
+            echo "== $pkg =="
+            (
+              cd "$pkg"
+              bun install --frozen-lockfile >/dev/null 2>&1
+              # npm audit needs npm's lockfile; generate a throwaway one from
+              # the committed manifest (bun.lock stays the source of truth).
+              bun x npm i --package-lock-only --no-audit --fund=false >/dev/null 2>&1
+              bun x npm audit --omit=dev || true
+              rm -f package-lock.json
+            )
+          done

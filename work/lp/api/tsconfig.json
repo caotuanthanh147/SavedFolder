@@ -12,6 +12,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "tools"],
   "exclude": ["src/index.ts", "src/durable.ts"]
 }

@@ -244,3 +244,25 @@ Implications for the template emitter (per-build randomization, doc
   listed here only to record the dead-end (no claims rest on it).
 - **lua.org Lua Gems performance chapter (PDF)**: page-reader cannot
   extract PDF text; not opened. No claims rest on it.
+
+## 7. Implementation-phase notes (session 20, 2026-10-10)
+
+- BYTECODE-M5.md (glm6, Public c26c157) landed as the ISA+container pin;
+  my §5 container question was answered: separate per-function AEAD
+  blobs with the ctLen prefix, chained keys K_0 = HKDF(constKey, ∅,
+  "const-key"), K_n = HKDF(K_{n-1}, u32be(n), "const-key") — the
+  lazy-decrypt sketch in §5 became the shipped key-memoized loader
+  (RUNTIME-M6 §5; the walk-forward-only variant had an order bug,
+  VERIFICATION-M6 §2 bug 3).
+- The dispatch measurements (§4) translated directly: chain/tree inline
+  in the interpreter loop, closure tables built once at chunk level,
+  runtime-built variant re-indexes through a baked permutation
+  (D-M6-3). The instruction-count parity gate born from §4's
+  misaligned-branch bug is now an enforced test (tests/parity.test.ts).
+- §2's counter table confirmed its worth during development: the
+  closure-strategy off-by-one and the non-monotonic chain bug were both
+  caught by differential testing inside one session (VERIFICATION §2).
+- The `%*` conformance gap (M5 interp-string lowering vs real hosts) is
+  the concrete case for keeping M5's reference interpreter as the
+  second oracle: real-Lua-only testing would have missed what the
+  fixture ASTs actually emit.
