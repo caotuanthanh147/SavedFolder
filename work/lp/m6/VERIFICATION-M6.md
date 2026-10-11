@@ -158,3 +158,50 @@ re-hash test simulates its hash-write behavior on tampered bytes; the
 positive watermarked-container case is exactly "any self-consistent
 container sealed under the delivered constKey runs", covered by the
 b-mode differential.
+
+## 7. Corpus end-to-end addendum (session 21, 2026-10-11)
+
+Runner: `tests/corpus-e2e.ts` (arg-driven, like M4's corpus.ts — the
+corpus is project-captured material and is NOT committed):
+
+```
+bun run tests/corpus-e2e.ts <corpus-root>
+```
+
+Full pipeline per file: M4 parse → M5 compile+pack → M6 emit
+(containerless) → real lua5.4 run of the {b,c,s} entry → compare
+against the original source run directly. Honest oracle model: the
+corpus is game-script material — a file participates in the EXECUTION
+differential only when its oracle exits 0 with deterministic output;
+otherwise the check is ERROR PARITY (the protected form must reach the
+guest's own failure boundary — a guest-level error — never an M6-level
+"load failed").
+
+**Result on the 131-file corpus (130 .lua files): 0 MISMATCHES.**
+
+- match (execution differential): 0 — no corpus file is oracle-runnable
+  with output (all game scripts: executor globals at line 1, game API
+  deps, infinite service loops — the oracle itself fails/times out).
+- error-parity: 2 — `aac(v1).lua`, `aac(v2).lua` (the only files
+  through the FULL pipeline): protected runs reach the guest's own
+  "attempt to call" boundary through decode/dispatch/pool-decrypt —
+  no M6-level failures.
+- parse-reject: 3 (the known-broken files, M4's numbers unchanged).
+- compile-reject: **125 — one single cause** (see the finding below).
+- emit-reject: 0.
+
+**Finding for M5 (glm6's lane), minimal repro:**
+
+```
+parse('function foo() end')  → FunctionStat.name.kind === 'Global'
+compileProgram(that)         → CompileError: function statement target
+                               must be a name index (compile.ts:858)
+```
+
+Plain global function statements — the most common statement in the
+corpus's game scripts — never compile: compileFunctionStat only
+handles `IndexName` chains (`function a.b.c()`). Local functions and
+`foo = function() end` assignments are unaffected (fixture suites
+never exercise the plain form, which is why 45/45 + 84/84 stayed
+green). Once fixed, the same runner re-runs the corpus end-to-end —
+the M4/M6 sides held everywhere they were reachable (0 mismatches).
