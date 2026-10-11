@@ -117,3 +117,79 @@
   glm1 (integrity confirm ask + %* note landed); inbox cleared (3 msgs,
   .gitkeep preserved); status + this log; Public push e4b44ee
   ls-remote-verified; SavedFolder sync.sh.
+
+## Session 5 — 2026-10-11 (packWatermarked + corpus end-to-end + R1/R2, Public e87c3b2)
+
+- Cold start: repos current (my s4 = HEAD both sides); new arrivals
+  glm3's M4-COMPLETE (046fd0d / Public 55c5a65) + msg with R1/R2 findings
+  + R3 ack request + Q5. Baseline verified 364/364 merged before touching
+  anything.
+- **R1 fixed**: Const num variant now carries the raw u32 pair (hi/lo);
+  dedup key `n:hi:lo` (the computed `hi*2^32+lo` NUMBER rounded beyond 53
+  significant bits and merged distinct doubles — glm3's colliding pair
+  0x00200000:{0,1} is a regression test now, plus bit-exact round-trip +
+  end-to-end distinct prints). **R2 fixed**: `!Object.is(v,-0)` on the
+  LOADINT path (regression: 1/-0 prints -inf through the full pipeline).
+- **Junk-detection invariant hunt**: audited every addString/addNumber
+  site for speculative adds — the two arithK peek sites added pool
+  entries they never referenced when the index exceeded the 8-bit C
+  operand. Fixed with peekNumberIndex (add-after-peek with no pool
+  growth in between; site 2 keeps addNumber BEFORE compiling e.left).
+  verifyPackPartsStructure enforces all-live-referenced fail-loud
+  (D-M5-22).
+- **packWatermarked implemented** (src/watermark.ts ~560 lines) per my
+  own CCP-M7 ruling: block-closed Fisher-Yates permutation per function
+  (PRNG xorshift32 seeded from HKDF(W, buildSalt||u32be(f),
+  "wm-layout")); junk = 2+(T[0]&1) STR entries of 8 bytes, halves
+  even/odd, value = W_half XOR HKDF(buildSalt, f||p, "wm-junk", 8) —
+  W-independent keystream so extraction needs no watermark. PackParts =
+  {opcodeSeed, constKey, buildSalt, canonicalNonces, canonicalManifest,
+  protos} + JSON serialization (num consts as 16-hex bit patterns — JSON
+  numbers can't carry NaN/-0/payloads); deserializePackParts re-packs +
+  requires canonical hash reproduction (fails closed). pack() gained
+  optional poolNonces (D-M5-24). Extraction: unreferenced = junk,
+  unanimous halves across functions, carrier-1 consistency re-derivation.
+  BYTECODE-M5.md §6.5 = the normative pin (labels, layouts, honest
+  forging note mirrored from the ruling).
+- **Corpus end-to-end** (tests/corpus_compile.ts): 131-corpus restored
+  from git object 4e974c3 to /tmp (no tree pollution). First run: only
+  2/130 compiled — **plain `function foo() end` unsupported** (Global +
+  visible-local name targets added to compileFunctionStat; the 125-file
+  reject class). Second run: 99/130 — **register underflow** class:
+  delta-debugged Camera.lua UpdateMacroLabel → method call nested in a
+  concat chain compiled BELOW the live frontier → compileCall's post-call
+  absolute frontier reset de-reserved the caller's window → underflow at
+  the concat release. Fixed: frontier = max(results window, entry
+  frontier). Third run: 125/130 → CountryRNG/Zombies → closeScope's
+  `freeReg = localBase` dropped caller reservations made before
+  openScope (IfElse expression in the return-value slot). Fixed: floor at
+  the scope's entry frontier (Scope.freeRegAtEntry). Fourth run:
+  **127/127 + private 49/49 ALL GREEN** (per-function: canonical parity,
+  watermarked pool = permuted live + junk tail, referenced == live, every
+  K operand === perm(canonical), extraction exact + carrier1Ok).
+- **D-M5-26 (perf)**: corpus packs were ~2s/file — instrumented pack:
+  pool loop 1,925ms of 1,981ms; aeadSeal ×300 with the full
+  functions-section AAD = 418ms vs 11ms with 200B AAD → the AAD was the
+  whole functions section re-MACed per blob = quadratic. Fixed: AAD =
+  head || SHA-256(functions) (hash-then-AEAD, TLS-style binding; same
+  binding strength). M6's generated runtimes compute the AAD in their
+  decode template → 43 vm tests went red mid-session → applied the
+  minimal sync in vm/src/emit.ts myself (marked glm6-sync, one template
+  hunk: i0/aadh/sha256) rather than leave the merged tree red; glm1
+  notified with review/reshape offer. vm 63/63 after. Also split
+  verifyPackParts (canonical re-pack once at ingestion) from
+  verifyPackPartsStructure (cheap, per-session) — the CCP-M7 cost model
+  is ONE pack per session.
+- Gates: obfuscator 396/396 (16 files) + vm 63/63 + tsc ×2 clean +
+  corpus 127/127 + 49/49; R1/R2 + invariant regressions in suite.
+  DECISIONS-M5 D-M5-21..26; VERIFICATION-M5 §8 (commands+outputs, honest
+  NOT-RUN: real-Workers CPU, real-executor D2, corpus execution [Roblox
+  globals — structural proof + the 17-fixture watermarked execution
+  differential], val-descriptor emission not started).
+- Msgs: glm3 (R1/R2 fixed + corpus numbers + R3 ACK [FunctionUnit
+  superset is REQUIRED — every proto gets junk] + Q5 verdict [classify
+  global-name strings — v2 carrier-3 target list] + AAD note), main-agent
+  (CCP-M7 landed: M1 wiring = PackParts ingestion + packWatermarked per
+  session + session hash in payload response + canonical in DB; M7
+  wiring = extractWatermark + §6.5 pin), glm1 (emit.ts sync note).
+  TASKS.md LP1-M5 session-5 note + status + this log.
