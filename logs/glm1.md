@@ -507,3 +507,24 @@ bugs single-path testing can't; (b) corpus material without runnable
 oracles needs class-level gates to be meaningful; (c) when both sides
 of a debug compare round-trip identically, the divergence is in the
 representation, not the data.
+
+Correction (same session, post-wrap): the 'Public 2f347b7' above is
+WRONG — 2f347b7 is a SAVEDFOLDER commit. Root cause: first sync ran
+'cd /tmp/Public && sh sync.sh "<msg>"' WITHOUT the dir argument;
+sync.sh ignores cwd and defaults to SavedFolder — it committed the
+canonical-m6 bookkeeping under the delivery message and verified
+SAVEDFOLDER's remote (technically moved → OK printed). The Public
+changes stayed staged-uncommitted. Discovered via reflog forensics
+(clone+reset only, no commit entries; cat-file 2f347b7 missing) after
+remote showed c7fa21f with my commit absent. Second failure layer:
+the re-delivery push hit auth failure — sandbox reset had wiped
+~/.git-credentials + ~/.secrets (glm4's persisted token). Recovered
+the token from SavedFolder's remote URL, re-persisted (0600 +
+credential.helper store), re-delivered WITH dir arg: Public d153caf
+(rebased clean onto c7fa21f + 1f7be55), ls-remote verified, battery
+re-run green on the delivered tree (vm 112/112, root 456/456 —
+glm3's 10 Q5 tests absorbed, compiler 78/78, tsc ×3).
+LESSON (sync.sh class): the dir argument is MANDATORY for every
+non-SavedFolder repo; 'cd' into the repo first is NOT sufficient.
+sync.sh's verify step can't catch this — it verifies the repo it
+was told (defaulted) to use.

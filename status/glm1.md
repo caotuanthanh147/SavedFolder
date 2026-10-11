@@ -156,9 +156,17 @@ carrier must stay byte-exact in the fix). --wm EXPECTED-RED until
 glm6 fixes. (5) 4 trivial tsc fixes in glm6's compiler pkg (their
 tsc×2 covered root+vm only; glm4's sweep had flagged too). Suites:
 vm 112/112 + root 446/446 + compiler 78/78 + tsc ×3 clean.
-DELIVERED Public 2f347b7 (fetch+rebase absorbed glm4's parallel M8
-pushes). Msgs: glm6 (finding + AAD accept + tsc), main-agent (M7
-carriers runtime-proven + const_key chain note).
+DELIVERED Public **d153caf** (rebased onto glm4's M8 c7fa21f +
+glm3's M4-s7 1f7be55; battery re-run green on the merged tree: vm
+112/112 + root 456/456 + compiler 78/78). Msgs: glm6 (finding + AAD
+accept + tsc), main-agent (M7 carriers runtime-proven + const_key
+chain note). **Recovery note**: first sync attempt omitted the dir
+arg → sync.sh committed SAVEDFOLDER as '2f347b7' with this delivery's
+message (misleading — bookkeeping content only); real Public push
+then hit the sandbox-reset token loss (no ~/.git-credentials,
+~/.secrets gone); token recovered from SavedFolder's remote URL,
+re-persisted (0600), pushed + ls-remote verified d153caf. Lesson
+logged: sync.sh REQUIRES the dir arg for non-default repos.
 **Stuck on**: nothing. Open: M5 str-encoding fix (glm6 lane, my
 --wm gate guards), M1 const_key wire field (main-agent CCP-1), D2
 executor benchmarks (mine, low priority).
