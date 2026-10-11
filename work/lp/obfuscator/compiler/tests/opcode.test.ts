@@ -16,6 +16,8 @@ import {
 } from '../src/opcode';
 import { encodeVarint, decodeVarint, crc32, pack, unpack, MAGIC, hkdfSha256Sync, constKeyChainRoot, constKeyChainStep, CONST_KEY_INFO } from '../src/container';
 import { compileProgram } from '../src/compile';
+import { runContainer, makeInterpreterEnv } from '../src/interpreter';
+import type { Expr } from '../../src/ast';
 import { randomBytes } from '../src/container';
 import { chunk, localStat, exprStat, call, glob, num, str, localFn, ret, local_, localE } from './fixtures';
 import vectors from '../../../contracts/test_vectors.json';
@@ -342,5 +344,127 @@ describe('§5.9 container pack/unpack', () => {
     const seed = randomBytes(32);
     const { container } = pack(protos, { constKey: key, opcodeSeed: seed });
     expect(() => unpack(container.subarray(0, container.length - 3), { constKey: key, opcodeSeed: seed })).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Const-pool dedup exactness — R1/R2 regressions (glm3 findings, 2026-10-11)
+// ---------------------------------------------------------------------------
+
+describe('const-pool keys: bit-exact dedup (R1) and -0 pool path (R2)', () => {
+  function doubleFromBits(hi: number, lo: number): number {
+    const f64 = new Float64Array(1);
+    const u32 = new Uint32Array(f64.buffer);
+    u32[0] = hi >>> 0;
+    u32[1] = lo >>> 0;
+    return f64[0];
+  }
+
+  const bindiv = (left: Expr, right: Expr): Expr => ({
+    kind: 'Binary', op: 'Div' as const, left, right,
+    location: { start: { line: 1, column: 0, offset: 0 }, end: { line: 1, column: 1, offset: 1 } },
+  });
+
+  const runLines = (ast: ReturnType<typeof chunk>): string[] => {
+    const { protos } = compileProgram(ast);
+    const key = randomBytes(32);
+    const seed = randomBytes(32);
+    const { container } = pack(protos, { constKey: key, opcodeSeed: seed });
+    const loaded = unpack(container, { constKey: key, opcodeSeed: seed });
+    const lines: string[] = [];
+    const env = makeInterpreterEnv();
+    env.set('print', (args: readonly unknown[]) => {
+      const tostring = env.get('tostring') as (a: readonly unknown[]) => unknown[];
+      lines.push(args.map((a) => String(tostring([a])[0])).join('\t'));
+      return [];
+    });
+    runContainer(loaded, env);
+    return lines;
+  };
+
+  test('R1: doubles differing below the 53-bit key ulp stay TWO pool entries', () => {
+    // glm3's executable pair (tests/analysis.test.ts "M5's naive n-key
+    // collides"): hi=0x00200000 lo=0 vs lo=1 — u32[0]*2^32+u32[1] both
+    // round to 2^53, so the OLD `n:${bits}` key merged two distinct
+    // doubles into one pool entry.
+    const a = doubleFromBits(0x00200000, 0);
+    const b = doubleFromBits(0x00200000, 1);
+    expect(a).not.toBe(b);
+    const x = local_('x');
+    const y = local_('y');
+    const ast = chunk(
+      localStat([x], [num(a)]),
+      localStat([y], [num(b)]),
+      exprStat(call(glob('print'), [localE(x)])),
+      exprStat(call(glob('print'), [localE(y)])),
+    );
+    const { protos } = compileProgram(ast);
+    const numConsts = protos[0].consts.filter((c) => c.kind === 'num');
+    expect(numConsts.length).toBe(2);
+    const keys = numConsts.map((c) => (c.kind === 'num' ? `${c.hi}:${c.lo}` : '?'));
+    expect(new Set(keys).size).toBe(2);
+    // End-to-end through compile -> pack -> unpack -> interpreter: with the
+    // merged key both registers loaded the SAME double and the two prints
+    // emitted identical text.
+    const lines = runLines(ast);
+    expect(lines.length).toBe(2);
+    expect(lines[0]).not.toBe(lines[1]);
+  });
+
+  test('R1: bit-exact round-trip — pack/unpack preserves both f64 patterns byte-for-byte', () => {
+    const a = doubleFromBits(0x00200000, 0);
+    const b = doubleFromBits(0x00200000, 1);
+    const x = local_('x');
+    const y = local_('y');
+    const ast = chunk(
+      localStat([x], [num(a)]),
+      localStat([y], [num(b)]),
+    );
+    const { protos } = compileProgram(ast);
+    const key = randomBytes(32);
+    const seed = randomBytes(32);
+    const { container } = pack(protos, { constKey: key, opcodeSeed: seed });
+    const loaded = unpack(container, { constKey: key, opcodeSeed: seed });
+    const nums = loaded.protos[0].consts.filter((c) => c.kind === 'num') as Extract<
+      ReturnType<typeof compileProgram>['protos'][number]['consts'][number],
+      { kind: 'num' }
+    >[];
+    expect(nums.length).toBe(2);
+    const pairs = nums.map((c) => `${c.hi}:${c.lo}`).sort();
+    expect(pairs).toEqual(['2097152:0', '2097152:1']);
+  });
+
+  test('R2: -0 takes the pool path (never LOADINT) and divides to -inf', () => {
+    const negZero = doubleFromBits(0, 0x80000000);
+    expect(Object.is(negZero, -0)).toBe(true);
+    const x = local_('x');
+    const ast = chunk(
+      localStat([x], [num(negZero)]),
+      ret(),
+    );
+    // Direct probe: pool entry bit-pattern + the loading instruction's
+    // opcode (the local-stat initializer IS the -0 loader).
+    const { protos } = compileProgram(ast);
+    const numConsts = protos[0].consts.filter((c) => c.kind === 'num');
+    expect(numConsts.length).toBe(1);
+    if (numConsts[0]!.kind !== 'num') throw new Error('unreachable');
+    expect(Object.is(numConsts[0]!.n, -0)).toBe(true);
+    // The instruction that loads x must NOT be LOADINT (its D operand is
+    // integral and would fold -0 to +0).
+    const loader = protos[0].code.find(
+      (i) => i.op === Op.LOADINT || i.op === Op.LOADK || i.op === Op.LOADKX,
+    );
+    if (!loader) throw new Error('no loader instruction found');
+    expect(loader.op).not.toBe(Op.LOADINT);
+    // End-to-end: 1/x through the interpreter must be -inf (the old LOADINT
+    // fold made it +inf).
+    const one = local_('one');
+    const astDiv = chunk(
+      localStat([x], [num(negZero)]),
+      localStat([one], [num(1)]),
+      exprStat(call(glob('print'), [bindiv(localE(one), localE(x))])),
+    );
+    const lines = runLines(astDiv);
+    expect(lines).toEqual(['-inf']);
   });
 });

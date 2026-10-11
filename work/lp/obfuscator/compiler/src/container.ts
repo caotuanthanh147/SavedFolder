@@ -110,6 +110,11 @@ export interface PackOptions {
   /** 32-byte constant-pool AEAD key. The build pipeline owns derivation
    *  (§5.7 const-key chain, M4 item 6); tests generate their own. */
   readonly constKey: Uint8Array;
+  /** Optional per-function pool-blob nonces (12 bytes each, one entry per
+   *  proto). When present the pack becomes bit-reproducible — used by
+   * PackParts canonical-hash verification (watermark.ts) and deterministic
+   * tests (D-M5-24). */
+  readonly poolNonces?: readonly Uint8Array[];
 }
 
 export interface PackResult {
@@ -176,6 +181,12 @@ export function pack(protos: readonly Proto[], options: PackOptions): PackResult
   const seed = options.opcodeSeed ?? randomBytes(32);
   if (seed.length !== 32) throw new Error('opcodeSeed must be 32 bytes');
   if (options.constKey.length !== 32) throw new Error('constKey must be 32 bytes');
+  if (options.poolNonces && options.poolNonces.length !== protos.length) {
+    throw new Error(`poolNonces must have exactly protos.length entries (${protos.length}), got ${options.poolNonces.length}`);
+  }
+  for (const n of options.poolNonces ?? []) {
+    if (n.length !== 12) throw new Error('each pool nonce must be 12 bytes');
+  }
   const map = opcodeMapFromSeed(seed);
   if (map.length !== OPCODE_COUNT) throw new Error('internal: opcode map size');
 
@@ -212,7 +223,11 @@ export function pack(protos: readonly Proto[], options: PackOptions): PackResult
   const headBytes = Uint8Array.from(head);
 
   // --- per-function constant pools, each its own AEAD blob (§10.2 item 6) ---
-  const aad = concat(headBytes, fnsBytes);
+  // AAD binds every pool to this exact code section via its SHA-256
+  // (D-M5-26): the pre-v1.1 full-section AAD made sealing O(fcount x
+  // fnsBytes) — quadratic — because Poly1305 re-absorbs the whole AAD per
+  // blob; hash-binding preserves the binding strength at O(fnsBytes).
+  const aad = concat(headBytes, sha256Raw(fnsBytes));
   const pool: number[] = [];
   let chainKey = constKeyChainRoot(options.constKey);
   for (let i = 0; i < protos.length; i++) {
@@ -220,7 +235,7 @@ export function pack(protos: readonly Proto[], options: PackOptions): PackResult
     const fnPlain: number[] = [];
     encodeVarint(fnPlain, protos[i].consts.length);
     for (const c of protos[i].consts) appendConst(fnPlain, c);
-    const nonce = randomBytes(12);
+    const nonce = options.poolNonces ? options.poolNonces[i]! : randomBytes(12);
     const sealed = aeadSeal(chainKey, nonce, Uint8Array.from(fnPlain), aad);
     encodeVarint(pool, sealed.ciphertext.length);
     for (const b of nonce) pool.push(b);
@@ -353,7 +368,7 @@ export function unpack(bytes: Uint8Array, options: UnpackOptions): LoadedContain
   // (Reference interpreter decrypts eagerly; M6 runtimes may decrypt
   // lazily — the ctLen prefix makes blobs skippable, the chain walks
   // forward with the head cached.)
-  const aad = concat(bytes.subarray(0, 5), bytes.subarray(37, fnsEnd));
+  const aad = concat(bytes.subarray(0, 5), bytes.subarray(37, p1), sha256Raw(bytes.subarray(p1, fnsEnd)));
   const poolPlainAll: Uint8Array[] = [];
   {
     let pp = pos;
@@ -396,7 +411,8 @@ export function unpack(bytes: Uint8Array, options: UnpackOptions): LoadedContain
         const u8 = new Uint8Array(f64.buffer);
         for (let k = 0; k < 8; k++) u8[k] = poolPlain[pp + k];
         pp += 8;
-        consts.push({ kind: 'num', n: f64[0], bits: 0 });
+        const u32 = new Uint32Array(f64.buffer);
+        consts.push({ kind: 'num', n: f64[0], hi: u32[0] >>> 0, lo: u32[1] >>> 0 });
       } else if (tagB === 3) {
         const [len, q2] = decodeVarint(poolPlain, pp); pp = q2;
         let s = '';
@@ -506,6 +522,22 @@ function appendConst(out: number[], c: Const): void {
     }
     case 'str': {
       out.push(3);
+      // Byte-string contract (BYTECODE-M5 §6.2, D-M5-28): every code unit
+      // of a str const is ONE byte (0..0xFF) — the M4 lexer's latin1
+      // char-per-byte model (src/index.ts header). A code unit > 0xFF means
+      // the input was decoded as UTF-8 TEXT somewhere upstream (the corpus
+      // 2026-10-11 finding: readFileSync utf8 instead of the contract's
+      // buf.toString('latin1')) — fail LOUD here instead of silently
+      // truncating to & 0xFF, mirroring the D-M5-22 junk-invariant posture.
+      for (let i = 0; i < c.s.length; i++) {
+        const u = c.s.charCodeAt(i);
+        if (u > 0xff) {
+          throw new Error(
+            `string const violates the byte-string model: code unit U+${u.toString(16).toUpperCase()} at index ${i}` +
+            ' (read source with buf.toString(\'latin1\'), M4 contract)',
+          );
+        }
+      }
       encodeVarint(out, c.s.length);
       for (let i = 0; i < c.s.length; i++) out.push(c.s.charCodeAt(i) & 0xff);
       break;

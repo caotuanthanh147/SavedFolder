@@ -827,5 +827,48 @@ print(a, b)
       );
     })(),
   },
+  {
+    // D-M5-28 byte-string regression: raw UTF-8 in string literals (the
+    // 26/130 corpus class — em-dashes/emoji/CJK in game-UI text), \x escapes
+    // with high bytes, and concatenation over them. SOURCE keeps the raw
+    // characters (written to disk as UTF-8 bytes — what real Lua sees); the
+    // AST consts hold the BYTE strings (char-per-byte, M4 latin1 model).
+    // This is the fixture the old text-decoded differential could never
+    // have caught: byte-equal outputs decoded differently per side.
+    name: 'byte-strings-unicode',
+    source: `local who = "gl\u00e7m"
+print("em-dash:\u{2014}end", who)
+print("emoji:\u{1F600}ok \u{4e2d}\u{6587}")
+print("byte:\\xFF!", "\\x80\\x7F")
+print(("a" .. "\u{2014}") .. "b", #"\u{2014}")
+local function tag(s) return "[" .. s .. "]" end
+print(tag("\u{2022} item"), tag("plain"))
+`,
+    ast: (() => {
+      const who = local_('who');
+      const s = local_('s');
+      const tag = local_('tag');
+      // UTF-8 byte sequences as latin1 code units (the AST consts hold
+      // BYTES, mirroring what real Lua reads from the disk file):
+      //   U+2014  = e2 80 94     U+1F600 = f0 9f 98 80
+      //   U+4E2D  = e4 b8 ad     U+6587  = e6 96 87     U+2022 = e2 80 a2
+      //   U+00E7  = c3 a7 ('glçm' — c-with-cedilla raw in source)
+      return chunk(
+        localStat([who], [str('gl\u00c3\u00a7m')]),
+        exprStat(call(glob('print'), [str('em-dash:\u00e2\u0080\u0094end'), localE(who)])),
+        exprStat(call(glob('print'), [str('emoji:\u00f0\u009f\u0098\u0080ok \u00e4\u00b8\u00ad\u00e6\u0096\u0087')])),
+        exprStat(call(glob('print'), [str('byte:\u00ff!'), str('\u0080\u007f')])),
+        exprStat(call(glob('print'), [
+          bin('Concat', bin('Concat', str('a'), str('\u00e2\u0080\u0094')), str('b')),
+          un('Len', str('\u00e2\u0080\u0094')),
+        ])),
+        localFn(tag, [s], [ret(bin('Concat', bin('Concat', str('['), localE(s)), str(']')))]),
+        exprStat(call(glob('print'), [
+          call(localE(tag), [str('\u00e2\u0080\u00a2 item')]),
+          call(localE(tag), [str('plain')]),
+        ])),
+      );
+    })(),
+  },
 ];
 

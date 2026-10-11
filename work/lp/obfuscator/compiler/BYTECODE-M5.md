@@ -26,6 +26,22 @@ table, function (closure or host). The AST front end is M4's
 | 2 | number | IEEE 754 double, 8 bytes little-endian |
 | 3 | byte-string | varint length + raw bytes (M4 byte-string model) |
 
+**Byte-string model (normative, D-M5-28):** a str const is a sequence of
+bytes — in the TS interchange, a "latin1-style" JS string where every
+code unit is one byte (0..0xFF), exactly the M4 contract
+(`obfuscator/src/index.ts`: read source files with
+`buf.toString('latin1')`; the lexer expands `\u{XXXX}` to UTF-8 bytes,
+one code unit per byte). `pack` ENFORCES this: a str const carrying a
+code unit > 0xFF fails LOUD (no silent `& 0xFF` truncation) — a > 0xFF
+code unit means the input was decoded as UTF-8 TEXT somewhere upstream
+(the corpus 2026-10-11 finding class). The container is byte-exact for
+the contract: raw UTF-8 literals (em-dash/emoji/CJK), `\xNN` escapes,
+and arbitrary binary round-trip unchanged (differential fixture
+`byte-strings-unicode`, byte-equal vs real Lua 5.4). A Unicode-safe
+re-encoding (UTF-8-in-pool) was REJECTED — Lua strings are byte
+strings; the oracle compares bytes; `\xFF` must stay ONE byte (see
+DECISIONS-M5 D-M5-28 for the full option comparison).
+
 ## 2. Instruction encoding (word code)
 
 Every instruction is one 32-bit word, little-endian in the container,
@@ -166,8 +182,12 @@ blob_n = varint(ctLen) || nonce(12) || ciphertext(ctLen) || tag(16)
 ```
 
 - AEAD = ChaCha20-Poly1305 (RFC 8439) under the chained key K_n (§6.2).
-- AAD (identical for every blob) = `magic || version || fcount || functions`
-  — binds every pool to exactly this code section.
+- AAD (identical for every blob) = `magic || version || fcount ||
+  SHA-256(functions)` — binds every pool to exactly this code section via
+  its hash (D-M5-26: the pre-2026-10-11 form used the RAW functions bytes,
+  which made sealing O(fcount × fnsBytes) — Poly1305 re-absorbs the whole
+  AAD per blob under a per-blob key, so no caching was possible;
+  hash-binding preserves the binding strength at O(fnsBytes + fcount)).
 - `ctLen` makes blobs skippable: a lazy runtime can walk to blob n without
   decrypting blobs < n (M6 lazy-decrypt option, §10.2.6 "decrypted lazily").
 - The reference interpreter decrypts eagerly at unpack; both are conformant.
@@ -208,6 +228,96 @@ against the TS side).
 `opcode_seed` is stored server-side (manifest) for debugging — it is NOT
 carried in the container (the runtime knows the mapping by construction,
 §7).
+
+### 6.5 Watermark carriers (CCP-M7 v1 — `packWatermarked`, D-M5-20)
+
+A watermarked container is an ordinary v1 container (NO version bump):
+carriers only permute pool order and append junk entries, so an unmodified
+v1 runtime consumes it transparently. All derivations below are normative
+(the implementation is `compiler/src/watermark.ts`; the leak-side
+reference extractor is `extractWatermark` in the same module — M7's
+`api/src/leak.ts` consumes it or mirrors it in lockstep).
+
+**Inputs:** watermark `W` = 16 bytes (sessions.watermark_id, M1 `randomId`);
+`buildSalt` = 32 random bytes per build, carried in PackParts (NOT in the
+manifest — its shape is a §5.9 fixed contract); flat function index `f`.
+
+```
+layout stream   T_f    = HKDF-SHA256(ikm = W, salt = buildSalt || u32be(f),
+                                     info = "wm-layout", 32)
+junk count      J_f    = 2 + (T_f[0] & 1)                       → 2 or 3
+PRNG seed       σ_f    = u32be read from T_f[1..5)
+keystream       S(f,p) = HKDF-SHA256(ikm = buildSalt,
+                                     salt = u32be(f) || u32be(p),
+                                     info = "wm-junk", 8)
+```
+
+The two info strings are container-internal labels (D-M5-21) — they are
+NOT part of doc §5.7's loader/API derivation chain.
+
+**Carrier 1 — pool order permutation.** `π_f` = block-closed Fisher-Yates
+over the LIVE indices `[0, nLive)` with blocks `[0,256)` / `[256,32768)` /
+`[32768,nLive)` (empty blocks skipped, drawn in that order), PRNG =
+xorshift32 seeded `σ_f` (zero seed → the documented constant
+`0x9e3779b9`), descending `i`, `j = lo + (next() mod (i-lo+1))` inside the
+block. Every K-reference operand of the function is reindexed through
+`π_f` (C-field arithK ops, D-field LOADK/GETGLOBAL/SETGLOBAL, AUX-field
+LOADKX/GETTABLEKS/SETTABLEKS/SELFKS, AUX|NOT-field JUMPIFEQKN/KS where
+the NOT bit is bit 31 and the index lives in bits 0..30). Block closure
+guarantees no rewritten operand outgrows its field width — no opcode-kind
+rewrites, no instruction insertion, jump offsets untouched. NEWCLOSURE D
+operands (child proto indices) are NEVER pool references and are never
+reindexed.
+
+**Carrier 2 — junk entries.** `J_f` STR constants of 8 bytes each are
+APPENDED after the live entries (positions p = 0..J_f-1):
+
+```
+junk[f][p] = STR( W_half(p) XOR S(f,p) )   where W_half(p) =
+             p even → W[0..8)   (bytes 0-7 of the watermark)
+             p odd  → W[8..16)  (bytes 8-15)
+```
+
+Extraction (leak workflow): decrypt the pool (server holds constKey via
+PackParts), the UNREFERENCED indices are exactly the junk (invariant:
+the compiler emits only referenced live entries — enforced fail-loud by
+`verifyPackParts`, D-M5-22), decode `W_half(p) = junk[f][p] XOR S(f,p)`, 
+assemble the halves; every function independently carries both halves,
+so a watermark is recoverable from any single function's junk, and
+cross-function disagreement signals tampering. Carrier-1 consistency
+(secondary): re-derive `π_f` + junk from the recovered W and compare pool
+contents — `extractWatermark(...).carrier1Ok`.
+
+**Integrity:** the session build hash covers the FINAL session bytes
+(watermark region included) — same §6.3 rule as any container. The
+canonical (pre-watermark) build hash stays in `PackParts.canonicalManifest`
+and the DB (`script_versions.build_hash`); the per-session `/auth/:id/payload`
+response's `build_hash` field carries the SESSION hash (CCP-M7 ruling,
+M1 impact).
+
+**Honest scope (mirrors CCP-M7-RULING.md):** carriers 1+2 trace a DUMP,
+not a recompile — an attacker holding the decrypted bundle holds constKey
+(RUNTIME-M6 §2) and can re-pack a stripped container with a valid hash.
+Carrier 3 (identifier fragments in live constants) is deferred to v2.
+
+**PackParts (CLI-boundary projection, option A):** JSON, bit-exact across
+processes — `serializePackParts` / `deserializePackParts` in watermark.ts;
+num consts ride as 16-hex-char f64 bit patterns (JSON numbers cannot carry
+NaN/-0/payload bits). `deserializePackParts` FAILS CLOSED: it re-packs with
+the recorded canonical nonces and requires the canonical build hash to
+reproduce. PackParts contains constKey — SERVER-SECRET, never delivered.
+PackParts also pins the per-version `opcodeSeed` (the inverse opcode map
+is baked into the immutable runtime — a per-session seed would dispatch
+through the wrong permutation; glm1's CCP-M7 co-sign item). **constKey
+posture (D-M5-27):** default = the per-version PackParts key (direct
+extraction per the ruling); `packWatermarked(..., { sessionConstKey })`
+optionally re-seals the pools under a fresh per-session key (better
+anti-dump posture — a leaked decrypted bundle decrypts ONE session's
+pools). Trade-off: the watermark lives inside the encrypted pools, so
+session-key builds extract only with that session's key — the leak
+workflow trials candidate session keys (an AEAD open IS the session
+identification; admin-investigation cost, not a hot path). The runtime
+receives whichever key via the payload (RUNTIME-M6 §2 entry c).
 
 ## 7. Per-build opcode permutation (doc §10.2 item 4)
 
@@ -272,3 +382,44 @@ discretion). Anything that changes BYTES a conformant runtime relies on
 (opcode semantics, encodings, chain construction, layout) requires a
 version bump. Additive notes that change no bytes (clarifications, M6
 guidance) do not.
+
+- 2026-10-11 (session 6): §1 byte-string model made FAIL-LOUD (D-M5-28):
+  `pack` now throws on a str const code unit > 0xFF instead of silently
+  truncating to `& 0xFF`. No container-format change — the encoding was
+  already "varint length + raw bytes" (M4 byte-string model); the guard
+  converts contract violations (UTF-8-decoded TEXT input — glm1's corpus
+  2026-10-11 finding, 26/130 files) into an error at the exact violation
+  point, mirroring the D-M5-22 junk-invariant posture. Root cause was the
+  M6 corpus runner's `readFileSync(file, 'utf8')` input decode (M4
+  contract is latin1); fixed in `vm/tests/corpus-e2e.ts` (marked). The
+  `--wm` corpus gate is GREEN again: 0 MISMATCH. Byte-exact comparison
+  adopted in the differential/watermark oracles (buffer stdout + latin1),
+  with a new `byte-strings-unicode` fixture (raw UTF-8 + `\xFF` escapes,
+  byte-equal vs real Lua 5.4). No version bump: bytes for conformant
+  inputs are unchanged.
+- 2026-10-11: §6.5 added — normative watermark-carrier pin (CCP-M7 v1,
+  `packWatermarked`). Additive for v1 runtimes (no version bump); the
+  junk bit-layout + permutation derivation become normative knowledge for
+  the extractor side from this point on.
+- 2026-10-11: §6.1 AAD changed to `magic || version || fcount ||
+  SHA-256(functions)` (D-M5-26 — pool-sealing was quadratic in the functions
+  section). TAG values change; blob layout does NOT. No version bump:
+  nothing is deployed (pre-launch, all consumers in-repo) — M6's runtime
+  template synced in the same session (vm/src/emit.ts decode: `aadh ..
+  sha256(fns)`); glm1 notified. Old containers (pre-change) fail AEAD auth
+  under new decoders — none exist outside test fixtures.
+- 2026-10-11 (same session, earlier): R1 fix — the compiler's number-const
+  DEDUP KEY changed from a computed `hi*2^32+lo` number (collides beyond 53
+  significant bits) to the raw `hi:lo` pair. No container-format change
+  (the pool serialization always carried exact f64 bytes); pools compiled
+  before the fix could silently MERGE distinct doubles — rebuild affected
+  builds.
+- 2026-10-11 (session 7): arg-window placement fix (D-M5-29, glm1's third
+  M5 finding) — compiler-side register discipline only: below-frontier
+  calls (concat operands — right-nested trees now flatten BOTH sides into
+  the single-CONCAT PUC shape; interp-string slots) compile args INTO the
+  CALL window (coverReg alignment), SELF receiver lands at base+1, and
+  compileTable stages SETLIST items at target+1 (latent gap bug the fix
+  exposed). NO ISA, field, or container change: raw-frontier output is
+  byte-identical; below-frontier output was previously miscompiled.
+  Chained-key/AAD/pool layouts untouched.

@@ -175,3 +175,250 @@ rumor):
 measurement; both listed as gates in the ruling's Cost Model). No
 analysis.ts exists on the M4 side yet (the interface was reviewed as a
 draft).
+
+## §8 — Session 5 (2026-10-11: packWatermarked + R1/R2 + corpus end-to-end)
+
+Claims, each with the command that produced it (run on the delivered tree):
+
+1. **R1 fixed (glm3's finding, executable evidence was theirs in
+   obfuscator/tests/analysis.test.ts):** the number-const dedup key now
+   uses the raw u32 pair; the colliding doubles stay two pool entries and
+   print distinctly end-to-end. Command:
+   `cd ~/Public/obfuscator && bun test compiler/tests/opcode.test.ts` →
+   `28 pass / 0 fail` incl. "R1: doubles differing below the 53-bit key
+   ulp stay TWO pool entries", "R1: bit-exact round-trip", "R2: -0 takes
+   the pool path (never LOADINT) and divides to -inf".
+2. **CCP-M7 v1 implemented (packWatermarked + PackParts + extractor):**
+   29 new tests. Command:
+   `bun test compiler/tests/watermark.test.ts` → `29 pass / 0 fail` —
+   v1-runtime transparency (all 17 differential fixtures re-run through
+   WATERMARKED containers vs real Lua 5.4.7, byte-equal stdout), exact
+   watermark recovery + carrier-1 consistency, canonical→null, two
+   sessions from one parts (unique containers, each recovers its own
+   watermark), determinism (same inputs → byte-identical; nonce or
+   watermark change → different bytes), corrupted-JSON ingestion fails
+   closed, junk bytes survive the JSON round-trip, >256-const chain
+   (block-boundary safety + invariant).
+3. **Full merged suites:** `cd ~/Public/obfuscator && bun test` →
+   `396 pass / 0 fail, 12705 expect() calls, 16 files, 16.43s`;
+   `cd ~/Public/obfuscator/vm && bun test` → `63 pass / 0 fail, 15.78s`;
+   `npx tsc --noEmit` clean in both packages.
+4. **Corpus end-to-end (§10.3, structural — corpus scripts cannot EXECUTE
+   outside a Roblox world, stated in the runner header):** 131-corpus
+   restored from git object 4e974c3 into /tmp (no working-tree pollution):
+   `bun run compiler/tests/corpus_compile.ts /tmp/corpus131/obfsucatortest` →
+   `files: 130  parse-rejects: 3  compiled: 127  compile-rejects: 0 /
+   functions: 19325  instructions: 961673  pool entries: 178302 /
+   watermarked+inverse+extraction OK: 127/127  ALL GREEN`.
+   Private corpus (SavedFolder work/lua): same command with
+   `/home/z/SavedFolder/work/lua` → `49/49 ALL GREEN` (1 parse-reject =
+   potato-harness-core.lua, Lua 5.3 `>>`, out of Luau spec).
+   The runner asserts per function: canonical pack/unpack instruction+
+   const parity; watermarked pool = permuted live + junk tail with every
+   live VALUE at its perm position; referenced set == live set; every
+   K operand === perm(canonical operand) (the forward-map check —
+   semantic preservation at the pool-reference level); extraction
+   recovers the exact watermark + carrier-1 consistency.
+5. **D-M5-26 (hash-bound AAD) measurement:** before:
+   `pack(protos)` on Alliance.lua (296 protos / 18,210 insns) ≈ 2.0s per
+   pack (instrumented section timers: pool loop 1,925ms of 1,981ms;
+   aeadSeal ×300 with the ~20-90KB functions-section AAD = 418ms vs 11ms
+   with a 200B AAD). After: corpus-wide 130-file run ~20s total including
+   2 packs + 2 unpacks + extraction per file. M6 runtime sync:
+   `vm/src/emit.ts` decode template now computes the same
+   `head || sha256(functions)` AAD — vm suite 63/63 after the sync
+   (was 20/63 with the old template vs new containers).
+6. **Compiler bug fixes the corpus exposed (each reproduced → minimal
+   shape → fixed → regression-covered):**
+   - plain `function foo() end` (Global name) and `function f() end`
+     (visible-local name) statements were unsupported — compileFunctionStat
+     only handled `function a.b() end` (Camera.lua-class reject, 125/130).
+   - compileCall's post-call frontier RESET dropped caller reservations
+     when a call sat below the live frontier (method call as a concat
+     operand — Camera.lua UpdateMacroLabel; same shape reachable via
+     interp-string expression slots). Fixed: frontier = max(results
+     window, entry frontier).
+   - closeScope's `freeReg = localBase` reset dropped caller reservations
+     made before openScope (IfElse expression compiled into the
+     return-value slot — CountryRNG.lua / Zombies.lua). Fixed: floor at
+     the scope's entry frontier.
+   - arithK peek pollution: the two `addNumber`-then-check sites added
+     unreferenced pool entries when the index exceeded the 8-bit C
+     operand (breaks the junk-detection invariant). Fixed with
+     peekNumberIndex (D-M5-22); regression = the >256-const chain test.
+7. **Artifacts:** src/watermark.ts (new, ~560 lines), src/compile.ts
+   (R1/R2 + FunctionStat + register-accounting fixes + peekNumberIndex),
+   src/container.ts (poolNonces option + hash-bound AAD), src/index.ts
+   (exports), tests/watermark.test.ts (new), tests/opcode.test.ts (R1/R2
+   regressions), tests/corpus_compile.ts (new runner),
+   vm/src/emit.ts (AAD sync, clearly marked), BYTECODE-M5.md (§6.1 AAD
+   + §6.5 watermark pin + §11 changelog), DECISIONS-M5.md D-M5-21..26,
+   this section.
+
+5b. **D-M5-27 (session constKey option, glm1's co-sign follow-up):**
+   `bun test compiler/tests/watermark.test.ts` → 30/30 incl.
+   "session-random constKey: packs under the override, per-version key
+   cannot open (AEAD auth failure), override key extracts (watermark +
+   carrier-1 green)".
+**NOT-RUN (honest):** no real-Workers CPU measurement (M1/M12's lane per
+the ruling's cost model — the local measurement in item 5 is the proxy);
+no real-executor runs of watermarked containers (M6's D2 lane); corpus
+scripts not EXECUTED (Roblox-world globals — structural proof only, plus
+the 17-fixture execution differential on watermarked containers); carrier
+3 (v2, per the ruling); no CPU benchmark of extractWatermark on adversarial
+inputs. Val-descriptor emission (IR.md Interface B consumption) NOT started
+this session — M4's analysis.ts landed mid-session and is advisory; next
+M5 session's lane.
+
+## §9 — Session 6 (2026-10-11: the str-encoding corpus finding — root cause + fail-loud guard + gate re-green)
+
+glm1's M6 session-22 msg (msgs/glm6/2026-10-11-glm1-m6s2-wm-e2e-strfinding.md)
+reported "container str encoding LOSSY for code units > 0xFF", 26/130 corpus
+files, `--wm` gate left EXPECTED-RED for me. Investigation, fix, and evidence
+below; every claim carries its command + output (§22.1).
+
+**Root cause (evidence-first, before any code):** the container's
+charCodeAt&0xFF pack is byte-exact for the DOCUMENTED M4 interchange contract
+(byte-string model: latin1 char-per-byte — `obfuscator/src/index.ts` header,
+`buf.toString('latin1')`). The loss entered at glm1's corpus runner input
+decode: `vm/tests/corpus-e2e.ts` L122 `readFileSync(file, 'utf8')` — raw
+UTF-8 source bytes (em-dashes/emoji in game-UI text) decoded to single code
+units > 0xFF BEFORE my code ever ran. Repro (both paths, same file):
+
+```
+$ bun run vm/tests/glm6-repro-str.ts        # session scratch, deleted after capture
+file bytes      : ... 3a e2 80 94 65 ...    (em-dash = e2 80 94)
+oracle stdout   : hex 656d2d646173683ae28094656e640a
+(a) utf8 read   : const code units = [... 2014] (len 12) → round-trip "em-dash:\u0014end" → matches oracle? false
+(b) latin1 read : const code units = [... e2 80 94] (len 14) → round-trip byte-exact → matches oracle? true
+```
+
+Decision: keep the byte-string encoding (Lua 5.4 manual §2.1, opened via
+curl: "The type string represents immutable sequences of bytes … 8-bit clean
+… encoding-agnostic" — a UTF-8-in-pool re-encode corrupts `\xFF` escapes and
+binary consts), add a FAIL-LOUD pack guard (D-M5-28), fix the runner's input
+decode (marked, owner notified), and make the test oracles byte-exact.
+Alternatives compared in DECISIONS-M5 D-M5-28.
+
+**Commands + outputs (this session):**
+
+1. BEFORE fix — reproduce glm1's gate (his runner, unmodified):
+   `bun run vm/tests/corpus-e2e.ts /tmp/m5-corpus/obfsucatortest --wm`
+   → `MISMATCH: 26` (all "watermark extraction: extraction failed post-pack"),
+   `parse-reject: 3`, exit 1 — matches his report exactly.
+
+2. Fix applied: `compiler/src/container.ts` appendConst — throws
+   "string const violates the byte-string model" on any code unit > 0xFF
+   (no format change; D-M5-28). `vm/tests/corpus-e2e.ts` L122 →
+   `readFileSync(file).toString('latin1')` + L56 write `'latin1'`
+   (both marked `// glm6 2026-10-11 str-model fix`; glm1 owns the file,
+   notified via msg). Differential + watermark oracle I/O made byte-exact
+   (spawnSync `encoding:'buffer'` + `.toString('latin1')`).
+
+3. New regression tests: differential fixture `byte-strings-unicode`
+   (raw em-dash U+2014 / emoji U+1F600 / CJK U+4E2D U+6587 / bullet U+2022 /
+   `\xFF`+`\x80\x7F` escapes / concat / `#` length — AST consts hold the
+   UTF-8 BYTE sequences) + watermark tests: pack throws on text consts
+   (plain AND watermarked paths), high-byte live pools round-trip byte-exact
+   with watermark lockstep green.
+
+4. `cd obfuscator/compiler && bun test` → **83 pass / 0 fail** (461 expects;
+   was 80 — +1 differential fixture, +3 byte-string contract tests).
+
+5. `cd obfuscator && bun test` (root, M4 suite) → **462 pass / 0 fail**.
+
+6. `cd obfuscator/vm && bun test` → **113 pass / 0 fail** (500 expects;
+   glm1's 28 watermark-e2e runtime tests re-verified on the fixed tree).
+
+7. tsc ×3 (glm4's sweep lesson — all THREE tsconfigs, not ×2):
+   root `./node_modules/.bin/tsc --noEmit` → clean;
+   `compiler` → clean; `vm` → clean.
+
+8. Corpus gates AFTER the fix (131-corpus, git 4e974c3, fresh extract):
+   `bun run vm/tests/corpus-e2e.ts /tmp/m5-corpus/obfsucatortest --wm`
+   → **MISMATCH: 0**, exit 0 (was 26/exit 1);
+   plain mode → **MISMATCH: 0**, exit 0.
+   The `--wm` gate is GREEN; glm1 can drop the EXPECTED-RED posture.
+
+**NOT-RUN (honest):** stdout compared as decoded strings in glm1's runner
+(spawnSync `encoding:'utf8'`) — byte-equal outputs compare equal, but two
+DIFFERENT byte sequences with invalid UTF-8 could theoretically decode equal
+(false-pass direction only); recommendation msg'd to glm1 (buffer compare is
+his call — minimal footprint in his file). Real-executor runs, real-Workers
+CPU, carrier 3: unchanged lanes from §8's NOT-RUN list.
+
+## §10 — Session 7 (2026-10-11: glm1's third M5 finding — arg-window placement — CLOSED)
+
+**The finding (msg glm1-20261011T0900Z.md):** compileCall compiled fixed
+args via `reserve(1)` at the ALLOCATION FRONTIER while `CALL A=base B=n+1`
+reads its window at base+1 (base+2 for self calls). Any call compiled
+below the live frontier — concat-chain operand positions (right-nested
+trees from the M4 parser bypassed the left-spine-only flattenConcat),
+interp-string expression slots — misplaces args. His repros: r7
+(`print("a"..g(1)..","..g(2))` → arithmetic-on-nil), r2
+(string.byte pair → bad-argument), r13 (pcall/tostring → `a=nil b=R`),
+r9 (parenthesized). Invisible to the corpus (deobf material restructures
+concat chains; error-parity scripts die at executor boundaries first).
+Fixed by me this session (D-M5-29), plus the SELF path he flagged for
+sweep, plus BOTH-SIDE flattenConcat (his suggestion), plus one LATENT
+compileTable bug the fix exposed (SETLIST staged at the frontier, reads
+contiguously at target+1 — table args in window slots staged with a gap).
+
+**Reproduction BEFORE the fix (evidence-first; scratch runner through the
+real M4 parser → M5 compile → pack/unpack → reference interpreter):**
+r7 oracle `"a2,3\n"` vs protected `"<RUNTIME-ERROR> attempt to perform
+arithmetic on a nil value"`; r2 `bad argument #1 to 'string.byte'`;
+r13 `"a=nil b=R\n"`; r9 arithmetic-on-nil; nested-call class
+arithmetic-on-nil — 6 of 10 scratch cases failing.
+
+**Fix shape (compile.ts):** `coverReg(ctx, r)` (mirrors reserve()'s
+overflow check + maxRegs bookkeeping) aligns the frontier to each window
+slot; fixed args compile into `argStart+i`; multret-last opens at the
+window's end; SELF receiver compiled AT base+1 (replaces the
+frontier-temp + release/re-reserve dance); flattenConcat flattens BOTH
+sides (single-CONCAT PUC shape restored; __concat pair order unchanged);
+compileTable stages at `target+1+count` with entryFree restore. Raw-
+frontier instruction streams proven byte-identical (instruction-by-
+instruction analysis in D-M5-29 + all 17 pre-existing differential
+fixtures unchanged-green).
+
+**Commands and outputs (fresh clone of this delivery's tree):**
+
+    $ cd obfuscator/compiler && bun test          # 107/107 pass, 485 expects (x3 runs)
+    $ cd obfuscator && bun test                   # 490/490 pass, 32807 expects (19 files)
+    $ cd obfuscator/vm && bun test                # 117/117 pass, 524 expects
+    $ for d in . compiler vm; do (cd $d && bunx tsc --noEmit); done   # ×3 clean
+    $ cd obfuscator/vm && bun run tests/corpus-e2e.ts /tmp/corpus-4e974c3/obfsucatortest
+      # MISMATCH: 0, parse-reject: 3 (known: Dupe corrupt / DinoHunters / WaveDefense),
+      # compile-reject: 0, oracle-fail: 0, no-output: 0, nondeterministic: 0, emit-reject: 0
+    $ bun run tests/corpus-e2e.ts /tmp/corpus-4e974c3/obfsucatortest --wm
+      # exit 0 — MISMATCH: 0 (same buckets; --wm extraction lockstep green per file)
+    $ cd obfuscator/compiler && bun run tests/corpus_compile.ts /tmp/corpus-4e974c3/obfsucatortest
+      # files: 130  parse-rejects: 3  compiled: 127  compile-rejects: 0
+      # functions: 19325  instructions: 959164  pool entries: 178302
+      # watermarked+inverse+extraction OK: 127/127  ALL GREEN (exit 0)
+    $ bun run tests/corpus_compile.ts ~/SavedFolder/work/lua
+      # files: 50  parse-rejects: 1  compiled: 49  compile-rejects: 0
+      # watermarked+inverse+extraction OK: 49/49  ALL GREEN (exit 0)
+    $ cd obfuscator/vm && bun run tools/obfuscate.ts demo/lp1-demo.lua /tmp/r1.obf.lua --seed lp1-demo-001 --dispatch closure
+    $ bun run tools/obfuscate.ts demo/lp1-demo.lua /tmp/r2.obf.lua --seed lp1-demo-001 --dispatch closure
+    $ cmp /tmp/r1.obf.lua /tmp/r2.obf.lua               # determinism: byte-identical
+    $ lua5.4 /tmp/r1.obf.lua > a.txt; lua5.4 demo/lp1-demo.lua > b.txt; cmp a.txt b.txt
+      # DEMO DIFFERENTIAL BYTE-EQUAL (regenerated artifact, post-fix compiler)
+
+**Regression suite added:** `compiler/tests/window.test.ts` — 24
+parse-based differential tests (real M4 parser; oracle = real Lua 5.4):
+glm1's r2/r6/r7/r9/r10/r13 classes + SELF-with-args below frontier +
+multret-last (shallow + deep 5-chain) + vararg multret + table args
+(List/Record/computed-key/table-call syntax in window slots — the latent
+compileTable bug) + nested tables in call args + 7-operand mixed chain +
+doubly-nested call args + 2 interp-string cases (protected-side expected
+output — plain lua5.4 cannot parse backtick syntax, fixtures.ts
+discipline).
+
+**NOT-RUN (honest):** real-executor runs (D2 lane, unchanged); the
+delivered demo artifact `demo/lp1-demo.obf.lua` itself was NOT regenerated
+in-repo (glm1's artifact, built pre-fix; regeneration verified equivalent
+in /tmp — his call whether to rebuild in-repo); corpus e2e runners are
+glm1's files (no edits made this session); M4/M6 suites re-run as
+delivered, no changes to their trees.

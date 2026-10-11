@@ -35,7 +35,11 @@ export class CompileError extends Error {
 /** Per-function constant pool entry. */
 export type Const =
   | { readonly kind: 'bool'; readonly b: boolean }
-  | { readonly kind: 'num'; readonly n: number; readonly bits: number }
+  // `hi`/`lo` = the two u32 halves of n's f64 bit pattern. The DEDUP KEY
+  // uses the raw pair — a computed `hi*2^32+lo` NUMBER rounds beyond 53
+  // significant bits and merges distinct doubles (glm3's R1 finding,
+  // 2026-10-11: lo=0x00200000 hi=0 vs hi=1 both keyed n:2^53).
+  | { readonly kind: 'num'; readonly n: number; readonly hi: number; readonly lo: number }
   | { readonly kind: 'str'; readonly s: string };
 
 /** Upvalue descriptor: where the child closure's upvalue comes from in the
@@ -98,6 +102,10 @@ interface LocalSlot {
 
 interface Scope {
   readonly localBase: number;
+  /** Frontier at openScope: caller reservations OUTSIDE this scope that
+   *  must survive closeScope (e.g. the return-value slot compileExprList
+   *  reserved before an IfElse expression opened its scope). */
+  readonly freeRegAtEntry: number;
   capturedHere: boolean;
 }
 
@@ -202,17 +210,34 @@ class Compiler {
     }
   }
 
+  /** Raise the allocation frontier to cover register r (window
+   *  placement: arg slots may sit below the live frontier — below-frontier
+   *  calls compile their window in place). Mirrors reserve()'s overflow
+   *  check and maxRegs bookkeeping for the raised region; no-op when the
+   *  frontier already covers r. */
+  coverReg(ctx: FnCtx, r: number): void {
+    if (ctx.freeReg >= r + 1) return;
+    if (r + 1 > LIMITS.maxRegs) {
+      throw new CompileError(`register overflow (limit ${LIMITS.maxRegs - 1})`);
+    }
+    ctx.freeReg = r + 1;
+    if (ctx.freeReg > ctx.proto.maxRegs) ctx.proto.maxRegs = ctx.freeReg;
+  }
+
   // --- scopes ------------------------------------------------------------
 
   openScope(ctx: FnCtx): void {
-    ctx.scopes.push({ localBase: ctx.locals.length, capturedHere: false });
+    ctx.scopes.push({ localBase: ctx.locals.length, freeRegAtEntry: ctx.freeReg, capturedHere: false });
   }
 
   closeScope(ctx: FnCtx, emitClose: boolean): void {
     const scope = ctx.scopes.pop();
     if (!scope) throw new CompileError('internal: scope underflow');
     ctx.locals.length = scope.localBase;
-    ctx.freeReg = scope.localBase;
+    // Scope-local temps die here, but caller reservations made BEFORE
+    // openScope stay: floor at the entry frontier (corpus finding
+    // 2026-10-11: IfElse-in-return-slot underflowed through this reset).
+    ctx.freeReg = Math.max(scope.localBase, scope.freeRegAtEntry);
     if (emitClose && scope.capturedHere) {
       this.emit(ctx, { op: Op.CLOSEUPVALS, a: scope.localBase, b: 0, c: 0, d: 0, aux: 0 });
     }
@@ -305,7 +330,7 @@ class Compiler {
     let key: string;
     switch (c.kind) {
       case 'bool': key = `b:${c.b ? 1 : 0}`; break;
-      case 'num': key = `n:${c.bits}`; break;
+      case 'num': key = `n:${c.hi}:${c.lo}`; break;
       case 'str': key = `s:${c.s.length}:${c.s}`; break;
     }
     const existing = ctx.constMap.get(key);
@@ -326,8 +351,21 @@ class Compiler {
     f64[0] = n;
     const u32 = new Uint32Array(f64.buffer);
     return this.addConst(ctx, {
-      kind: 'num', n, bits: u32[0] * 0x100000000 + u32[1],
+      kind: 'num', n, hi: u32[0] >>> 0, lo: u32[1] >>> 0,
     });
+  }
+
+  /** Index a Number const WOULD occupy (existing dedup index, else the
+   *  next free slot) WITHOUT inserting it. The arithK fast paths use this
+   * to skip the pool entirely when the index would not fit the 8-bit C
+   * operand — otherwise they would add an entry no instruction ever
+   * references (every pool entry must stay referenced: the watermark
+   * junk-detection invariant, D-M5-22). Callers must addNumber() before
+   * compiling anything else that can grow the pool, or the reserved index
+   * shifts. */
+  peekNumberIndex(ctx: FnCtx, n: number): number {
+    const existing = ctx.constMap.get(numberKey(n));
+    return existing !== undefined ? existing : ctx.proto.consts.length;
   }
 
   loadK(ctx: FnCtx, target: number, kIdx: number): void {
@@ -837,12 +875,11 @@ class Compiler {
 
   /** R(target) := R(target) op <value>. */
   compileBinOpAssign(ctx: FnCtx, target: number, value: Expr, binOp: BinaryOp): void {
-    if (value.kind === 'Number') {
-      const kIdx = this.addNumber(ctx, value.value);
-      if (kIdx <= LIMITS.kIndex8Max) {
-        this.emit(ctx, { op: arithKOp(binOp), a: target, b: target, c: kIdx, d: 0, aux: 0 });
-        return;
-      }
+    if (value.kind === 'Number' && this.peekNumberIndex(ctx, value.value) <= LIMITS.kIndex8Max) {
+      // addNumber immediately after the peek: no pool growth in between,
+      // so the index is the one the 8-bit C operand can hold.
+      this.emit(ctx, { op: arithKOp(binOp), a: target, b: target, c: this.addNumber(ctx, value.value), d: 0, aux: 0 });
+      return;
     }
     const r = this.reserve(ctx, 1);
     this.compileExpr(ctx, value, r, 'single');
@@ -854,6 +891,37 @@ class Compiler {
 
   compileFunctionStat(ctx: FnCtx, stat: FunctionStat): void {
     const name = stat.name;
+    // `function foo() end` == `foo = <closure>` — plain global name
+    // (parseNameExpr: Global when not a visible local). Corpus coverage
+    // finding 2026-10-11: only the IndexName form was compiled before.
+    if (name.kind === 'Global') {
+      const val = this.reserve(ctx, 1);
+      this.compileClosure(ctx, stat.func, val);
+      this.emit(ctx, { op: Op.SETGLOBAL, a: val, b: 0, c: 0, d: this.addString(ctx, name.name), aux: 0 });
+      this.release(ctx, 1);
+      return;
+    }
+    // `function f() end` with f a visible local (incl. enclosing scope —
+    // resolves to an upvalue here). Mirrors the Assign/LocalExpr path.
+    if (name.kind === 'LocalExpr') {
+      const res = this.resolveName(ctx, name.local.name);
+      if (res.kind === 'local') {
+        this.compileClosure(ctx, stat.func, res.reg);
+      } else if (res.kind === 'upval') {
+        const val = this.reserve(ctx, 1);
+        this.compileClosure(ctx, stat.func, val);
+        this.emit(ctx, { op: Op.SETUPVAL, a: val, b: res.idx, c: 0, d: 0, aux: 0 });
+        this.release(ctx, 1);
+      } else {
+        // Unbound Local identity (parser saw a local, compiler cannot
+        // resolve it — e.g. hand-built ASTs): store to the global by name.
+        const val = this.reserve(ctx, 1);
+        this.compileClosure(ctx, stat.func, val);
+        this.emit(ctx, { op: Op.SETGLOBAL, a: val, b: 0, c: 0, d: this.addString(ctx, name.local.name), aux: 0 });
+        this.release(ctx, 1);
+      }
+      return;
+    }
     if (name.kind !== 'IndexName') {
       throw new CompileError('function statement target must be a name index');
     }
@@ -957,15 +1025,26 @@ class Compiler {
     // are aligned here. Without this, argument registers clobber the
     // callee slot (differential harness: "attempt to call a number value").
     if (ctx.freeReg < base + 1) ctx.freeReg = base + 1;
+    // Frontier at entry (incl. the base+1 alignment above). Callers can
+    // compile a call BELOW the live frontier (concat operands, interp-string
+    // expression slots) — the post-call frontier must never drop below it,
+    // or the caller's reserved window is silently de-reserved (register
+    // underflow; corpus finding 2026-10-11, Camera.lua UpdateMacroLabel).
+    const entryFree = ctx.freeReg;
     // Argument window is reserved above the callee slot.
     let argStart: number;
     if (call.self && call.func.kind === 'IndexName') {
-      const t = this.reserve(ctx, 1);
-      this.compileExpr(ctx, call.func.expr, t, 'single');
+      // Receiver lands AT base+1 — the register CALL's B window counts as
+      // the implicit self argument (PUC shape). Compiling the receiver
+      // into the window (not a frontier temp) keeps method calls legal
+      // below the live frontier (concat/interp operand positions): the
+      // old frontier-temp + release/re-reserve dance placed the "self
+      // slot" at the frontier, so CALL read a never-written register
+      // (finding 2026-10-11, glm1: SELF path of the arg-window bug).
+      this.coverReg(ctx, base + 2);
+      this.compileExpr(ctx, call.func.expr, base + 1, 'single');
       const kIdx = this.addString(ctx, call.func.index);
-      this.emit(ctx, { op: Op.SELFKS, a: base, b: t, c: 0, d: 0, aux: kIdx });
-      this.release(ctx, 1);
-      this.reserve(ctx, 1); // self slot at base+1
+      this.emit(ctx, { op: Op.SELFKS, a: base, b: base + 1, c: 0, d: 0, aux: kIdx });
       argStart = base + 2;
     } else {
       this.compileExpr(ctx, call.func, base, 'single');
@@ -975,23 +1054,30 @@ class Compiler {
     const lastIsMultret = args.length > 0 && isMultretExpr(args[args.length - 1]);
     let b: number;
     if (lastIsMultret) {
-      // All but last as fixed args; the last opens the window (B=0).
+      // Fixed args compile INTO the window (argStart+i), never the raw
+      // frontier: below-frontier calls (concat/interp operands) must put
+      // args where CALL's B window reads them (finding 2026-10-11, glm1:
+      // arg-window misplacement — reserve(1) wrote them at the frontier).
+      // The multret last opens at the window's end; its results extend
+      // into not-yet-written slots above it and are consumed by this CALL.
       for (let i = 0; i < args.length - 1; i++) {
-        const r = this.reserve(ctx, 1);
+        const r = argStart + i;
+        this.coverReg(ctx, r);
         this.compileExpr(ctx, args[i], r, 'single');
       }
       const last = args[args.length - 1];
+      const rLast = argStart + args.length - 1;
+      this.coverReg(ctx, rLast);
       if (last.kind === 'Call') {
-        const r = this.reserve(ctx, 1);
-        this.compileCall(ctx, last, r, 0);
+        this.compileCall(ctx, last, rLast, 0);
       } else {
-        const r = this.reserve(ctx, 1);
-        this.emit(ctx, { op: Op.GETVARARGS, a: r, b: 0, c: 0, d: 0, aux: 0 });
+        this.emit(ctx, { op: Op.GETVARARGS, a: rLast, b: 0, c: 0, d: 0, aux: 0 });
       }
       b = 0;
     } else {
       for (let i = 0; i < args.length; i++) {
-        const r = this.reserve(ctx, 1);
+        const r = argStart + i;
+        this.coverReg(ctx, r);
         this.compileExpr(ctx, args[i], r, 'single');
       }
       b = args.length + (argStart - base - 1) + 1;
@@ -1000,8 +1086,10 @@ class Compiler {
     this.emit(ctx, { op: Op.CALL, a: base, b, c, d: 0, aux: 0 });
     // Post-call register state: fixed wants keep live results at
     // base..base+want-1; want=-1 keeps the caller's 1-slot window (results
-    // discarded); multret leaves an open window at base+1.
-    ctx.freeReg = base + (want === 0 ? 1 : Math.max(want, 1));
+    // discarded); multret leaves an open window at base+1. The frontier is
+    // the MAX of that results window and the entry frontier — the caller's
+    // live registers above `base` stay reserved.
+    ctx.freeReg = Math.max(base + (want === 0 ? 1 : Math.max(want, 1)), entryFree);
     if (ctx.freeReg > ctx.proto.maxRegs) ctx.proto.maxRegs = ctx.freeReg;
   }
 
@@ -1016,7 +1104,9 @@ class Compiler {
         this.emit(ctx, { op: Op.LOADBOOL, a: target, b: e.value ? 1 : 0, c: 0, d: 0, aux: 0 });
         break;
       case 'Number': {
-        if (Number.isInteger(e.value) && e.value >= -32768 && e.value <= 32767) {
+        // -0 must take the pool path: LOADINT's D operand is integral, so
+        // folding -0 there would rewrite it to +0 (glm3's R2 finding).
+        if (Number.isInteger(e.value) && !Object.is(e.value, -0) && e.value >= -32768 && e.value <= 32767) {
           this.emit(ctx, { op: Op.LOADINT, a: target, b: 0, c: 0, d: e.value, aux: 0 });
         } else {
           this.loadK(ctx, target, this.addNumber(ctx, e.value));
@@ -1179,15 +1269,16 @@ class Compiler {
         this.compileComparison(ctx, e, target);
         break;
       default: {
-        if (e.right.kind === 'Number') {
+        if (e.right.kind === 'Number' && this.peekNumberIndex(ctx, e.right.value) <= LIMITS.kIndex8Max) {
+          // addNumber BEFORE compiling e.left (original order): compiling
+          // the left operand grows the pool, which would push the reserved
+          // index past the 8-bit C operand.
           const kIdx = this.addNumber(ctx, e.right.value);
-          if (kIdx <= LIMITS.kIndex8Max) {
-            const l = this.reserve(ctx, 1);
-            this.compileExpr(ctx, e.left, l, 'single');
-            this.emit(ctx, { op: arithKOp(e.op), a: target, b: l, c: kIdx, d: 0, aux: 0 });
-            this.release(ctx, 1);
-            break;
-          }
+          const l = this.reserve(ctx, 1);
+          this.compileExpr(ctx, e.left, l, 'single');
+          this.emit(ctx, { op: arithKOp(e.op), a: target, b: l, c: kIdx, d: 0, aux: 0 });
+          this.release(ctx, 1);
+          break;
         }
         const l = this.reserve(ctx, 1);
         this.compileExpr(ctx, e.left, l, 'single');
@@ -1257,6 +1348,7 @@ class Compiler {
   // --- table constructor ---------------------------------------------------
 
   compileTable(ctx: FnCtx, e: TableExpr, target: number): void {
+    const entryFree = ctx.freeReg;
     let arrayHint = 0;
     let hashHint = 0;
     for (const item of e.items) {
@@ -1270,13 +1362,13 @@ class Compiler {
     });
     let arrayCount = 0;
     let stored = 0; // array items already committed by earlier flushes
-    let stagedBase = -1;
-    const releaseStaged = (): void => {
-      if (stagedBase >= 0) {
-        this.release(ctx, ctx.freeReg - stagedBase);
-        stagedBase = -1;
-      }
-    };
+    // Staged array items sit CONTIGUOUSLY at target+1..target+B — SETLIST
+    // reads R[A+1..A+B] — never at the raw frontier. Frontier-relative
+    // staging (reserve-based) left a gap after the table register when
+    // the table compiles below the live frontier (call-arg window slots,
+    // concat/interp operands) and SETLIST read never-written registers
+    // (latent until the 2026-10-11 arg-window fix put table args there).
+    const stagedAt = (): number => target + 1 + arrayCount;
     const flush = (multret: boolean): void => {
       if (arrayCount === 0 && !multret) return;
       // AUX = number of array items ALREADY stored (0-based chunk offset);
@@ -1290,22 +1382,14 @@ class Compiler {
       });
       stored += arrayCount;
       arrayCount = 0;
-      releaseStaged();
-    };
-    const ensureStaged = (): number => {
-      if (stagedBase < 0) {
-        stagedBase = this.reserve(ctx, 1);
-      } else {
-        this.reserve(ctx, 1);
-      }
-      return stagedBase + arrayCount;
     };
     for (let i = 0; i < e.items.length; i++) {
       const item = e.items[i];
       const isLast = i === e.items.length - 1;
       if (item.kind === 'List') {
         if (isLast && isMultretExpr(item.value)) {
-          const r = ensureStaged();
+          const r = stagedAt();
+          this.coverReg(ctx, r);
           if (item.value.kind === 'Call') {
             this.compileCall(ctx, item.value, r, 0);
           } else {
@@ -1314,7 +1398,8 @@ class Compiler {
           flush(true);
           continue;
         }
-        const r = ensureStaged();
+        const r = stagedAt();
+        this.coverReg(ctx, r);
         this.compileExpr(ctx, item.value, r, 'single');
         arrayCount++;
         if (arrayCount >= FIELDS_PER_FLUSH) flush(false);
@@ -1324,21 +1409,27 @@ class Compiler {
           throw new CompileError('internal: record item key must be a string');
         }
         const kIdx = this.addString(ctx, item.key.value);
-        const v = this.reserve(ctx, 1);
+        const v = target + 1;
+        this.coverReg(ctx, v);
         this.compileExpr(ctx, item.value, v, 'single');
         this.emit(ctx, { op: Op.SETTABLEKS, a: v, b: target, c: 0, d: 0, aux: kIdx });
-        this.release(ctx, 1);
       } else {
         flush(false);
-        const k = this.reserve(ctx, 1);
+        const k = target + 1;
+        this.coverReg(ctx, k);
         this.compileExpr(ctx, item.key as Expr, k, 'single');
-        const v = this.reserve(ctx, 1);
+        const v = target + 2;
+        this.coverReg(ctx, v);
         this.compileExpr(ctx, item.value, v, 'single');
         this.emit(ctx, { op: Op.SETTABLE, a: v, b: target, c: k, d: 0, aux: 0 });
-        this.release(ctx, 2);
       }
     }
     flush(false);
+    // Only the table register stays live; everything staged above the
+    // entry frontier is dead. At the raw frontier this equals the old
+    // release-to-stagedBase end state (freeReg = target+1).
+    ctx.freeReg = Math.max(entryFree, target + 1);
+    if (ctx.freeReg > ctx.proto.maxRegs) ctx.proto.maxRegs = ctx.freeReg;
   }
 }
 
@@ -1352,6 +1443,14 @@ interface FnParams {
 
 function isMultretExpr(e: Expr): boolean {
   return e.kind === 'Call' || e.kind === 'Vararg';
+}
+
+/** Dedup key for a Number const (must match addConst's 'num' branch). */
+function numberKey(n: number): string {
+  const f64 = new Float64Array(1);
+  f64[0] = n;
+  const u32 = new Uint32Array(f64.buffer);
+  return `n:${u32[0] >>> 0}:${u32[1] >>> 0}`;
 }
 
 function arithOp(op: BinaryOp): number {
@@ -1389,12 +1488,22 @@ function unaryOp(op: UnaryOp): number {
 }
 
 function flattenConcat(e: BinaryExpr, out: Expr[]): void {
-  if (e.left.kind === 'Binary' && (e.left as BinaryExpr).op === 'Concat') {
-    flattenConcat(e.left as BinaryExpr, out);
-  } else {
-    out.push(e.left);
-  }
-  out.push(e.right);
+  // Both-side flattening: `a .. b .. c` is right-associated by grammar,
+  // but the concat OPERATOR is one n-ary chain semantically (PUC emits a
+  // single CONCAT; pair folding stays right-to-left either way, so
+  // __concat metamethod order is unchanged). Left-spine-only flattening
+  // compiled right-nested trees as NESTED CONCATs — each level reserving
+  // its own window at the frontier — which is what put calls below the
+  // live frontier in operand positions (finding 2026-10-11, glm1).
+  const push = (x: Expr): void => {
+    if (x.kind === 'Binary' && (x as BinaryExpr).op === 'Concat') {
+      flattenConcat(x as BinaryExpr, out);
+    } else {
+      out.push(x);
+    }
+  };
+  push(e.left);
+  push(e.right);
 }
 
 // Re-exported for tests and consumers.

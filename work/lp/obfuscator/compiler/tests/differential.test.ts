@@ -20,14 +20,20 @@ const LUA54 = process.env.LUA54 ?? join(process.env.HOME ?? '/home/z', '.lua54',
 function runRealLua(source: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'm5-diff-'));
   const file = join(dir, 'fixture.lua');
+  // Byte-exact oracle I/O (D-M5-28): capture stdout as raw BYTES and keep
+  // them as a latin1 char-per-byte string — the same byte-string model the
+  // protected side's consts use. The previous utf8 decode compared TEXT:
+  // byte-equal outputs whose bytes were non-ASCII decoded differently on
+  // the two sides of the comparison (oracle stdout vs interpreter string
+  // consts) and could never match.
   writeFileSync(file, source, 'utf8');
   try {
-    const res = spawnSync(LUA54, [file], { encoding: 'utf8', timeout: 10_000 });
+    const res = spawnSync(LUA54, [file], { encoding: 'buffer', timeout: 10_000 });
     if (res.error) throw res.error;
     if (res.status !== 0) {
       throw new Error(`real lua failed (${res.status}): ${res.stderr}`);
     }
-    return res.stdout;
+    return (res.stdout as Buffer).toString('latin1');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

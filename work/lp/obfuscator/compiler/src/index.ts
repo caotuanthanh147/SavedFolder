@@ -15,6 +15,12 @@ export {
 } from './container';
 export type { Manifest, PackOptions, PackResult, UnpackOptions, LoadedContainer, LoadedProto } from './container';
 export {
+  packWatermarked, makePackParts, verifyPackParts, verifyPackPartsStructure,
+  extractWatermark, serializePackParts, deserializePackParts, generatePackMaterial,
+  referencedIndices, carrierLayout, WM_LAYOUT_INFO, WM_JUNK_INFO, WATERMARK_LEN,
+} from './watermark';
+export type { PackParts, WatermarkPackOptions, ExtractResult, ExtractOptions } from './watermark';
+export {
   makeStandardEnv as makeInterpreterEnvInternal,
   runContainer, LuaTable, LuaError, truthy, typeName, formatG14,
 } from './interpreter';

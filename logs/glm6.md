@@ -255,3 +255,80 @@
 Stage: LP1-M5 s6 complete. Next lane: val-descriptor emission (M4
 analysis.ts const-plan consumption), then real-Workers CPU, then v2
 carrier 3 (Q5 globalName list).
+
+## Session 7 — 2026-10-11 ~09:50–10:45Z (BIG PROJECT: glm1's third M5 finding closed)
+
+- Cold start after context break (session summary carried the task):
+  re-cloned SavedFolder + Public (token from session context/worklog line 3),
+  bootstrap glm6, watchers on. Mandatory re-reads: ONBOARDING, PROMPT,
+  TASKS.md head-to-toe (Big Project section focus), GLM_SCRIPTING_RULES
+  head-to-toe (Rule 18), lessons.md, doc.md ALL 1036 lines (source of
+  truth), inbox ×2.
+- Inbox: glm1's THIRD M5 finding (compileCall fixed args at the FRONTIER
+  while CALL reads window at base+1 — below-frontier calls from concat
+  operand positions; right-nested trees bypass left-spine flattenConcat;
+  repros r2/r7/r9/r13; SELF path flagged for sweep; corpus-blind
+  explanation) + glm5's pass-1 reconfirmation of the Latin-1 finding
+  (which my s6 a23c636 had already closed — his run predated the fix).
+- REPRODUCED FIRST (evidence-first): scratch runner through the real M4
+  parser → compileProgram → pack/unpack → TS interpreter vs real lua5.4.
+  Pre-fix: r7 "attempt to perform arithmetic on a nil value", r2
+  "bad argument #1 to 'string.byte'", r13 "a=nil b=R", r9 same, nested-
+  call class, interp-slot class — 6/10 failing. Confirmed root cause
+  exactly as filed (my local trace: g(2) base=R4, argStart=R5, LOADINT
+  landed R6=frontier).
+- FIX (D-M5-29, glm1's proposal as the seed, extended):
+  coverReg(ctx,r) alignment helper (mirrors reserve() overflow check +
+  maxRegs) + fixed args into argStart+i + multret-last at the window end +
+  SELF receiver AT base+1 (replaces frontier-temp + release/re-reserve
+  dance — its "self slot" was never written for below-frontier method
+  calls) + flattenConcat BOTH sides (PUC single-CONCAT shape; __concat
+  pair order unchanged — semantically neutral; his parity gate verified
+  strategy-vs-strategy, not pinned counts).
+- LATENT BUG the fix EXPOSED (found by my own extended repro — NOT in
+  glm1's list): compileTable staged SETLIST items at the raw frontier but
+  SETLIST reads R[A+1..A+B] contiguously → table args in window slots
+  staged with a GAP after the table register. Repro:
+  `print("x" .. table.concat({"a","b"}, "-") .. "y" .. ("[%s]"):format("k"))`
+  — oracle "xa-by[k]", protected "xy[k]" (operand LOST). Fixed: stagedAt()
+  = target+1+count, coverReg, final freeReg = max(entryFree, target+1).
+  The two bugs were mutually masking: table args were never below-frontier
+  before the compileCall fix.
+- Below-frontier compileExpr caller AUDIT (safety invariant for writing
+  into window slots): grep'd every compileExpr call site — only concat
+  operands (start+i) and interp-string slots (base+2+i) are below-frontier,
+  both block windows whose later slots are write-later → window writes are
+  safe. List cursors reserve-per-item (aligned); table staging now
+  target-relative; everything else reserve-then-compile.
+- Regressions: NEW compiler/tests/window.test.ts (24 parse-based
+  differential tests; oracle = real lua5.4; interp-string cases with
+  stated expected output — lua5.4 can't parse backticks, fixtures.ts
+  discipline). Includes glm1's r2/r6/r7/r9/r10/r13 + SELF-with-args +
+  multret shallow/deep + vararg multret + table arg classes + nested
+  tables + 7-operand chain + doubly-nested call args. One test-case bug
+  caught by the oracle itself: bare `{...}[1]` indexing is invalid Lua
+  syntax (lua5.4 parse error) — replaced with a semantically clean case.
+- Gates: compiler 107/107 ×3 + obf root 490/490 + vm 117/117 + tsc ×3
+  clean; corpus-e2e plain MISMATCH 0 / --wm exit 0 (131-corpus @ 4e974c3
+  via git worktree); corpus_compile 127/127 + private 49/49 ALL GREEN; M6
+  CLI determinism (same seed → byte-identical) + demo differential
+  BYTE-EQUAL on regenerated artifact.
+- DELIVERED Public d926e28 (pull --rebase clean, push, ls-remote verified).
+  Canonical work/lp/obfuscator/compiler re-synced from Public (was stale
+  since s5 — glm1's tsc fixes + my s5/s6 files had drifted).
+- Docs: DECISIONS D-M5-29 (full options/choice/evidence/tier table row),
+  VERIFICATION-M5 §10 (commands+outputs, honest NOT-RUN: real executors;
+  demo artifact not regenerated in-repo — glm1's file), BYTECODE-M5
+  changelog (no ISA/container change — compiler-internal discipline).
+- Msgs: glm1 (fix landed + co-review lane + SELF sweep answer + latent
+  compileTable bug + demo-artifact rebuild question + register-numbering
+  note) + glm5 (timeline: his pass ran pre-a23c636; D3 markable CLOSED;
+  d926e28 flagged for closing pass; his transport trick noted). Inbox
+  cleared, .gitkeep kept.
+- SavedFolder: TASKS LP1-M5 row s7 note + status + this log. Local
+  worklog updated.
+
+Stage: LP1-M5 s7 complete — all three glm1 findings closed (function-stat
+s5, Latin-1 s6, arg-window s7) + one latent self-found bug. Next lane
+unchanged: val-descriptor emission (M4 analysis.ts const-plan), then
+real-Workers CPU, then v2 carrier 3 (Q5 globalName list).

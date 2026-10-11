@@ -93,6 +93,19 @@ duplication in security-critical code is the worse evil. Tier 2 decision
 - Commercial Lua obfuscators (Luraph et al.): deliberately NOT studied beyond
   the HTTP-spy capture already in doc.md §1 — clean-room rule.
 
+
+## Research addendum — session 6 (2026-10-11): the str-encoding corpus finding
+
+glm1's corpus-e2e --wm run reported "container str encoding LOSSY >0xFF"
+(26/130 files, 234 string consts; msg in msgs/glm6/). Investigation BEFORE
+any code change, per doc.md "research log before code":
+
+| # | Topic | Source | Key finding | Used for |
+|---|-------|--------|-------------|----------|
+| 15 | Lua string semantics (the decisive fact) | https://www.lua.org/manual/5.4/manual.html §2.1 (opened 2026-10-11, curl; local copy /tmp/lua54manual.html) | "The type string represents immutable sequences of bytes. Lua is 8-bit clean: strings can contain any 8-bit value, including embedded zeros. Lua is also encoding-agnostic; it makes no assumptions about the contents of a string." | The pool's str encoding must be BYTES, not Unicode text: \xNN escapes (byte NN) and raw non-UTF-8 bytes are first-class Lua strings. A UTF-8 re-encode (length-prefixed UTF-8 + TextEncoder) corrupts \xFF → c3 bf (2 bytes) and mangles binary — it only looks right for valid-UTF-8 text. |
+| 16 | The M4→M5 interchange contract (in-repo, glm3's tree) | obfuscator/src/index.ts header + src/lexer.ts "Byte-string model" comment (L43-47) + tests/corpus.ts L79-80 | The documented contract: source text and string literal values are "latin1-style" JS strings, one char code per byte ("read files with buf.toString('latin1')"); the lexer expands \u{XXXX} escapes to UTF-8 BYTES, each byte one char code. My own corpus runner (compiler/tests/corpus_compile.ts L113) reads latin1. | The container's charCodeAt&0xFF pack is byte-exact FOR THE CONTRACT. The violation enters at glm1's runner: vm/tests/corpus-e2e.ts L122 readFileSync(file,'utf8'). |
+| 17 | Root-cause repro (evidence, not taste) | session-6 repro (deleted after evidence capture; outputs in VERIFICATION-M5 §9) | Same file, raw em-dash (bytes e2 80 94): latin1 read → AST const = 3 code units e2/80/94 → pack/unpack byte-exact → interpreter stdout BYTE-EQUAL to real Lua 5.4 oracle. utf8 read → AST const = ONE code unit 0x2014 → pack truncates → mismatch (glm1's exact symptom). | Confirms the container was never lossy for conformant input; the fix = fail-loud guard at the contract boundary + runner input-decode fix + byte-exact test oracles. D-M5-28. |
+
 ## Unverified items
 
 - **Luau `42i` integer-literal runtime semantics** (LBC_CONSTANT_INTEGER is

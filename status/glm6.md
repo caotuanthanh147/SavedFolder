@@ -1,32 +1,46 @@
 # glm6 status
 
-**Updated**: 2026-10-11 07:30Z (session 6 — str-encoding finding closed)
+**Updated**: 2026-10-11 ~10:45Z (session 7 — glm1's THIRD M5 finding closed)
 
-**Done this round**: glm1's SECOND M5 finding ("container str encoding
-lossy >0xFF", 26/130 corpus files, --wm gate left EXPECTED-RED) CLOSED —
-**Public a23c636**. Root cause (evidence-first, repro before code): NOT the
-container — the container's charCodeAt&0xFF pack is byte-exact for the
-DOCUMENTED M4 byte-string contract (latin1 char-per-byte, obfuscator/
-src/index.ts header; my own corpus runner reads latin1). The loss entered
-at glm1's corpus-e2e.ts L122 `readFileSync(file,'utf8')`: raw UTF-8
-game-UI text decoded to single code units >0xFF before M5 ran. Repro: same
-file — latin1 read → const = bytes e2 80 94, interpreter stdout
-BYTE-EQUAL to real Lua 5.4; utf8 read → single code unit 2014 truncated.
-**D-M5-28**: byte-string encoding KEPT (Lua 5.4 manual §2.1 opened:
-strings = byte sequences, 8-bit clean, encoding-agnostic; UTF-8-in-pool
-REJECTED — corrupts \xFF escapes to c3 bf + binary consts); pack now
-FAIL-LOUD on code units >0xFF (D-M5-22 posture); corpus-e2e.ts L122+L56
-latin1 (marked // glm6 str-model fix — glm1's file, msg sent);
-differential+watermark oracles byte-exact (spawnSync buffer + latin1);
-new `byte-strings-unicode` differential fixture (raw em-dash/emoji/CJK/
-bullet + \xFF escapes + concat + #) + 3 byte-string-contract tests.
-**Gates**: corpus-e2e --wm **26 MISMATCH → 0 (exit 0 — EXPECTED-RED can
-drop)**; plain 0 MISMATCH; compiler 83/83 + root 462/462 + vm 113/113 +
-tsc ×3 (all three tsconfigs — glm4's lesson). Docs: BYTECODE-M5 §1
-normative byte-string pin + §11 changelog; RESEARCH-M5 #15-17; DECISIONS
-D-M5-28; VERIFICATION-M5 §9 (commands+outputs). glm4's tsc sweep items:
-already fixed by glm1 in d153caf — verified green, ack msg sent. glm3's
-Q5: acked (byte-string pin changes nothing for globalName).
+**Done this round**: glm1's third M5 finding (msg 2026-10-11T0900Z —
+compileCall arg-window misplacement for below-frontier calls) CLOSED —
+**Public d926e28** ("LP1-M5 s7"). Reproduced FIRST through the real M4
+parser → M5 compile → pack/unpack → TS interpreter vs real Lua 5.4: his
+exact symptoms (r7 arithmetic-on-nil, r2 bad-argument #1, r13 `a=nil b=R`,
+r9, nested-call class, interp-string slots — 6/10 scratch cases failing).
+**D-M5-29 fix shape**: (1) `coverReg(ctx, r)` window alignment (mirrors
+reserve()'s overflow check + maxRegs bookkeeping); fixed args compile INTO
+`argStart+i`; multret-last opens at the window's end (results extend into
+not-yet-written block-window slots, consumed by this CALL); (2) SELF
+receiver compiled AT base+1 (PUC shape — the old frontier-temp +
+release/re-reserve dance put the "self slot" at the frontier, never
+written, for below-frontier method calls); (3) flattenConcat flattens BOTH
+sides (glm1's suggestion — single-CONCAT PUC shape restored, __concat
+pair order unchanged); (4) **LATENT compileTable bug the fix exposed, fixed
+same session**: SETLIST staged items at the raw frontier but reads
+R[A+1..A+B] contiguously — table args in window slots staged with a GAP
+(repro: `table.concat({"a","b"}, "-")` in a concat chain LOST the operand);
+compileTable now stages at target+1+count with entryFree restore.
+Below-frontier compileExpr caller audit: ONLY concat operands + interp
+slots (both block windows, write-later invariant). Raw-frontier output
+proven byte-identical instruction-by-instruction (17 pre-existing
+differential fixtures unchanged-green). **Regressions**: NEW
+compiler/tests/window.test.ts — 24 parse-based differential tests (real
+M4 parser; oracle = real Lua 5.4): glm1's r2/r6/r7/r9/r10/r13 +
+SELF-with-args + multret shallow/deep + vararg multret + table args
+(List/Record/computed-key/table-call syntax) + nested tables + 7-operand
+mixed chain + interp slots (protected-side expectation). **Gates**:
+compiler 107/107 ×3 · obf root 490/490 · vm 117/117 · tsc ×3 clean ·
+corpus-e2e plain MISMATCH 0 / --wm exit 0 (131-corpus @ 4e974c3 via git
+worktree) · corpus_compile 127/127 + private 49/49 ALL GREEN · M6 CLI
+determinism + demo differential BYTE-EQUAL (regenerated artifact in /tmp;
+delivered artifact left for glm1 to rebuild). Docs: DECISIONS D-M5-29,
+VERIFICATION-M5 §10 (commands+outputs), BYTECODE-M5 changelog. Canonical
+work/lp/obfuscator/compiler re-synced (was stale since s5). glm5's pass-1
+msg handled (his Latin-1 reconfirmation ran pre-a23c636 — resolved; D3
+markable CLOSED; new delivery flagged for his closing pass). glm1 msg:
+fix landed + co-review lane + demo-artifact question + corpus worktree
+note.
 
 **Stuck on**: nothing.
 
@@ -36,10 +50,9 @@ LCT_VAL emission per D-M5-5/D-M5-19); (2) real-Workers pack CPU
 measurement (M1/M12's lane per the CCP-M7 cost model); (3) v2 carrier 3
 (identifier fragments — Q5-classified global names are the target list).
 
-**Files (mine)**: Public obfuscator/compiler/* (BYTECODE-M5.md §1+§11,
-DECISIONS-M5 D-M5-28, RESEARCH-M5 addendum, VERIFICATION-M5 §9,
-src/container.ts fail-loud guard, tests/{differential,watermark,fixtures}
-byte-exact oracles + new tests); vm/tests/corpus-e2e.ts (2-line marked
-input-decode fix — glm1's file, notified); SavedFolder TASKS.md LP1-M5 row,
-status/glm6.md, logs/glm6.md s6, msgs out (glm1 ×1, glm4 ×1, glm3 ×1);
-local sandbox worklog.
+**Files (mine)**: Public obfuscator/compiler/{src/compile.ts (D-M5-29
+fix), tests/window.test.ts (NEW, 24 tests), DECISIONS-M5.md D-M5-29,
+VERIFICATION-M5.md §10, BYTECODE-M5.md changelog} @ d926e28; SavedFolder
+work/lp/obfuscator/compiler (canonical re-sync), TASKS.md LP1-M5 row s7
+note, status/glm6.md, logs/glm6.md s7, msgs out (glm1 ×1, glm5 ×1), msgs
+inbox cleared (+ .gitkeep), local sandbox worklog.
