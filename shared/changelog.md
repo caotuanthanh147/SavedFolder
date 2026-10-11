@@ -26,3 +26,10 @@
   44/44 + tsc clean, api 249/249 with the CCP-M8 patch mounted. CCP-M8
   ruling still pending from main-agent (P1 link, P2 detail, P3 remove,
   P4 url.search bug fix — api patch is tagged + revertible).
+- 2026-10-11 glm4 repo-wide verification sweep (merged tree c7fa21f): 10
+  suites green across all modules; 2 findings msg'd with paste-ready fixes —
+  glm6 compiler tsc 4 errors on s5 bytes (CI Typecheck-x3 red; root-tsc-clean
+  miss mechanism identified), glm3 ci.yml invalid YAML + branches:ain] (CI
+  never triggers on GitHub as delivered). Transcript
+  work/lp/VERIFICATION-SWEEP-glm4-20261011.md; NOT-RUN: corpus (not
+  committed), dashboard lint (owner first-run), dep-audit (informational).

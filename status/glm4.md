@@ -1,6 +1,6 @@
 # glm4 status
 
-**Updated**: 2026-10-11 (session 8 — LP1-M8 PUSHED: Public c7fa21f, ls-remote verified)
+**Updated**: 2026-10-11 (session 8 — LP1-M8 PUSHED Public c7fa21f + repo-wide verification sweep: 2 findings msg'd)
 
 **Done this session**: LP1-M8 "Discord bot" (doc §15) fully built:
 `bot/` = discord.js 14.27.0 on Bun (library choice live-smoke-verified —
@@ -26,9 +26,20 @@ patch, rebased onto glm3's 1f7be55 first, gates re-run green post-rebase)
 ~/.git-credentials (store helper) + ~/.secrets/github.env for future
 sandbox resets.
 
+**Repo-wide verification sweep (same session, post-push)**: all module
+suites re-run on merged tree c7fa21f — 10 green (api 249/249+tsc, obf
+428/428+tsc, vm 84/84+tsc, M3 lua 101/101, M7 lua 40/40, stub 42/42+tsc,
+assembly 9/9+tsc, seed smoke) + **2 findings**: (1) glm6's compiler tsc
+FAILS on delivered s5 bytes (4 errors, CI Typecheck-x3 will go red;
+paste-ready fixes msg'd — root-level tsc is clean, which is likely why it
+was missed); (2) glm3's ci.yml NEVER RUNS on GitHub — invalid YAML (unquoted
+colon line 94) + branches:ain] typo (msg'd w/ fixes). Transcript:
+work/lp/VERIFICATION-SWEEP-glm4-20261011.md.
+
 **Next candidates**: M14 review after merge (always last); real-token
 Discord E2E (owner checklist); possible CCP-M8 acceptance follow-ups from
-main-agent.
+main-agent; an independent reviewer for my own M8/M13 rows (§22.1 — one
+command each: cd bot && bun test / cd loader/stub && bun test).
 
 **Past**: LP1-M13 delivered + re-landed after force-push #3 (42d31c5).
 FW1-H closed moot 2026-10-08. SAC1-H delivered 2026-10-04. Sandbox resets: x6.

@@ -247,3 +247,28 @@
 - NOT-RUN honest list (owner checklist, needs a real bot token): gateway
   login, live command registration, real guild role ops, real channel
   posts.
+
+### Session 8 (cont.) — repo-wide verification sweep
+
+- Standing order "continue don't just stop when you're done" + §22.1
+  (reviewer ≠ author runs tests itself) → re-ran EVERY module suite on the
+  merged tree c7fa21f (frozen installs, exit codes captured unpiped).
+- 10 green: api 249/249 + tsc (with my CCP-M8 patch), obf parser 428/428 +
+  tsc, vm 84/84 + tsc, M3 lua 101/101, M7 lua 40/40, stub 42/42 + tsc,
+  assembly 9/9 + tsc, db seed smoke. bot 44/44 + tsc (mine).
+- FINDING 1 (msg glm6, paste-ready): compiler package tsc exit 2 — 4 errors
+  on delivered s5 bytes (unused Insn import, unused pack import, unused x
+  local, .kind missing from too-narrow JSON cast — serializePackParts does
+  emit kind, runtime fine). CI's Typecheck-x3 fails at the compiler line.
+  Miss mechanism: root-level tsc --noEmit in obfuscator/ is clean (root
+  tsconfig excludes compiler/) — verified exit 0 myself.
+- FINDING 2 (msg glm3, paste-ready): ci.yml as delivered never runs —
+  line 94 unquoted ": " in a plain scalar = YAML ScannerError (workflow file
+  rejected, zero jobs) + line 16 branches: ain] (string "ain]", never
+  matches). One-line quoting fix + [main].
+- Process note caught mid-sweep: `cmd | tail -2; echo $?` reports tail's
+  exit code — nearly mis-reported F1 as 2 errors instead of 4; all tsc
+  re-runs with direct exit capture. Noted in the transcript's method section.
+- Transcript: work/lp/VERIFICATION-SWEEP-glm4-20261011.md (per-suite commands
+  + outputs + NOT-RUN honest list: corpus not committed, dashboard lint
+  owner-first-run, dep-audit informational).
