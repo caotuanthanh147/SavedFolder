@@ -2,7 +2,11 @@
  * M6 corpus end-to-end runner (NOT shipped as a test — the corpus is the
  * project's captured material; run it locally like M4's corpus.ts):
  *
- *   bun run tests/corpus-e2e.ts <corpus-root>
+ *   bun run tests/corpus-e2e.ts <corpus-root> [--wm]
+ *
+ * --wm: pack WATERMARKED containers (CCP-M7 v1, per-version default key)
+ * and verify per file that extractWatermark recovers the watermark from
+ * the exact container bytes the runtime consumed.
  *
  * Full §10.2 pipeline per file: M4 parse → M5 compile+pack → M6 emit
  * (containerless) → run under real lua5.4 as {b,c,s} entry → compare
@@ -24,6 +28,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { parse } from '../../src/parser';
 import { compileProgram } from '../../compiler/src/compile';
 import { pack } from '../../compiler/src/container';
+import { generatePackMaterial, packWatermarked, extractWatermark } from '../../compiler/src/watermark';
 import { emitRuntime } from '../src/emit';
 import { sha256Raw } from '../../compiler/src/opcode';
 
@@ -65,6 +70,25 @@ function luaByteString(bytes: Uint8Array): string {
   return out;
 }
 
+/** Map a PUC-lua error line to an execution-error class ('' = not a
+ * runtime-error line — parse/syntax failures fall here). Used by the
+ * error-parity CLASS gate (session 22): when the oracle's failure is an
+ * execution error, the protected run's first error must be the SAME class
+ * — the guest reached its own first failing operation, not a different one. */
+function errClass(line: string): string {
+  if (/syntax error|unexpected symbol|near '/.test(line)) return 'parse';
+  if (/attempt to call a nil value/.test(line)) return 'call-nil';
+  if (/attempt to call a (number|string|boolean|table) value/.test(line)) return 'call-noncallable';
+  if (/attempt to index a nil value/.test(line)) return 'index-nil';
+  if (/attempt to index a (number|string|boolean) value/.test(line)) return 'index-nonindexable';
+  if (/attempt to perform arithmetic/.test(line)) return 'arith';
+  if (/attempt to concatenate/.test(line)) return 'concat';
+  if (/attempt to compare/.test(line)) return 'compare';
+  if (/stack overflow/.test(line)) return 'stack-overflow';
+  if (/Spawn TIMED OUT|timeout/i.test(line)) return 'timeout';
+  return 'other';
+}
+
 /** deterministic seeds from the file path (reproducible runs). */
 function seedsFor(path: string): { constKey: Uint8Array; opcodeSeed: Uint8Array; vmSeed: Uint8Array } {
   const h1 = sha256Raw(Buffer.from(`m6corpus-c:${path}`, 'utf8'));
@@ -75,9 +99,13 @@ function seedsFor(path: string): { constKey: Uint8Array; opcodeSeed: Uint8Array;
 
 const root = process.argv[2];
 if (!root) {
-  console.error('usage: bun run tests/corpus-e2e.ts <corpus-root>');
+  console.error('usage: bun run tests/corpus-e2e.ts <corpus-root> [--wm]');
   process.exit(2);
 }
+/** --wm: pack WATERMARKED containers (CCP-M7 v1, per-version default key)
+ * and verify per file that extractWatermark recovers the watermark from
+ * the exact bytes the runtime consumed. */
+const WM_MODE = process.argv.includes('--wm');
 
 type Bucket = 'match' | 'error-parity' | 'parse-reject' | 'compile-reject' | 'oracle-fail' | 'no-output' | 'nondeterministic' | 'MISMATCH' | 'emit-reject';
 const results = new Map<Bucket, string[]>();
@@ -111,15 +139,44 @@ for (const file of walk(root)) {
   }
   const seeds = seedsFor(rel);
   let container;
+  let runtimeConstKey: Uint8Array = seeds.constKey;
+  let runtimeOpcodeSeed: Uint8Array = seeds.opcodeSeed;
+  let wmExtractOk = true;
+  let wmExtractWhy = '';
   try {
-    ({ container } = pack(protos, { constKey: seeds.constKey, opcodeSeed: seeds.opcodeSeed }));
+    if (WM_MODE) {
+      const wm = sha256Raw(Buffer.from(`m6corpus-w:${rel}`, 'utf8')).slice(0, 16);
+      const { parts } = generatePackMaterial(protos);
+      ({ container } = packWatermarked(parts, wm));
+      runtimeConstKey = parts.constKey;
+      runtimeOpcodeSeed = parts.opcodeSeed;
+      const got = extractWatermark(container, parts);
+      if (!got || !got.carrier1Ok) {
+        wmExtractOk = false;
+        wmExtractWhy = 'extraction failed post-pack';
+      } else {
+        const rec = Buffer.from(got.watermark);
+        if (!rec.equals(Buffer.from(wm))) {
+          wmExtractOk = false;
+          wmExtractWhy = 'watermark bytes differ';
+        }
+      }
+    } else {
+      ({ container } = pack(protos, { constKey: seeds.constKey, opcodeSeed: seeds.opcodeSeed }));
+    }
   } catch (e) {
     note('compile-reject', rel, `pack: ${String((e as Error).message).slice(0, 60)}`);
     continue;
   }
+  if (WM_MODE && !wmExtractOk) {
+    // the runtime run is skipped — a failed extraction is already a hard
+    // failure of the watermark pipeline for this file
+    note('MISMATCH', rel, `watermark extraction: ${wmExtractWhy}`);
+    continue;
+  }
   let runtimeLua;
   try {
-    runtimeLua = emitRuntime({ container: null, opcodeSeed: seeds.opcodeSeed, vmSeed: seeds.vmSeed, dispatch: 'chain' }).lua;
+    runtimeLua = emitRuntime({ container: null, opcodeSeed: runtimeOpcodeSeed, vmSeed: seeds.vmSeed, dispatch: 'chain' }).lua;
   } catch (e) {
     note('emit-reject', rel, String((e as Error).message).slice(0, 80));
     continue;
@@ -150,7 +207,7 @@ for (const file of walk(root)) {
   const main = `local entry = dofile("runtime.lua")
 local ok, e1 = pcall(entry, {
   b = "${luaByteString(container)}",
-  c = "${luaByteString(seeds.constKey)}",
+  c = "${luaByteString(runtimeConstKey)}",
   s = "corpus-e2e",
   args = {}, nargs = 0,
 })
@@ -177,7 +234,23 @@ if not ok then error(e1, 0) end`;
       note('MISMATCH', rel, 'protected: M6-level load failure (guest never reached)');
       continue;
     }
-    note('error-parity', rel, firstErr.slice(0, 60));
+    // CLASS gate (session 22): when the oracle's failure is an EXECUTION
+    // error, the protected first error must carry the same class — same
+    // guest operation, reached through the container. Oracle parse-fails
+    // (Luau-only syntax under PUC lua5.4) have no execution class to
+    // compare; guest-boundary reach is the check there (kept as its own
+    // sub-tally so the two populations never blur).
+    const oc = errClass(oracle1.err.split('\n')[0] ?? '');
+    const pc = errClass(firstErr);
+    if (oc && oc !== 'parse') {
+      if (pc !== oc) {
+        note('MISMATCH', rel, `error-class differs: oracle ${oc} vs protected ${pc || 'n/a'}`);
+        continue;
+      }
+      note('error-parity', rel, `class=${oc}: ${firstErr.slice(0, 50)}`);
+      continue;
+    }
+    note('error-parity', rel, `oracle-parse, prot ${pc || '?'}: ${firstErr.slice(0, 44)}`);
     continue;
   }
   // protected SUCCEEDED where the oracle failed — suspicious in general,
@@ -188,6 +261,7 @@ if not ok then error(e1, 0) end`;
 
 console.log(`\nM6 corpus end-to-end — root: ${root}`);
 console.log(`total files: ${total}`);
+if (WM_MODE) console.log('watermark mode: ON — packWatermarked per file + extraction lockstep verified');
 for (const bucket of ['match', 'error-parity', 'MISMATCH', 'parse-reject', 'compile-reject', 'oracle-fail', 'no-output', 'nondeterministic', 'emit-reject'] as Bucket[]) {
   const arr = results.get(bucket) ?? [];
   console.log(`${bucket}: ${arr.length}`);

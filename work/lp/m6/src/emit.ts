@@ -487,13 +487,18 @@ export function emitRuntime(options: EmitOptions): EmitResult {
   );
   tail.push(junk(rng));
 
-  // container decode (BYTECODE-M5 §2-§6; trap slots refuse to load)
+  // container decode (BYTECODE-M5 §2-§6; trap slots refuse to load).
+  // AAD = head || sha256(functions) — D-M5-26 (glm6 sync, 2026-10-11):
+  // hash-bound AAD replaced the full-section AAD (quadratic Poly1305
+  // re-absorption per blob); byte-identical to compiler/src/container.ts.
   tail.push(
     `local function ${N.DECODE}()\n` +
     `\tlocal s = ${N.BL}\n` +
     `\tif s:byte(1) ~= 76 or s:byte(2) ~= 80 or s:byte(3) ~= 86 or s:byte(4) ~= 66 then ${N.ERRM}() end\n` +
     `\tif s:byte(5) ~= 1 then ${N.ERRM}() end\n` +
     `\tlocal fcount, i = ${N.VI}(s, 38)\n` +
+    `\tlocal i0 = i\n` +
+    `\tlocal aadh = s:sub(1, 5) .. s:sub(38, i0 - 1)\n` +
     `\tlocal protos = {}\n` +
     `\tlocal poofs = {}\n` +
     `\tlocal poofl = {}\n` +
@@ -555,7 +560,7 @@ export function emitRuntime(options: EmitOptions): EmitResult {
     `\t\tpoofl[f] = cl\n` +
     `\t\ti = i + 12 + cl + 16\n` +
     `\tend\n` +
-    `\tlocal aads = s:sub(1, 5) .. s:sub(38, fnsEnd)\n` +
+    `\tlocal aads = aadh .. ${N.SH}.sha256(s:sub(i0, fnsEnd))\n` +
     `\treturn protos, poofs, poofl, aads\n` +
     `end`,
   );

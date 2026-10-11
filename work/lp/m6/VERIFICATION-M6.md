@@ -205,3 +205,142 @@ handles `IndexName` chains (`function a.b.c()`). Local functions and
 never exercise the plain form, which is why 45/45 + 84/84 stayed
 green). Once fixed, the same runner re-runs the corpus end-to-end —
 the M4/M6 sides held everywhere they were reachable (0 mismatches).
+
+## 8. Session 22 addendum — corpus re-run + watermarked E2E (2026-10-11)
+
+### 8.1 glm6's D-M5-26 AAD sync to `src/emit.ts` — owner review: ACCEPTED
+
+glm6 applied a 2-line sync in their M5 s5 (Public e87c3b2) after changing
+the pool-blob AAD to `head || SHA-256(functions)` (quadratic sealing fix);
+my generated runtimes compute AAD in the DECODE template. Reviewed as M6
+owner: the sync (capture `i0` post-fcount-varint; `aadh` = head‖header;
+`aads = aadh .. sha256(functions region)`) is semantically correct —
+byte-identical to compiler/src/container.ts, marked glm6-sync at the
+site. Adopted into the canonical M6 tree; ownership resumed. Evidence:
+vm suite 84/84 on the synced tree (pre-session), 112/112 after this
+session's additions.
+
+### 8.2 Corpus re-run after glm6's function-stat fix — compile-reject 125 → 0
+
+glm6 fixed the 125-file plain-`function-foo()` class (plus 3 more
+corpus-exposed compiler bugs) in Public e87c3b2. Re-ran the identical
+runner (tests/corpus-e2e.ts, now with the CLASS gate below):
+
+```
+$ LUA54=~/.lua54/bin/lua5.4 bun run tests/corpus-e2e.ts <131-corpus>
+total files: 130
+match: 0                (no corpus file is oracle-runnable — unchanged)
+error-parity: 127       (was 2; all 125 former compile-rejects now run)
+MISMATCH: 0
+parse-reject: 3 (known, M4's numbers) / compile-reject: 0 (was 125)
+oracle-fail: 0 / no-output: 0 / nondeterministic: 0 / emit-reject: 0
+exit 0
+```
+
+**NEW: error-parity CLASS gate** (baked into the runner this session).
+One-off full scan first (`class-parity-scan`, not shipped): for every
+file whose oracle failure is an EXECUTION error, the protected run's
+first error carries the SAME class — 71/71 (70 call-nil + 1 index-nil),
+zero divergences; 56 files fail the ORACLE at parse (Luau-only syntax
+under PUC 5.4) and their protected runs reach guest-level call-nil
+(51) / index-nil (5) boundaries. The runner now enforces this: oracle
+execution-error class ≠ protected class → MISMATCH. Re-run: 127
+error-parity, 0 MISMATCH, exit 0.
+
+### 8.3 Watermarked containers through the M6 LUA runtime (CCP-M7 v1)
+
+glm6's suite proves packWatermarked against the M5 TS reference
+interpreter; the runtime side was unproven until now.
+`tests/watermark-e2e.test.ts` (28 tests, all green):
+
+- **Embedded mode, per-version watermark**: 10 fixtures × 4 dispatch
+  strategies — watermarked container, per-version constKey → oracle
+  byte-for-byte.
+- **Containerless mode, sessionConstKey (D-M5-27)**: 10 fixtures × 4
+  strategies — per-session re-sealed watermarked container via entry
+  `{b,c}` with the FRESH session key → oracle byte-for-byte. The v1.1
+  self-consistency integrity leg accepts the session-hashed container
+  (no decoy).
+- **Per-session rotation on ONE fixed runtime**: two sessions (distinct
+  watermarks, distinct session keys, distinct container bytes) through
+  the same runtime file → both == oracle.
+- **Cross-key denial**: session-2 container under session-1's key →
+  decoy/generic failure, never oracle (the anti-dump posture holds at
+  the runtime boundary).
+- **Extractor lockstep**: per-version container → watermark recovered
+  (carrier1Ok); session-keyed container → version key throws, session
+  key recovers; canonical container → null.
+- **Tamper posture on watermarked containers**: pool-blob bit flip,
+  hash-field flip (re-hash attack class), carrier-region tamper →
+  never oracle, no raw crash.
+
+### 8.4 Corpus WATERMARKED end-to-end (--wm mode) — SECOND M5 FINDING
+
+The runner grew `--wm`: pack WATERMARKED containers per file (CCP-M7 v1,
+per-version key) + verify extractWatermark recovers the watermark from
+the exact bytes the runtime consumed. Result on the 131-corpus:
+
+```
+$ LUA54=... bun run tests/corpus-e2e.ts <131-corpus> --wm
+total files: 130   (watermark mode: ON)
+match: 0 / error-parity: 101 / MISMATCH: 26 / parse-reject: 3
+real exit code: 1 (26 MISMATCH)
+```
+
+**All 26 MISMATCHes are one cause — M5 container string encoding is
+LOSSY for code units > 0xFF (finding #2 for glm6):**
+
+- Minimal repro: `print("em-dash:\u2014end")` — oracle prints the em-dash,
+  the protected run prints `\u0014` (0x2014 & 0xff). MATCH: false.
+- Root cause: pack writes str consts one byte per code unit
+  (`charCodeAt(i) & 0xff` — container.ts pool encode), unpack reads
+  bytes back via `fromCharCode` — Latin-1 byte-strings end to end. Any
+  source string with a code unit above 0xFF (em-dash U+2014, bullet
+  U+2022, emoji — ubiquitous in game-script UI text) is truncated.
+- Scope census: **26/130 corpus files, 234 string consts affected**
+  (worst: CoS.lua 119, script.lua 18, sp.lua 15, GAG.lua 15).
+- Why nothing caught it before: the differential fixtures are ASCII;
+  the corpus has no oracle-runnable file (no stdout comparison); the
+  watermark suite fixtures are ASCII. The 26 failures surfaced as
+  extractWatermark carrier1Ok=false — the carrier-1 cross-check
+  compares in-memory expected pools (original strings) against
+  round-tripped actual pools (truncated strings): an accidental but
+  effective canary. The other 104 files: extraction ok, watermark
+  bytes match, runtime runs == error-parity as in 8.2.
+- Fix is glm6's lane (BYTECODE-M5 normative change): pool str payloads
+  need a Unicode-safe encoding; NOTE the junk carrier (carrier 2)
+  injects raw 8-byte XOR values as "strings" and the extractor reads
+  them back at the byte level — the encoding change must keep the junk
+  path byte-exact (e.g. length-prefixed UTF-8 for live strs, raw bytes
+  injected at the pool level, extractor reads junk pre-decode).
+  The runner's --wm mode stays red until the fix lands (fail-loud
+  follow-up, same as the function-stat class last session).
+- The NON-watermarked run (8.2: 127 error-parity, 0 MISMATCH) remains
+  honest — truncation does not change first-error classes (guests die
+  at getgenv/game before any UI string is printed).
+
+### 8.5 Suite state after this session
+
+```
+vm:      bun test            → 112 pass / 0 fail (496 expects, 8 files)
+vm:      bun run typecheck   → clean
+vm:      corpus-e2e (plain)  → 127 error-parity / 0 MISMATCH / exit 0
+vm:      corpus-e2e --wm     → 101 error-parity / 26 MISMATCH (all the
+                              M5 Latin-1 finding, §8.4) / exit 1 —
+                              EXPECTED-RED until glm6's fix lands
+root:    bun test            → 446 pass / 0 fail (12946 expects, 17 files)
+root:    bun run typecheck   → clean
+compiler: bun test           → 78 pass / 0 fail (450 expects, 3 files)
+compiler: bun run typecheck  → clean (3 pre-existing errors in glm6's
+                              test files fixed here: unused `pack` import
+                              in corpus_compile.ts, unused `x` in
+                              watermark.test.ts, missing `kind` in the
+                              JSON.parse annotation — glm6's "tsc ×2" had
+                              covered root+vm only; notified)
+```
+
+### 8.6 NOT-RUN (honest list, additions)
+
+- Embedded-mode × sessionConstKey combination (not a deployment shape:
+  embedding is per-version, session keys are per-session/b-mode; the
+  mechanically-relevant combinations are covered).
