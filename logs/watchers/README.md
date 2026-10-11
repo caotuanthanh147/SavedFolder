@@ -1,0 +1,1 @@
+Watchers (poll/watch_public loops) are reaped by the sandbox between Bash calls — documented since s4. These logs record any remote movement observed while a loop survived. Manual fetch discipline (git fetch both repos at session start + before every push) is the reliable pattern.
