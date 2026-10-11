@@ -331,6 +331,44 @@ check("handshake payload sig len", payload and #payload.bundle_sig, 64)
 local bad_wm = h.payload(session, "zz-not-hex")
 check("handshake non-hex watermark rejected", bad_wm, nil)
 
+-- ---------- session 3: CCP-M6 per-fetch value + const_key wire ----------
+local ck_server = MockServer(Crypto, TestEnv, Signer, {
+        signing_sk = signing_sk,
+        proof_key = "proof-secret-1",
+        valid_key = "TEST-AAAAA-BBBBB-CCCCC-DDDDD",
+        script_id = "0123456789abcdef0123456789abcdef",
+        build = "build-42",
+        build_hash = hx(sha2.sha256("bundle-v1")),
+        bundle = "FAKE-BUNDLE-BYTES-0123456789",
+        watermark_id = "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+        server_time = 1791638000 + 5,
+        server_x25519_sk = dhx("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"),
+        server_nonce = dhx("11111111111111111111111111111111"),
+        const_key = dhx("aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"),
+})
+local saved_request = TestEnv.request
+TestEnv.request = ck_server.request
+local ck_h = Handshake.new({
+        script_id = "0123456789abcdef0123456789abcdef",
+        base_url = "https://mock-api",
+        proof_key = "proof-secret-1",
+        verify_pk = server.server_pk,
+        lv = "1.0.0",
+        build = "build-42",
+})
+local ck_session = ck_h.init("TEST-AAAAA-BBBBB-CCCCC-DDDDD", 123, 456, 789)
+local fetch_s = "\1\2\3\4\5\6\7\8\9\10\11\12\13\14\15\16"
+local pl_s = ck_h.payload(ck_session, nil, fetch_s)
+check("handshake s-mode payload succeeds (CCP-M6 salt)", pl_s ~= nil, true)
+check("handshake s-mode server saw body.s", ck_server.state.payload_s, encoding.b64url_encode(fetch_s))
+check("handshake const_key decoded (32B raw)", pl_s and pl_s.const_key, dhx("aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"))
+check("handshake const_key byte length", pl_s and #pl_s.const_key, 32)
+local pl_legacy = ck_h.payload(ck_session)
+check("handshake no-s fallback still works", pl_legacy ~= nil, true)
+local pl_oversize = ck_h.payload(ck_session, nil, string.rep("x", 65))
+check("handshake oversize s rejected client-side", pl_oversize, nil)
+TestEnv.request = saved_request
+
 local bad_session = h.init("TEST-WRONG", 1, 2, 3)
 check("handshake wrong key fails", bad_session, nil)
 

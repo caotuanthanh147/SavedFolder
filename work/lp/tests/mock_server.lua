@@ -5,6 +5,10 @@
 -- serverNonce, nonce = serverNonce[0..12); payload = b64url(nonce|ct|
 -- tag), payloadKey salt = fromHex(build_hash), info = "payload-key"|
 -- fromHex(watermark_id), aad = scriptId|sessionId(16 raw)).
+-- Session 3 extensions (matching M1's landed auth.ts): payload request
+-- body.s (b64url, CCP-M6) mixes into the salt as buildHash||s; response
+-- plaintext may carry const_key (b64url 32B — the RUNTIME-M6 §2 wire
+-- field) when opts.const_key is set.
 
 return function(Crypto, Env, Signer, opts)
         local enc = Crypto.encoding
@@ -113,7 +117,9 @@ return function(Crypto, Env, Signer, opts)
         local function handle_init(req)
                 state.init_request = req
                 local body = Env.json_decode(req.Body or "")
-                if not body or body.key ~= valid_key then
+                -- keyless mode (M1: keyless scripts skip the key checks;
+                -- opts.keyless = true models a script with keyless = 1)
+                if not opts.keyless and (not body or body.key ~= valid_key) then
                         return { StatusCode = 200, Body = Env.json_encode({ code = "KEY_INVALID", message = "Invalid key.", data = {} }), Headers = { ["x-ts"] = tostring(server_time) } }
                 end
                 local hello = enc.b64url_decode(body.hello or "")
@@ -158,16 +164,27 @@ return function(Crypto, Env, Signer, opts)
                 if not body or body.session_token ~= state.session_token then
                         return { StatusCode = 200, Body = "AAAA", Headers = { ["x-ts"] = tostring(server_time) } }
                 end
-                local salt = enc.hex_decode(build_hash)
+                -- CCP-M6: per-fetch value (b64url in body.s) joins the salt
+                -- exactly like M1's payloadKeyFrom: buildHash || s.
+                local s_raw = ""
+                if type(body.s) == "string" and #body.s > 0 then
+                        s_raw = enc.b64url_decode(body.s) or ""
+                end
+                state.payload_s = body.s
+                local salt = enc.hex_decode(build_hash) .. s_raw
                 local info = "payload-key" .. enc.hex_decode(watermark_id)
                 local payload_key = hkdf.hkdf_sha256(state.session_key, salt, info, 32)
                 local session_id_raw = enc.b64url_decode(state.session_token)
                 local sig = Signer.sign(server_sk, enc.hex_decode(build_hash) .. bundle)
-                local plain = Env.json_encode({
+                local plain_fields = {
                         build_hash = build_hash,
                         bundle = enc.b64url_encode(bundle),
                         bundle_sig = enc.b64url_encode(sig),
-                })
+                }
+                if opts.const_key then
+                        plain_fields.const_key = enc.b64url_encode(opts.const_key)
+                end
+                local plain = Env.json_encode(plain_fields)
                 local nonce = opts.payload_nonce or "\1\2\3\4\5\6\7\8\9\10\11\12"
                 local aad = script_id .. session_id_raw
                 local sealed = aead.seal(payload_key, nonce, aad, plain)

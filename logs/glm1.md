@@ -427,3 +427,33 @@ standard, msg other glm to see what it need to improve".
   availability), glm3 (IR.md Q3 correction: M6 consumes packed
   containers, no pre-compile transforms); canonical work/lp/m6;
   worklog.md + TASK_SOURCE.md updated.
+
+
+--- session 21 (2026-10-11) — co-sign correction + M6 v1.1 + M3 s3 ---
+
+Context: fresh sandbox (bootstrap re-run), board fully re-read. glm3
+took M12 (last open lane) — my session = my own follow-ups only.
+CCP-M7: read the ruling end-to-end, traced my emitted entry code, found
+`bh ~= BH` pins the build-time canonical hash — under a fixed runtime +
+per-session watermarked containers every delivery decoys. doc §8 step 10
+pinned the deployment shape (runtime embedded in the immutable init,
+container = the per-session bundle) → v1.1 was the honest fix, not a
+doc nitpick. Delivered same-session: containerless mode + entry `b` +
+self-consistency leg; 21 new tests; 1 real emitted-code bug (decoy
+fallback mutated the bh nil-signal → non-string b crashed with a RAW
+"attempt to call a nil value (method 'byte')" instead of the generic
+failure — fixed with a dedicated bstr flag; regression-tested).
+M3 s3: the entry assembly. The E2E suite (assembled init × mock M1 ×
+M6 runtime under lua5.4) surfaced a 3-hit bug class: factory-chunk
+modules are chunk() → factory → factory(deps); calling chunk(deps)
+SILENTLY returns the factory (no error at the call site — it fails
+later as "index a function"). Hit in the assembled wrapper, the glue's
+module section, AND the test driver. Fix pattern: a mod() helper +
+comment. Also: the test-only Lua signer derives a non-RFC pk for the
+TV1 sk (self-consistent sign/verify; shipped verifier is RFC-tested) —
+bake the signer's actual pk in tests, not the RFC pk. Assert-order:
+guest output prints DURING the entry call; markers after.
+Pipeline state: full §8 6-10 chain now exists end-to-end in-repo:
+stub payload shape → checks → handshake (s-salt + const_key modeled) →
+containerless runtime. Awaiting M1's const_key field for production
+wiring (tracked, mocked both sides).

@@ -136,14 +136,27 @@ return function(Crypto, Env)
                         return session
                 end
 
-                -- Step 9-10: fetch payload, derive payload key, decrypt, verify sig.
-                function self.payload(session, watermark_id)
+--                -- Step 9-10: fetch payload, derive payload key, decrypt, verify sig.
+                -- s_raw (optional, CCP-M6): the §5.6 per-fetch value — mixed into
+                -- the payload-key salt (buildHash||s) exactly as M1's auth.ts
+                -- payloadKeyFrom does; absent => legacy salt (backward compatible).
+                -- Response const_key (optional, M1 wire extension per
+                -- RUNTIME-M6 §2/D-M6-13): b64url 32B per-session constKey —
+                -- decoded and attached to the result when well-formed.
+                function self.payload(session, watermark_id, s_raw)
                         local path = path_prefix() .. "/payload"
-                        local body = Env.json_encode({
+                        local body_fields = {
                                 v = 1,
                                 session_token = session.session_token,
                                 payload_ref = session.payload_ref,
-                        })
+                        }
+                        if s_raw ~= nil then
+                                if type(s_raw) ~= "string" or #s_raw > 64 then
+                                        return nil, "fetch-value"
+                                end
+                                body_fields.s = enc.b64url_encode(s_raw)
+                        end
+                        local body = Env.json_encode(body_fields)
                         local res = request("POST", path, body)
                         if not res then
                                 return nil, "network"
@@ -162,6 +175,9 @@ return function(Crypto, Env)
                         local wm_raw = enc.hex_decode(wm_hex)
                         if not salt or not wm_raw then
                                 return nil, "protocol"
+                        end
+                        if s_raw then
+                                salt = salt .. s_raw
                         end
                         local payload_key = hkdf.hkdf_sha256(session.session_key, salt, "payload-key" .. wm_raw, 32)
                         local session_id_raw = enc.b64url_decode(session.session_token)
@@ -192,11 +208,18 @@ return function(Crypto, Env)
                         if not ed25519.verify(self.verify_pk, signed .. bundle, sig) then
                                 return nil, "signature"
                         end
-                        return {
+                        local result = {
                                 build_hash = payload.build_hash,
                                 bundle = bundle,
                                 bundle_sig = sig,
                         }
+                        if type(payload.const_key) == "string" then
+                                local ckey = enc.b64url_decode(payload.const_key)
+                                if ckey and #ckey == 32 then
+                                        result.const_key = ckey
+                                end
+                        end
+                        return result
                 end
 
                 return self

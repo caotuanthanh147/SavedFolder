@@ -89,3 +89,36 @@ work/lp/obfuscator/vm/* (canonical); Public ee3b58f + 4f25733.
 - Canonical work/lp/m6/. Next-in-lane candidates: M7 (anti-tamper) or
   M12 (repo pipeline) if unclaimed on next read; M3 follow-ups (D2
   benchmarks, M13 entry assembly) still open.
+
+## 2026-10-11 — session 21: CCP-M7 co-sign + M6 v1.1 + M3 s3 (init entry assembly)
+
+**Doing**: user signal "continue" (trigger 10+11 merged; glm6 done, M4
+s6 complete). Read board: M12 claimed by glm3 (their s7) — last open
+lane gone; my lanes only.
+**Done this round**: (1) CCP-M7 co-sign msg — CONFIRMED the self-
+consistency model + FLAGGED the real gotcha: v1's baked canonical-hash
+pin (BH literal) would decoy every watermarked delivery through a fixed
+runtime; glm6's pending-item inference was half-wrong (msgs/glm6/
+2026-10-11-glm1-ccpm7-cosign.md; + const_key wire field + PackParts
+opcodeSeed pin asks). (2) **M6 v1.1 DELIVERED Public d52e29a** —
+containerless emit mode + entry field `b` (LPVB bytes per session, doc
+§8-step-10 shape) + self-consistency integrity leg; 84/84 vm suite (21
+new incl. re-hash attack, nil/table/short/truncated b generic-fail
+regressions); found+fixed decoy-fallback bh-mutation leak; merged
+package 385/385; RUNTIME-M6/RUNTIME contract docs updated (b row, two
+modes, kind-0 + %* cross-refs, D-M6-13). (3) **M3 s3 DELIVERED Public
+ff32b86** — loader/init/entry.lua (§8 glue w/ M7 checks mounted per
+README contract) + loader/assembly/ (assembleInit generator) +
+handshake CCP-M6 s-forwarding + const_key opportunistic decode +
+env_executor Env.clock; E2E 9/9 fresh-clone (keyless+keyed happy paths
+byte-equal oracle, wrong-key silent, tampered-bundle decoy, noconst
+gate, determinism, no-leak, luac, config-validation); regressions
+101/101 M3 + 40/40 M7 + 42/42 M13. Session bug class: factory-chunk
+double-call (wrapper + glue + driver — chunk(deps) silently returns the
+factory); + test-only signer pk divergence (bake the signer's actual pk,
+not the RFC pk). Msgs: glm6 (co-sign + v1.1 delivered), main-agent
+(checks mounted + const_key + s-forwarding), glm4 (assembly↔initpack).
+**Stuck on**: nothing. Open: M1 const_key field (their lane), corpus
+end-to-end for M5/M6 (now unblocked — my next lane), D2 executor runs.
+**Files**: work/lp/{m6,loader,tests,assembly} canonical; Public d52e29a
++ ff32b86; msgs to glm6/main-agent/glm4.
