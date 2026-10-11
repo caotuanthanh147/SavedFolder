@@ -30,7 +30,16 @@
  *       keyed by `FunctionUnit = FunctionExpr | Chunk` — a superset of
  *       the reviewed `Map<FunctionExpr, ...>`: every FunctionExpr-keyed
  *       lookup behaves identically, and the main chunk (M5's proto 0)
- *       gets its plan entry.
+ *       gets its plan entry. [ACKED by glm6 2026-10-11: packWatermarked
+ *       iterates the flat proto array — every proto incl. 0 gets junk +
+ *       carrier permutation, so the superset is REQUIRED, not tolerated.]
+ *   Q5  (ANSWERED by glm6 2026-10-11: classify — yes) global-NAME strings
+ *       (GETGLOBAL/SETGLOBAL operands: `Global` nodes in reads, write
+ *       targets, and plain `function foo() end` names) ARE planned, flagged
+ *       `globalName: true`. No v1 correctness impact (M5 pools them
+ *       unconditionally); the classification exists so v2 carrier 3
+ *       (identifier-fragment hosting) can exclude name-resolution-critical
+ *       strings without a re-analysis pass.
  *   R1  (finding for glm6, NOT an M4 change): compile.ts addNumber's key
  *       `u32[0] * 2^32 + u32[1]` computes a REAL number and collides for
  *       patterns needing > 53 significant bits (double rounding).
@@ -91,6 +100,14 @@ export interface ConstEntry {
   /** Stay out of the pool entirely (M5 LOADINT range; see R2).
   *  Precedence: inlineOk overrides protect. */
   readonly inlineOk: boolean;
+  /** [Q5, glm6-ruled 2026-10-11] True iff this string value is used as a
+ *    GETGLOBAL/SETGLOBAL operand in this unit (a global NAME): the bytes
+ *    are load-bearing for name resolution, so v2 carrier-3 fragment
+ *    hosting must exclude them. False on every number/int entry and every
+ *    string that only occurs as data (literal, interp part, member key,
+ *    record key). Merges with OR like `protect`: a value that is BOTH a
+ *    data literal and a global name is a global name. */
+  readonly globalName: boolean;
 }
 
 export interface AnalysisResult {
@@ -144,6 +161,7 @@ interface MutableConstEntry {
   value: string;
   protect: boolean;
   inlineOk: boolean;
+  globalName: boolean;
 }
 
 class Analyzer {
@@ -201,6 +219,15 @@ class Analyzer {
     this.addEntry(key, 'string', value, value.length >= PROTECT_MIN_BYTES || indexPosition, false);
   }
 
+  /** [Q5, glm6-ruled 2026-10-11] A global NAME (GETGLOBAL/SETGLOBAL
+   *  operand): structural class — always protect, length-independent
+   *  (same treatment as member keys, IR.md §2.2): M5 pools the name
+   *  unconditionally (the D operand IS a pool index), and v2 carrier 3
+   *  excludes it from fragment hosting via the flag. */
+  private addGlobalNameConst(name: string): void {
+    this.addEntry(`s:${name}`, 'string', name, true, false, true);
+  }
+
   private addNumberConst(value: number, raw: string): void {
     // C4: raw key — no number parsing in the key path. `value` is only
     // consulted for the inlineOk classification (the lexer already
@@ -217,17 +244,20 @@ class Analyzer {
 
   private addEntry(
     key: string, kind: 'string' | 'number' | 'int', value: string,
-    protect: boolean, inlineOk: boolean,
+    protect: boolean, inlineOk: boolean, globalName = false,
   ): void {
     const plan = this.touch(this.unit()).plan;
     const existing = plan.get(key);
     if (existing) {
-      // Same key ⇒ same value; protect merges with OR (a string that is
-      // BOTH a plain literal and an index position is index-protected).
+      // Same key ⇒ same value; protect/globalName merge with OR (a string
+      // that is BOTH a plain literal and an index position is
+      // index-protected; one that is BOTH a data literal and a global name
+      // is a global name — its bytes resolve names somewhere in the unit).
       existing.protect = existing.protect || protect;
+      existing.globalName = existing.globalName || globalName;
       return;
     }
-    plan.set(key, { key, kind, value, protect, inlineOk });
+    plan.set(key, { key, kind, value, protect, inlineOk, globalName });
   }
 
   // -- walk ----------------------------------------------------------------
@@ -379,6 +409,13 @@ class Analyzer {
         this.use(expr.local);
         break;
       case 'Global':
+        // [Q5, ANSWERED: classify] The name string is a pooled constant
+        // (GETGLOBAL/SETGLOBAL D operand — compile.ts addString(name)):
+        // planned + flagged. Covers reads, assignment targets (routed
+        // here by walkAssignStat/walkCompoundAssign), and `function foo()`
+        // names (FunctionStat.name kind Global — glm6's 125-file class).
+        this.addGlobalNameConst(expr.name);
+        break;
       case 'Nil':
       case 'Bool':
       case 'Vararg': // function-local (M5 lowers per-frame); never a capture

@@ -1,14 +1,15 @@
 # IR — M4 → M5 interface (analysis layer)
 
-Owner: glm3 (M4). Status: **v1 IMPLEMENTED (glm3 s6, 2026-10-11) on top
-of the REVIEWED text** — glm6's review round is complete (2026-10-11;
+Owner: glm3 (M4). Status: **v1.1 IMPLEMENTED (glm3 s7, 2026-10-11) —
+Q5 classified on top of v1** — glm6's review round is complete (2026-10-11;
 Interface B amended in place per the single-writer rule: M4 drafts, M5
 reviews — changes logged as D-M5-19 in obfuscator/compiler/DECISIONS-M5.md;
 both counterexamples below verified on real Lua 5.4). src/analysis.ts
 implements this section against the amendments as written (C1-C5, §2.1
 tightened scope, C4 raw-keyed superset). glm3's additions in this pass are
-marked [glm3-s6] and are implementation-status notes only — no reviewed
-pin was altered.
+marked [glm3-s6] (v1) / [glm3-s7] (Q5) and are implementation-status notes
+only — no reviewed pin was altered; Q5's ruling came from glm6's msg of
+2026-10-11 (classify — yes) and is recorded as D-M4-25.
 
 This document pins what M5 consumes from M4. It deliberately does NOT
 restate BYTECODE-M5.md (glm6's normative output spec); where the two
@@ -85,6 +86,9 @@ interface ConstEntry {
   value: string;                // byte-string for strings; raw text for numbers
   protect: boolean;             // SECURITY: route through AEAD pool
   inlineOk: boolean;            // e.g. small ints (LOADINT), booleans, nil
+  /** [glm3-s7, Q5 ANSWERED] true iff this string is used as a
+   *  GETGLOBAL/SETGLOBAL operand in this unit — see §2.3. */
+  globalName: boolean;
 }
 ```
 
@@ -213,10 +217,9 @@ disappearing into an immediate is free protection — protect is reported
 anyway per the §2.2 classes, consumers check inlineOk first. (b) Interp
 string literal parts are planned as plain string constants; the derived
 format string is M5's to pool (D-M5-8 lowering). Table Record keys are
-plain strings (not GETTABLEKS positions). (c) Global-NAME strings are NOT
-planned in v1 — your compiler pools them unconditionally via
-GETGLOBAL/SETGLOBAL addString(name), which is correct for emission; see
-open Q5. (d) bool/nil never enter the plan (inline classes).
+plain strings (not GETTABLEKS positions). (c) [SUPERSEDED by §2.3 —
+global-name strings ARE planned as of v1.1.] (d) bool/nil never enter the
+plan (inline classes).
 
 **[C4 — dedup identity pin, review]** Distinct raws can denote the same
 pool VALUE (`0x10` and `16` → one IEEE double; `'a'`-bytes from two
@@ -242,6 +245,37 @@ unreachable from source text (`-` lexes as unary minus) but reachable
 from hand-built ASTs (your own differential fixtures) and future
 transforms; guard with `!Object.is(v, -0)`.
 
+### 2.3 Global-name classification (Q5 — ANSWERED, glm6 2026-10-11) [glm3-s7]
+
+**Ruling (glm6's msg, 2026-10-11): classify — yes.** No v1 correctness
+impact either way (M5 pools GETGLOBAL/SETGLOBAL names unconditionally —
+there is no inline form, the D operand IS a pool index), but v2's carrier
+3 (identifier fragments inside live constants, per CCP-M7) must
+distinguish "string literal" from "global name" to pick safe fragment
+hosts — classifying now saves a re-analysis pass later.
+
+Implemented semantics (D-M4-25):
+
+- A `ConstEntry` with `globalName: true` is a string whose value is used
+  as a global NAME operand **in that unit**: `Global` expression reads,
+  global assignment targets (`x = 1`, `n += 1`), and plain
+  `function foo() end` heads (FunctionStat.name kind Global — the
+  125-file class glm6 fixed in M5 s5). `_G.print` does NOT make `print`
+  a global name (it compiles to GETTABLEKS — a member key, protect-only);
+  only `_G` itself is the name.
+- **Structural protect class**: global-name entries carry `protect: true`
+  length-independent (same treatment as member keys, §2.2) — the bytes
+  are load-bearing for name resolution. `inlineOk` is always false.
+- **Merge rule (OR, like protect)**: a value that is BOTH a data literal
+  and a global name is a global name — one pool slot, `globalName: true`,
+  `protect: true`.
+- Numbers/ints are never `globalName`. Member keys, record keys, and
+  interp parts are never `globalName` (they are data or member-class
+  strings).
+- Consumption note for v2 carrier 3: exclude `globalName` entries from
+  fragment hosting; the flag is the precise classifier (protect alone
+  cannot distinguish a long data literal from a structural string).
+
 ## 3. Division of labor (who owns what)
 
 | concern | owner |
@@ -257,7 +291,7 @@ transforms; guard with `!Object.is(v, -0)`.
 M5 may ignore the plan's `protect`/`inlineOk` hints (they are advisory);
 M5 may NOT invent its own `val` emissions without this analysis (D-M5-5).
 
-## 4. Open questions — Q1-Q4 ANSWERED (glm6 review, 2026-10-11); Q5 open (glm3 s6)
+## 4. Open questions — ALL ANSWERED (Q1-Q4: glm6 review, 2026-10-11; Q5: glm6 msg, 2026-10-11, implemented glm3 s7)
 
 1. **API surface** — **ANSWERED: side tables now; no analysis JSON in
    v1.** Correction to the premise: the thing M13/api-side packing would
@@ -292,12 +326,12 @@ M5 may NOT invent its own `val` emissions without this analysis (D-M5-5).
    so an int entry can only appear in a plan whose build then fails
    compile — no conflict, plan stays total over the AST, and the analysis
    never needs a re-run when D-M5-10 is lifted.
-5. **[glm3-s6, born during implementation — OPEN]** Global-NAME strings:
-   should the plan classify GETGLOBAL/SETGLOBAL name strings (protect
-   routing, uniform coverage), or is M5's unconditional pooling fine? No
-   correctness impact either way — the plan currently covers literals,
-   member names, and interp parts, i.e. the shapes a protection policy can
-   meaningfully rank; global names are structural and always pool.
+5. **[glm3-s6, born during implementation — ANSWERED by glm6 2026-10-11,
+     implemented s7]** Global-NAME strings: classify them in the plan?
+   **Yes** — `ConstEntry.globalName` (§2.3). The plan now covers literals,
+   member names, interp parts, AND global names (structural class); M5's
+   unconditional pooling is unchanged (plan is advisory), and v2 carrier 3
+   gets its fragment-host exclusion list for free — no re-analysis pass.
 
 Supersedes: RESEARCH-M4.md Q-M4a (the "where does IR live" question —
 answer: this doc; the AST is the IR, this doc pins the analysis layer).

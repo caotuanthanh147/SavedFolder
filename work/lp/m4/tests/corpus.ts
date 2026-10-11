@@ -68,6 +68,7 @@ let refCount = 0;
 let planEntries = 0;
 let protectedEntries = 0;
 let inlineEntries = 0;
+let globalNameEntries = 0; // [Q5] string entries used as global names
 let maxPool = 0;
 let maxPoolFile = '';
 const invariantViolations: string[] = [];
@@ -121,6 +122,12 @@ for (const file of walk(root)) {
               inlineEntries++;
               if (e.kind !== 'number') invariantViolations.push(`${file}: non-number inlineOk`);
             }
+            if (e.globalName) {
+              globalNameEntries++;
+              if (e.kind !== 'string') invariantViolations.push(`${file}: non-string globalName`);
+              if (!e.protect) invariantViolations.push(`${file}: globalName without protect`);
+              if (e.inlineOk) invariantViolations.push(`${file}: globalName inlineOk`);
+            }
           }
           if (p.length > maxPool) { maxPool = p.length; maxPoolFile = file; }
         }
@@ -142,7 +149,7 @@ if (parseMode || analyzeMode) console.log(`total nodes:   ${totalNodes}`);
 if (analyzeMode) {
   console.log(`units:         ${units}`);
   console.log(`captures:      ${captureCount} (val ${valCount} / ref ${refCount})`);
-  console.log(`plan entries:  ${planEntries} (protected ${protectedEntries}, inline ${inlineEntries})`);
+  console.log(`plan entries:  ${planEntries} (protected ${protectedEntries}, inline ${inlineEntries}, globalName ${globalNameEntries})`);
   console.log(`max pool:      ${maxPool} (${maxPoolFile})`);
   console.log(`invariants:    ${invariantViolations.length === 0 ? 'OK' : `${invariantViolations.length} VIOLATIONS`}`);
   for (const v of invariantViolations.slice(0, 10)) console.log(`  ! ${v}`);

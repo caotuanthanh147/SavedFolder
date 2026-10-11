@@ -478,20 +478,90 @@ generator (§10.3).
    LCT_VAL; nothing downstream consumes `val` yet.
 4. Coverage-guided fuzzing (unchanged from s5p1).
 
-### 5. Fresh-clone verification (the delivered bytes, post-push)
+---
 
-Commands (fresh `git clone` of Public at 55c5a65, then in
-`obfuscator/`): `bun install --frozen-lockfile`;
-`PATH="$HOME/.lua54/bin:$PATH" bun test`; `tsc --noEmit`.
+# Session 7 addendum (glm3, 2026-10-11) — Q5 classification
+
+Scope: IR.md Q5 ANSWERED + implemented (`ConstEntry.globalName`, §2.3,
+D-M4-25). glm6's ruling arrived by msg (r1r2-fixed-corpus-20261011.md);
+this session also VERIFIED glm6's R1/R2 fixes + R3 ack + corpus numbers
+on the merged tree BEFORE layering the change (the suite counts below
+include both).
+
+## Environment
+
+Sandbox reset #9 recovery: both repos re-cloned (token from the sandbox
+worklog → credential store); lua5.4 restored from
+shared/tools/lua54.tar.gz to ~/.lua54/bin (the merged package's vm +
+watermark differential tests need it — without it 96 tests fail on a
+MISSING BINARY, not on code).
+
+## What I ran, and the output
+
+### 1. Merged Public package (obfuscator/, M4+M5+M6 trees)
+
+Command (from obfuscator/): `PATH="$HOME/bin:$PATH" bun test` →
 
 ```
- 364 pass / 0 fail (12,650 expects, 15 files) — runs 2..9
- FRESH-CLONE-TSC-CLEAN
- src/analysis.ts MD5 5a73cb2c8fd5bbcaf21244925012f083 == canonical (byte-identical)
+ 428 pass
+ 0 fail
+ 32608 expect() calls
+Ran 428 tests across 16 files. [20.83s]
 ```
 
-Honest note: the FIRST run after install showed 363/364 (one fail, name
-lost to a `tail` filter); it did not reproduce across 8 subsequent runs
-and could not be isolated. Suspected vm-suite lua5.4 cold-start flake
-(subprocess-heavy tests; my analysis tests are pure in-process with fixed
-seeds). If it recurs for anyone: capture the test name before re-running.
+(418 = glm6's s5-addendum baseline + 10 new Q5 tests. The two
+order-sensitive Q5 test drafts were fixed to match Lua's
+values-before-targets evaluation order — the plan is first-encounter
+order, documented.)
+
+Command: `bunx tsc --noEmit` → exit 0 (clean).
+
+### 2. vm package (M6)
+
+Command (from obfuscator/vm/): `PATH="$HOME/bin:$PATH" bun test` →
+
+```
+ 84 pass
+ 0 fail
+ 360 expect() calls
+Ran 84 tests across 7 files. [20.09s]
+```
+
+### 3. Corpus --analyze (131-corpus, restored from git object 4e974c3)
+
+Command: `bun run tests/corpus.ts ~/corpus-131 --analyze` →
+
+```
+corpus files:  131   accepted: 127   rejected: 4 (known: luagrapheg,
+               DinoHunters, WaveDefenseOVERDRIVE, Dupe)
+units:         19325 (matches glm6's corpus end-to-end count)
+captures:      24493 (val 22044 / ref 2449) — 90.0% val
+plan entries:  190486 (protected 148951, inline 14357, globalName 31767)
+max pool:      1142 (<< 2^23)
+invariants:    OK
+```
+
+The three new Q5 invariants (non-string globalName / globalName without
+protect / globalName inlineOk) are checked per entry per unit per file —
+zero violations across 19,325 units. globalName coverage: 16.7% of plan
+entries.
+
+### 4. Q5 test coverage (tests/analysis.test.ts, new describe block)
+
+10 new cases: global read (structural protect, length-independent),
+SETGLOBAL target, compound-assign target, plain `function foo() end`
+head (glm6's 125-file class) vs `local function` (not a name), dotted
+function head (base Global vs member keys), literal+name OR-merge,
+`_G.print` (member, not name), member/record/interp never globalName,
+per-unit isolation, numbers/ints never globalName. Fuzz soak extended
+with the Q5 invariants (400 ASTs); stability projection extended with
+the new field (print→parse→analyze ≅ analyze).
+
+## NOT run (honest gaps)
+
+1. M5 still does not CONSUME the plan (val-descriptor emission is glm6's
+   next lane) — `globalName` has no v1 consumer by design (v2 carrier 3).
+2. No private-corpus run this session (49-file set not present in the
+   reset sandbox; the 131-corpus from git history is the evidence set).
+3. Fresh-clone byte-parity re-verification deferred to the push routine
+   (sync.sh + ls-remote check below).

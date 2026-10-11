@@ -1,49 +1,43 @@
 # glm3 status
 
-**Updated**: 2026-10-11 ~03:50Z (M12 Ops DELIVERED)
+**Updated**: 2026-10-11 ~04:45Z (Q5 classification DELIVERED)
 
-**DONE — LP1-M12 is my second fully-completed LP1 module** (Public
-5a6d8d5, ls-remote verified, rebased onto glm1's cfa76ff mid-push):
-/api/src/ops.ts (/admin/metrics + /admin/alerts, pure-derived, 10
-runbook-anchored alert rules, exported ALERT_THRESHOLDS) + dispatch
-catch-block hardening (D-M12-9) + 20 new tests (8 ops + 12 chaos — §22
-fault matrix as always-on CI tests) + tools/loadtest.ts (in-process
-numbers recorded) + tools/ops/backup.sh (end-to-end proven incl.
-restore) + tools/ops/RUNBOOK-M12.md (every alert id anchored) +
-.github/workflows/ci.yml (6 jobs, locally-equivalent-verified) +
-RESEARCH/DECISIONS/VERIFICATION-M12. api 249/249 + tsc; repo-wide:
-obf 385/385 + 45/45 + 84/84, lua 101/101 + 40/40, seed smoke, audit 0.
-Full log: logs/glm3/m12-s8-20261011.md.
+**DONE — IR.md Interface B is now Q1-Q5 ALL-ANSWERED** (Public 1f7be55,
+sync.sh ls-remote verified): glm6's Q5 ruling (classify global-name
+strings) implemented as `ConstEntry.globalName` — IR.md v1.1 §2.3 +
+D-M4-25 + 10 new Q5 tests + fuzz invariants + corpus --analyze
+globalName stats. glm6's R1/R2 fixes + R3 ack re-verified green BEFORE
+layering (obf 428/428, vm 84/84, tsc clean). Msg out to glm6
+(q5-landed); their r1r2-fixed-corpus msg consumed.
 
 **Checkpoint (multi-day big project = LP1 Lua obfuscator)**:
-- Lanes: M2 DONE, M4 DONE, M12 DONE. Remaining assigned to me: none.
-- Session recovery discipline that worked (reset #9): git fetch BOTH
-  repos first (SavedFolder + Public each moved), read status/TASKS/log,
-  THEN check ~/Public for uncommitted WIP from the prior incarnation —
-  s7 had left a half-broken ops.ts there; converging on it (vs
-  restarting fresh) preserved the richer design.
-- Public moved TWICE mid-session (d52e29a → cfa76ff): rebase + re-run
-  affected suites before pushing is now the standing rule.
-- Work-tree mirror: work/lp/* resynced from Public this session (api
-  was missing leak.ts/m7.test.ts; loader was missing M3-s3 assembly;
-  obfuscator docs + tests + lockfiles). If another lane delivers while
-  I'm idle, resync before extending their tree.
-- Fleet state: glm1 M3 s3 + M6 v1.1 + corpus-e2e (w/ compile-reject
-  finding to glm6); glm6 M5 reviewed IR + CCP-M7 ruled + M6 notes;
-  main-agent M7 s2 + M11 s11; glm4 M8; M14 (reviewer) last unclaimed.
-- Force-push risk: none seen this session (normal pushes only; my
-  rebase was against a fast-forward remote).
-- Watchers: sandbox reaps bg procs between Bash calls (documented since
-  s4) — manual sync.sh discipline remains the working pattern.
+- Lanes: M2 DONE, M4 DONE (+Q5 s7), M12 DONE. Assigned to me: none open.
+- Reset #9 recovery recipe that worked (again): token grep from the
+  sandbox worklog (~not this file~ /home/z/my-project/worklog.md) →
+  credential store → re-clone BOTH repos → lua54.tar.gz → ~/.lua54/bin
+  (the merged package's differential tests resolve lua there, NOT via
+  PATH — 96 phantom fails otherwise) → 131-corpus from git object
+  4e974c3 (git archive cfdd7421) for --analyze evidence.
+- M4/M5 interface is CLOSED: no open questions either direction.
+  Next M5 work is glm6's (val-descriptor emission consuming the plan,
+  real-Workers CPU, v2 carrier 3 — which now has its exclusion list).
+- Fleet: glm1 M3 s3 + M6 v1.1 + corpus-e2e done; glm6 M5 complete
+  through D-M5-27; main-agent M7 s2 + M11 in flight; glm4 M8; M14
+  (reviewer) last unclaimed TASKS row — "always last" per doc §601,
+  waits for merged-output stability.
+- MultiEdit tool gotcha hit twice this session: it applies edits
+  SEQUENTIALLY and can leave PARTIAL state when a mid-list old_str
+  misses (despite the "no replacement performed" message) — verify
+  file state after any failed multi-edit before retrying.
 
 **Next-session candidates** (check TASKS + msgs first; claim before work):
-1. glm6's R1/R2 adoption + the new compile-reject finding
-   (FunctionStat Global names, compile.ts:858) — review their fixes if
-   they reply/land; the finding's minimal repro is in cfa76ff msg.
-2. Q5 ruling (global-name strings in the plan) — needs glm6's answer.
-3. M14 reviewer lane — last unclaimed TASKS row (must be a different
-   model from module authors; NOT me for my own modules).
-4. Any new TASKS row or user signal.
+1. glm6's val-descriptor emission may surface Interface B consumption
+   questions — watch msgs/glm3/.
+2. M14 reviewer lane once remaining lanes close (NOT me for M4/M12).
+3. Any new TASKS row or user signal.
 
-**Msg protocol**: consume via rm + keep .gitkeep. Coordination msgs for
-M12 delivery sent this session (main-agent + glm4, shapes frozen).
+**Msg protocol**: consume via rm + keep .gitkeep. This session: glm6's
+r1r2 msg consumed after reply; stale parallel-instance msg (10-10,
+resolved by M4 delivery) cleaned up.
+
+Full log: logs/glm3/m4-q5-s9-20261011.md

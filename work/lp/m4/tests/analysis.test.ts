@@ -110,7 +110,7 @@ function shape(src: string): string {
   const { chunk, result } = run(src);
   return JSON.stringify(units(chunk).map((u) => ({
     c: caps(result, u).map((ci) => [ci.local.name, ci.mode, ci.proof]),
-    p: plan(result, u).map((e) => [e.key, e.kind, e.value, e.protect, e.inlineOk]),
+    p: plan(result, u).map((e) => [e.key, e.kind, e.value, e.protect, e.inlineOk, e.globalName]),
   })));
 }
 
@@ -398,8 +398,10 @@ describe('analysis: const plan', () => {
   test('member names are always protect (GETTABLEKS/SETTABLEKS/method) [IR.md §2.2; compile.ts addString(v.index)]', () => {
     const p = planFor('local t = t2.x\nlocal u = t:m()\nreturn u.y\n');
     const names = p.filter((e) => e.kind === 'string');
-    expect(names.map((e) => e.value).sort()).toEqual(['m', 'x', 'y']);
+    expect(names.map((e) => e.value).sort()).toEqual(['m', 't2', 'x', 'y']);
     for (const e of names) expect(e.protect).toBe(true);
+    // [Q5] t2 is the only global NAME in the unit — members are not.
+    for (const e of names) expect(e.globalName).toBe(e.value === 't2');
   });
 
   test('literal + member name merge to one entry, protect=true [dedup rule]', () => {
@@ -499,15 +501,18 @@ describe('analysis: const plan', () => {
 
   test('table Record keys are plain string constants', () => {
     const p = planFor('return { tiny = 1, ["LONG_KEY_9"] = 2, [exprkey] = 3 }\n');
-    // exprkey is a global read, not a const; keys "tiny"/"LONG_KEY_9" are.
-    expect(p.filter((e) => e.kind === 'string').map((e) => [e.value, e.protect])).toEqual([
-      ['tiny', false], ['LONG_KEY_9', true],
+    // exprkey is a global read → planned + flagged [Q5]; keys "tiny"/
+    // "LONG_KEY_9" are data/member strings, never globalName.
+    expect(p.filter((e) => e.kind === 'string').map((e) => [e.value, e.protect, e.globalName])).toEqual([
+      ['tiny', false, false], ['LONG_KEY_9', true, false], ['exprkey', true, true],
     ]);
   });
 
   test('string-call and table-call arguments are walked (Record keys are consts)', () => {
     const p = planFor('return f"ARG_STR_9", g{ k = "VAL_STR_9" }\n');
-    expect(p.filter((e) => e.kind === 'string').map((e) => e.value).sort()).toEqual(['ARG_STR_9', 'VAL_STR_9', 'k']);
+    expect(p.filter((e) => e.kind === 'string').map((e) => [e.value, e.globalName]).sort()).toEqual([
+      ['ARG_STR_9', false], ['VAL_STR_9', false], ['f', true], ['g', true], ['k', false],
+    ]);
   });
 });
 
@@ -554,6 +559,84 @@ describe('analysis: exact const keys (R1 evidence for glm6)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Q5: global-name classification [glm6-ruled 2026-10-11: classify — yes]
+// ---------------------------------------------------------------------------
+
+describe('analysis: Q5 global-name classification', () => {
+  test('global read: planned, flagged, structural-protect (length-independent)', () => {
+    const p = planFor('return game\n');
+    expect(p).toHaveLength(1);
+    expect(p[0]!.key).toBe('s:game');
+    expect(p[0]!.kind).toBe('string');
+    expect(p[0]!.value).toBe('game');
+    expect(p[0]!.globalName).toBe(true);
+    expect(p[0]!.protect).toBe(true); // 4 bytes < 8 — still protect (structural)
+    expect(p[0]!.inlineOk).toBe(false);
+  });
+
+  test('SETGLOBAL target: `x = 1` plans s:x flagged (after the RHS value — Lua evaluates values first) [compile.ts addString on Global target]', () => {
+    const p = planFor('x = 1\n');
+    expect(p.map((e) => [e.key, e.globalName])).toEqual([['n:1', false], ['s:x', true]]);
+  });
+
+  test('compound-assign global target: `n += 1` plans s:n flagged (after the RHS)', () => {
+    const p = planFor('n += 1\n');
+    expect(p.map((e) => [e.key, e.globalName])).toEqual([['n:1', false], ['s:n', true]]);
+  });
+
+  test('plain `function foo() end`: FunctionStat.name Global → flagged [glm6 125-file class]', () => {
+    const p = planFor('function foo() return 1 end\n');
+    const hit = p.filter((e) => e.value === 'foo');
+    expect(hit).toHaveLength(1);
+    expect(hit[0]!.globalName).toBe(true);
+    // `local function f` binds a Local — NOT a global name.
+    const q = planFor('local function f() return 1 end\nreturn f\n');
+    expect(q.filter((e) => e.globalName)).toHaveLength(0);
+  });
+
+  test('dotted function head: only the base Global is a name; members are member keys', () => {
+    const p = planFor('function a.b:c() return 1 end\n');
+    const strs = p.filter((e) => e.kind === 'string').map((e) => [e.value, e.globalName]);
+    expect(strs).toEqual([['a', true], ['b', false], ['c', false]]);
+  });
+
+  test('literal + global-name merge: ONE entry, protect/globalName OR-merged [dedup rule]', () => {
+    const p = planFor('local s = "print"\nprint(s)\n');
+    const hit = p.filter((e) => e.value === 'print');
+    expect(hit).toHaveLength(1);
+    expect(hit[0]!.globalName).toBe(true);
+    expect(hit[0]!.protect).toBe(true); // 5-byte literal alone would be false
+  });
+
+  test('_G.member access: _G is the global name; member key is NOT [GETTABLEKS, not GETGLOBAL]', () => {
+    const p = planFor('return _G.print\n');
+    const strs = p.filter((e) => e.kind === 'string').map((e) => [e.value, e.globalName]);
+    expect(strs).toEqual([['_G', true], ['print', false]]);
+  });
+
+  test('member/record/interp strings are never globalName', () => {
+    const p = planFor('local t = { k = 1 }\nlocal s = `x={t.k}`\nreturn s\n');
+    for (const e of p) expect(e.globalName).toBe(false);
+  });
+
+  test('per-unit isolation: a global read inside a closure is only in THAT plan [BYTECODE-M5 §4]', () => {
+    const { result, chunk } = run('local f = function() return workspace end\nreturn f, game\n');
+    const root = plan(result, chunk);
+    const inner = plan(result, units(chunk)[1]!);
+    expect(root.filter((e) => e.globalName).map((e) => e.value)).toEqual(['game']);
+    expect(inner.filter((e) => e.globalName).map((e) => e.value)).toEqual(['workspace']);
+  });
+
+  test('number/int entries are never globalName', () => {
+    const p = planFor('return 0x10, 42i, game\n');
+    for (const e of p.filter((e) => e.kind !== 'string')) {
+      expect(e.globalName).toBe(false);
+    }
+    expect(p.filter((e) => e.globalName).map((e) => e.value)).toEqual(['game']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Structural stability + fuzz soak [§10.3 oracle pattern]
 // ---------------------------------------------------------------------------
 
@@ -580,7 +663,7 @@ describe('analysis: stability', () => {
       const r2 = analyze(twice);
       expect(shape(src)).toBe(JSON.stringify(units(twice).map((u) => ({
         c: (r2.captures.get(u) ?? []).map((ci) => [ci.local.name, ci.mode, ci.proof]),
-        p: (r2.constPlan.get(u) ?? []).map((e) => [e.key, e.kind, e.value, e.protect, e.inlineOk]),
+        p: (r2.constPlan.get(u) ?? []).map((e) => [e.key, e.kind, e.value, e.protect, e.inlineOk, e.globalName]),
       }))));
     }
   });
@@ -614,6 +697,12 @@ describe('analysis: stability', () => {
         for (const e of p) {
           if (e.inlineOk) {
             expect(e.kind).toBe('number');
+          }
+          // [Q5] globalName is a string-only classification.
+          if (e.globalName) {
+            expect(e.kind).toBe('string');
+            expect(e.inlineOk).toBe(false);
+            expect(e.protect).toBe(true); // structural class, always
           }
         }
       }
