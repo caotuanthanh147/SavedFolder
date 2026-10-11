@@ -367,3 +367,131 @@ could not (real scripts never exercise them):
    coverage-feedback loop is possible future work).
 3. Semantic differential vs a real Lua runtime (out of M4 scope — M5/M6
    own execution oracles).
+
+---
+
+# Session 6 addendum (2026-10-11) — analysis + const extraction (items 2 + 6, the M4 completion)
+
+Scope: src/analysis.ts (IR.md Interface B v1) + src/index.ts (package
+entry, D-M4-24) + tests/analysis.test.ts (50 cases) + corpus --analyze
+mode. **Timeline note (§22.1 honesty): implementation started against the
+IR.md v0 draft per checkpoint; glm6's review (D-M5-19, Public e4b44ee)
+landed MID-SESSION — the code was re-fitted to the reviewed amendments
+(C1 parent-local-boundary captures, C4 raw-keyed superset, C3 protect
+no-op, §2.1 tightened proof scope) BEFORE delivery. All numbers below are
+from the re-fitted code, re-run after the final sync to Public (canonical
+= SavedFolder work/lp/m4; files byte-identical to the Public delivery).
+
+## Environment
+
+Same as sessions 1-5 (Linux sandbox, Bun 1.x, tsc 5.x strict). Note for
+reproducers: the merged `obfuscator/` package needs `lua5.4` on PATH for
+glm1's M6 vm tests (restored from shared/tools/lua54.tar.gz after the
+sandbox reset — without it those 63 tests fail on a MISSING BINARY, not on
+code; my 256 parser-package tests and tsc do not need it).
+
+## What I ran, and the output
+
+### 1. Canonical package (work/lp/m4)
+
+Command: `bun test` → 256 pass / 0 fail (12,000 expects; 6 files — was
+206 before this session; +50 analysis cases).
+
+Command: `./node_modules/.bin/tsc --noEmit` → exit 0.
+
+### 2. Merged Public package (obfuscator/, with M5 + M6 trees)
+
+Command (from obfuscator/): `PATH="$HOME/.lua54/bin:$PATH" bun test` →
+
+```
+ 364 pass
+ 0 fail
+13751 expect() calls
+Ran 364 tests across 15 files. [14.51s]
+```
+
+(256 mine + 45 M5 + 63 M6. First run showed 66 vm failures — ALL from
+lua5.4 missing after the sandbox reset; restored from the protocol
+tarball, then clean. No code change involved.)
+
+Command: `bun run typecheck` at obfuscator/, obfuscator/compiler/,
+obfuscator/vm/ → exit 0 at all three.
+
+### 3. Corpus --analyze (invariants: no duplicate captures, mode⇔proof,
+plan keys deduped, inlineOk ⇒ number)
+
+Private corpus (50 files, 2,240,420 bytes):
+
+```
+accepted:      49        (reject = potato-harness-core.lua 189:30 Lua 5.3 bitwise — known, unchanged)
+units:         7841
+captures:      6494 (val 5393 / ref 1101)   → 83.0% val-eligible (boundary captures, C1)
+plan entries:  45115 (protected 32215, inline 3917)
+max pool:      744 (scpinc_harness.lua)
+invariants:    OK
+```
+
+131-corpus (retrieved via `git archive 4e974c3 obfsucatortest`; 130
+.lua files, 8,646,341 bytes):
+
+```
+accepted:      127       (rejects: Dupe [corrupt], WaveDefense [`local 5 = 20], DinoHunters [`local funcition` typo] — known, unchanged)
+units:         19325
+captures:      24493 (val 22044 / ref 2449)  → 90.0% val-eligible (boundary captures, C1)
+plan entries:  159416 (protected 117568, inline 14357)
+max pool:      1114 (script.lua)             (M5 limit 2^23 — no risk)
+invariants:    OK
+```
+
+(Pre-review-fit numbers, for the record: transitive-inclusive capture
+counts were 10,012/41,924 — the C1 re-fit correctly removed the
+transitive entries; plan entries grew ~0.1% under C4 raw keying.)
+
+### 4. External-source derivation for the new tests
+
+Every analysis case cites: Lua 5.1 manual §2.6 (upvalues/closures),
+§2.4.3 (loop var rebinding), §2.4.4 (repeat scope), §2.5 (varargs);
+luau.org/syntax (if-else expressions, interpolation, compound assign,
+annotations); BYTECODE-M5.md §5/D-M5-5 + the REVIEWED IR.md amendments
+(D-M5-19: C1-C5 pins, §2.1 counterexamples — both re-derived in tests);
+IEEE 754 (the R1 collision evidence pair). The fuzzer soak reuses the s5
+generator (§10.3).
+
+## Findings shipped to other modules (msgs)
+
+- **R1 (glm6, M5)**: addNumber's computed-Number key collides for > 53-bit
+  patterns — reproducible pair + fix suggestion in IR.md §2.2 / D-M4-23.
+- **R2 (glm6, M5, minor)**: LOADINT folds -0; unreachable from source,
+  reachable from hand-built ASTs.
+- Sandbox-reset note (fleet): lua5.4 must be restored from
+  shared/tools/lua54.tar.gz before running the merged package.
+
+## NOT run (honest gaps)
+
+1. M5 does not yet CONSUME the plan/captures (adoption is glm6's next
+   move — Interface B is advisory; his compiler's own pool/upval emission
+   is unchanged and still passes 45/45).
+2. No JSON/PackParts projection for M13 (Q1 answered: that is a
+   compiler-output projection at the CLI boundary, decided when a
+   consumer exists).
+3. val-capture runtime semantics are M6's to exercise once M5 emits
+   LCT_VAL; nothing downstream consumes `val` yet.
+4. Coverage-guided fuzzing (unchanged from s5p1).
+
+### 5. Fresh-clone verification (the delivered bytes, post-push)
+
+Commands (fresh `git clone` of Public at 55c5a65, then in
+`obfuscator/`): `bun install --frozen-lockfile`;
+`PATH="$HOME/.lua54/bin:$PATH" bun test`; `tsc --noEmit`.
+
+```
+ 364 pass / 0 fail (12,650 expects, 15 files) — runs 2..9
+ FRESH-CLONE-TSC-CLEAN
+ src/analysis.ts MD5 5a73cb2c8fd5bbcaf21244925012f083 == canonical (byte-identical)
+```
+
+Honest note: the FIRST run after install showed 363/364 (one fail, name
+lost to a `tail` filter); it did not reproduce across 8 subsequent runs
+and could not be isolated. Suspected vm-suite lua5.4 cold-start flake
+(subprocess-heavy tests; my analysis tests are pure in-process with fixed
+seeds). If it recurs for anyone: capture the test name before re-running.
