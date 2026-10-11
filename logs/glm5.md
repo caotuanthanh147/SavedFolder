@@ -149,3 +149,53 @@ Stage Summary:
 - Project context: a cross-instance ST-QA1 quality audit was just claimed
   (faed27a, by another instance) — the stress test continues in parallel.
   glm5 standing by.
+
+---
+
+## Session 3 — 2026-10-11 (M14 Reviewer, pass 1)
+
+**Context recovery**: token re-provided by owner ("save your token") after
+glm5-s2 ended token-blocked. Sandbox had been RESET (~/Public + ~/SavedFolder
+gone; s2's staged M5 work unrecoverable — and moot: TASKS.md on origin shows
+LP1-M5 done by glm6 s1-s5; verified nothing of mine ever landed). Token
+persisted four ways (worklog grep-line, ~/.secrets/github.env, ~/.git-credentials,
+both clone remotes) — the exact failure mode that killed s2's delivery.
+
+**Claim**: LP1-M14 (the only unclaimed module; review/critic lineage + s2's M5
+expertise). Row added + pushed BEFORE work (ca0efb4, sync.sh verified).
+
+**Work**:
+- Research Log first per doc rules (RESEARCH-M14): OWASP API Top 10 2023
+  opened + quoted (owasp.org); license/HWID-pitfall + crypto-misuse sources
+  via live web_search (LicenseSpring, Keygen, RFC 8439/5869/8032 misuse
+  classes, timing-attack refs); honest [opened]/[snippet] markers.
+- Full suite battery RUN BY ME on d153caf — all green (see status) except
+  ci.yml (real YAML error line 94) and corpus --wm (expected-red, = glm1's
+  Latin-1 finding, independently reproduced 26/130).
+- NEW review/cross-e2e/ harness: REAL api/ router (Bun.serve, CCP-M8 P4
+  semantics) × REAL loader/sdk/library.lua (lua5.4 + real M3 crypto bundle +
+  curl transport) — the merge-checklist seam that existed nowhere. 20/20 ×3
+  deterministic: sync/offset, status, KEY_VALID w/ REAL Ed25519 x-sig verify,
+  HWID bind/rebind/mismatch over the wire, KEY_INVALID denial, tamper rejection,
+  nonce-replay denial.
+- Bring-up caught 2 methodology traps (now lessons): spawnSync freezes the Bun
+  event loop (server starves); sandbox display strips literal `[m` (ANSI-reset-
+  shaped) — glm4's F2(b) "branches: ain]" is this artifact, byte-verified
+  (real: [main]); only their F2(a) line-94 colon is real.
+- Security reads: HWID bind = atomic conditional UPDATE (no TOCTOU);
+  replay/skew/uniform-error gate verified (incl. over real HTTP); constant-time
+  compares verified in source (crypto.ts:42, payments.ts:112, flow.ts:85);
+  goto/secrets/key-in-URL scans clean; clean-room scan: zero Luarmor constants,
+  one identity leak into demo fixtures ("Homumado"/"Yuri Hub"/40961328 — D5,
+  owner ruling); research spot-checks: 3 RESEARCH-M8 URLs live, discord.js
+  14.27.0 = current latest today.
+- REVIEW-M14.md: 9-point checklist + defect list D1-D9 + merge-checklist
+  status + honest NOT-RUN list. No blockers; 2 majors both already owned
+  (glm3 ci.yml, glm6 Latin-1).
+- Msgs: glm3 (D1 paste-ready + D2), glm4 (D2), glm6 (D3 reconfirm), main-agent
+  (report + D5/D7 + session-2 lanes). Bookkeeping: status, this log, TASKS row,
+  lessons +2, worklog. Sync + push verified.
+
+**Stage summary**: M14 pass 1 delivered — every suite independently re-run,
+the API↔SDK seam closed with a reusable real-HTTP harness, 9 findings filed
+with owners, final gate correctly deferred to after M1/M7.
