@@ -24,12 +24,22 @@ container embed, randomized identifier set, junk locals + opaque
 predicates, numeric literal forms. Same `vmSeed` + `opcodeSeed` +
 container ⇒ byte-identical output (tested).
 
+**Two emit modes (v1.1):** `container: <bytes>` embeds the container
+(original shape — harness + one-artifact use); `container: null` emits a
+CONTAINERLESS runtime: no blob/hash literals, and the container arrives
+per entry call via `b` (§2). Containerless is the DEPLOYMENT shape of
+doc §8 step 10 — the runtime lives in the immutable init build
+(M13 content-addressed), the container is delivered per-session as the
+`bundle` over the M1 payload wire (CCP-M7 D-M5-20 option A makes those
+bytes per-session watermarked).
+
 ## 2. Entry table (consumed)
 
 | field | type | meaning |
 |---|---|---|
 | `s` | string, 0..64 bytes, optional | §5.6 per-fetch value (from the stub). Length/type violation ⇒ silent decoy path (§4) |
 | `c` | string, exactly 32 bytes | **constKey** (M5 PackOptions.constKey) — delivered per session via the encrypted payload (M1 wire), never baked into the runtime |
+| `b` | string, optional (REQUIRED in containerless builds) | **LPVB container bytes** — the per-session bundle. Non-string / shorter than the 42-byte floor ⇒ silent decoy path (§4). Embedded builds ignore it |
 | `env` | table, optional | guest environment; defaults to `_G` |
 | `args` / `nargs` | array + count, optional | guest vararg main arguments (the chunk proto is vararg) |
 | `dbg` | table, optional | countHook builds only: filled with `count`, `ops`, `pools` |
@@ -45,8 +55,11 @@ Lua 5.1/5.4 `string.format` rejects.
 
 ## 3. What the runtime embeds
 
+Embedded builds:
+
 - the **LPVB container** (per-build escaped or hex-encoded),
-- the container's **build hash** (32B) — integrity anchor,
+- the container's **build hash** (32B) — integrity anchor (§4 embedded
+  leg),
 - the **inverse opcode map** derived from the pack-time `opcodeSeed`
   (the seed itself never appears; traps refuse to load, BYTECODE-M5 §7),
 - shape/aux tables for all 58 canonical opcodes,
@@ -54,12 +67,31 @@ Lua 5.1/5.4 `string.format` rejects.
   `loader/crypto/{bit,sha2,hmac,hkdf,chacha20,poly1305,aead}.lua` +
   the M13-family FNV-1a32/DJB2 pair).
 
+Containerless builds embed everything EXCEPT the container and its hash
+literal (a `b`-shaped entry consumes them per call); the inverse opcode
+map still pins the per-VERSION opcodeSeed — the api-side per-session
+pack (CCP-M7 option A) MUST pack under the same seed or the runtime
+dispatches through the wrong permutation (traps/garbage).
+
 ## 4. Integrity feeds derivation — never a detectable branch (§10.2 item 9)
 
 At entry the runtime computes SHA-256 over the container's hashed-bytes
 region (magic|version|fcount|functions|pool, excluding the hash field
 and CRC trailer) and the per-fetch `s` validity, and uses them to SELECT
-the chain root:
+the chain root. The hash LEG depends on the emit mode:
+
+- **embedded builds**: the recomputed hash is compared against the
+  build-time hash PINNED as a literal in the runtime — tamper ⇒ decoy.
+  This pin is only legitimate for the one-artifact shape (the runtime
+  and its container ship together).
+- **containerless builds (v1.1, CCP-M7 D-M5-20)**: SELF-CONSISTENCY —
+  the recomputed hash is compared against the DELIVERED container's own
+  hash field (bytes 6..37). Per-session watermarked containers (the
+  packer writes the session hash over the final bytes) flow through
+  unchanged; tamper-without-rehash ⇒ decoy; rehash-without-constKey ⇒
+  AEAD garbage (the honest-forging boundary is the ruling's, not ours).
+
+Both legs select identically:
 
 - hash matches + `s`/`c` well-formed ⇒ `K_0 = HKDF(c, ∅, "const-key")`
   (the pinned M5 chain, BYTECODE-M5 §6.2), or
@@ -126,8 +158,23 @@ Goto-free everywhere. Closure-strategy handlers return either nil
 - **env identity**: guest sees the wrapped env (§2); `env == _G`
   comparisons inside guest code fail. `env._G` still reaches the real
   `_G`.
+- **%\* interp-strings (D-M6-9)**: M5 lowers Luau interp-strings to
+  `string.format` with `%\*` (BYTECODE-M5 §10) — the wrapped `string`
+  table is a CONFORMANCE REQUIREMENT for any runtime of this container,
+  not a courtesy (real hosts reject `%\*`).
+- **kind-0 upvalues (BYTECODE-M5 §5)**: immutable plain value frozen at
+  NEWCLOSURE; SETUPVAL against kind-0 is impossible-by-construction
+  (M4 analysis proves single-write-anywhere); conformant runtimes may
+  trap on it. v1 containers carry zero kind-0 descriptors (M5 emits
+  ref-only), so this is a forward pin, not a live path.
 
 ## 8. Changes to this contract
+
+- **v1.1 (2026-10-11)**: additive — entry field `b` + containerless
+  emit mode (`container: null`) + the §4 self-consistency leg. Entry
+  fields remain a superset; embedded builds are byte-for-byte the v1
+  behavior (63/63 suite re-run green). CCP-M7 D-M5-20 co-sign delivered
+  with this change.
 
 Additive entries (new optional entry fields, new per-build variants)
 may land without a version bump; anything consumers rely on

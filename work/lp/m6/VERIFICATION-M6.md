@@ -114,3 +114,47 @@ SHA-256).
 
 Re-ran on the Public-delivered tree after commit (see TASKS.md M6 row
 for the commit hash): `bun run typecheck` clean, `bun test` 63/63.
+
+## 6. v1.1 addendum — containerless mode (session 21, 2026-10-11)
+
+**What**: `container: null` emit mode + entry field `b` (RUNTIME-M6 §1/§2/§4)
+— the CCP-M7 D-M5-20 co-sign correction. Self-consistency integrity leg:
+SHA-256 over the delivered container's hashed region vs its own hash field.
+
+**Commands + output** (fresh clone of the merged tree, lua5.4.7 on PATH):
+
+```
+cd obfuscator/vm
+bun install          # 5 packages
+bun run typecheck    # tsc --noEmit — clean
+bun test             # 84 pass, 0 fail, 360 expect() calls (63 v1 + 21 v1.1)
+```
+
+**New coverage** (tests/differential.test.ts, tests/tamper.test.ts,
+tests/api.test.ts):
+
+- containerless differential: 10 fixtures × 4 strategies, b-entry runtime,
+  byte-equal stdout vs the real-lua5.4 oracle; two-session double-entry
+  call on one runtime file == oracle×2 (per-call state, the deployment
+  cadence).
+- self-consistency positive: valid container via `b` runs clean.
+- hash-field bit flip (bytes 6..37) → decoy, never oracle.
+- re-hash attack (pool byte flip + correctly rewritten hash field, i.e.
+  the strongest constKey-less attacker mimicking packWatermarked's
+  re-hash) → real-key path selected, AEAD garbage, never oracle.
+- nil `b` / table `b` / 10-byte `b` / truncated `b` → generic
+  "load failed", NO raw crash (regression: the first cut leaked
+  "attempt to call a nil value (method 'byte')" — the decoy fallback
+  mutated the `bh` nil-signal; fixed with a dedicated `bstr` flag).
+- CRC flip inert in b-mode too (D-M6-7 holds on both legs).
+- wrong constKey via b-mode → AEAD failure, never oracle.
+- containerless determinism (same seeds → identical bytes), luac5.4 -p
+  parse gate on all containerless strategy variants, size sanity.
+
+**NOT-RUN (unchanged from v1)**: real executors (D2), corpus end-to-end
+(now unblocked — M4 s6 + M5 landed; next-session lane), nested VM /
+deep flattening (D-M6-10). packWatermarked does not exist yet — the
+re-hash test simulates its hash-write behavior on tampered bytes; the
+positive watermarked-container case is exactly "any self-consistent
+container sealed under the delivered constKey runs", covered by the
+b-mode differential.

@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { FIXTURES } from '../../compiler/tests/fixtures';
-import { buildProtected, runLua, runnerScript } from './helpers';
+import { buildProtected, luaByteString, runLua, runnerScript } from './helpers';
 
 function oracleOf(source: string): string {
   return runLua({ 'src.lua': source }, 'src.lua');
@@ -40,6 +40,48 @@ describe('differential vs real Lua 5.4 (all strategies)', () => {
     const names = FIXTURES.map((f) => f.name);
     expect(new Set(names).size).toBe(names.length);
     expect(names.length).toBeGreaterThanOrEqual(15);
+  });
+});
+
+describe('differential — containerless mode (v1.1, CCP-M7 D-M5-20): container arrives via entry b', () => {
+  // The deployment shape of doc §8 step 10: a FIXED runtime (immutable init
+  // build) consumes per-session container bytes handed in at the entry.
+  // Watermarked containers are ordinary valid v1 containers, so the
+  // differential must hold for every fixture × strategy unchanged.
+  const strategies = [
+    { dispatch: 'chain' as const },
+    { dispatch: 'tree' as const },
+    { dispatch: 'closure' as const, runtimeBuilt: false },
+    { dispatch: 'closure' as const, runtimeBuilt: true },
+  ];
+
+  for (const fixture of FIXTURES.slice(0, 10)) {
+    test(`fixture ${fixture.name}: b-entry runtime, all strategies == oracle`, () => {
+      const expected = oracleOf(fixture.source);
+      for (const strat of strategies) {
+        const p = buildProtected(fixture, { ...strat, containerless: true });
+        expect(p.emit.containerless).toBe(true);
+        const out = runLua(
+          { 'runtime.lua': p.emit.lua, 'main.lua': runnerScript(p) },
+          'main.lua',
+        );
+        expect(out).toBe(expected);
+      }
+    });
+  }
+
+  test('same program, two sessions (two entry calls, same runtime file) == oracle', () => {
+    const fixture = FIXTURES[0]!;
+    const expected = oracleOf(fixture.source);
+    const p = buildProtected(fixture, { containerless: true });
+    const main = `local entry = dofile("runtime.lua")
+local blob = "${luaByteString(p.container)}"
+local c = "${luaByteString(p.constKey)}"
+local ok1 = pcall(entry, { c = c, s = "sess-one", b = blob, args = {}, nargs = 0 })
+local ok2 = pcall(entry, { c = c, s = "sess-two", b = blob, args = {}, nargs = 0 })
+if not ok1 or not ok2 then error("session run failed", 0) end`;
+    const out = runLua({ 'runtime.lua': p.emit.lua, 'main.lua': main }, 'main.lua');
+    expect(out).toBe(expected + expected);
   });
 });
 

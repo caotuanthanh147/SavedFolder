@@ -46,9 +46,14 @@ export interface ProtectedBuild {
   readonly constKey: Uint8Array;
   readonly opcodeSeed: Uint8Array;
   readonly vmSeed: Uint8Array;
+  /** The (possibly tampered) container bytes — the `b` entry input in
+   * containerless mode. */
+  readonly container: Uint8Array;
 }
 
-/** Full pipeline: fixture AST → M5 compile → pack → M6 runtime. */
+/** Full pipeline: fixture AST → M5 compile → pack → M6 runtime.
+ * `containerless: true` emits the v1.1 entry-`b` runtime (no embedded
+ * container — the runner injects it per call). */
 export function buildProtected(
   fixture: Fixture,
   opts: {
@@ -58,6 +63,7 @@ export function buildProtected(
     vmSeed?: Uint8Array;
     opcodeSeed?: Uint8Array;
     constKey?: Uint8Array;
+    containerless?: boolean;
     tamperContainer?: (bytes: Uint8Array) => Uint8Array;
   } = {},
 ): ProtectedBuild {
@@ -68,22 +74,24 @@ export function buildProtected(
   let { container } = pack(protos, { constKey, opcodeSeed });
   if (opts.tamperContainer) container = opts.tamperContainer(container);
   const emit = emitRuntime({
-    container,
+    container: opts.containerless ? null : container,
     opcodeSeed,
     vmSeed,
     dispatch: opts.dispatch,
     runtimeBuilt: opts.runtimeBuilt,
     countHook: opts.countHook,
   });
-  return { emit, constKey, opcodeSeed, vmSeed };
+  return { emit, constKey, opcodeSeed, vmSeed, container };
 }
 
-/** Runner script: loads the runtime, calls the entry with key/seed/env. */
+/** Runner script: loads the runtime, calls the entry with key/seed/env
+ * (container too, in containerless mode). */
 export function runnerScript(p: ProtectedBuild, extra = ''): string {
+  const blob = p.emit.containerless ? `, b = "${luaByteString(p.container)}"` : '';
   return `local entry = dofile("runtime.lua")
 local c = "${luaByteString(p.constKey)}"
 local s = "\\1\\2\\3\\4"
-local ok, e1 = pcall(entry, { c = c, s = s, args = {}, nargs = 0 })
+local ok, e1 = pcall(entry, { c = c, s = s${blob}, args = {}, nargs = 0 })
 if not ok then error(e1, 0) end
 ${extra}`;
 }

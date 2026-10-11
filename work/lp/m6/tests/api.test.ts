@@ -72,6 +72,14 @@ describe('api surface', () => {
           if (res.status !== 0) throw new Error(`luac -p failed for ${v.dispatch}: ${res.stderr}`);
         }
       }
+      // v1.1 containerless variants (entry-b mode) parse too
+      for (const v of variants) {
+        const r = emitRuntime({ container: null, opcodeSeed, vmSeed: cryptoBytes(32), ...v });
+        const f = join(dir, `rtc_${v.dispatch}_${v.runtimeBuilt ? 'b' : 'd'}.lua`);
+        writeFileSync(f, r.lua, 'utf8');
+        const res = spawnSync(LUAC54, ['-p', f], { encoding: 'utf8' });
+        if (res.status !== 0) throw new Error(`luac -p failed (containerless) for ${v.dispatch}: ${res.stderr}`);
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -81,6 +89,20 @@ describe('api surface', () => {
     const r = emitRuntime({ container, opcodeSeed, vmSeed: cryptoBytes(32) });
     expect(r.lua.length).toBeGreaterThan(20_000);
     expect(r.lua.length).toBeLessThan(5_000_000);
+  });
+
+  test('containerless: flags, determinism, size (v1.1)', () => {
+    const vmSeed = cryptoBytes(32);
+    const a = emitRuntime({ container: null, opcodeSeed, vmSeed, dispatch: 'tree' });
+    const b = emitRuntime({ container: null, opcodeSeed, vmSeed, dispatch: 'tree' });
+    expect(a.containerless).toBe(true);
+    expect(a.blobLength).toBe(0);
+    expect(a.lua).toBe(b.lua); // same seeds -> byte-identical (no container variance)
+    expect(a.vmChecksums).toEqual(b.vmChecksums);
+    const other = emitRuntime({ container: null, opcodeSeed, vmSeed: cryptoBytes(32), dispatch: 'tree' });
+    expect(other.lua).not.toBe(a.lua);
+    expect(a.lua.length).toBeGreaterThan(20_000);
+    expect(a.lua.length).toBeLessThan(5_000_000);
   });
 });
 

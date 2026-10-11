@@ -36,9 +36,15 @@ import { emitDispatch, emitLoop, type DispatchKind } from './dispatch';
 // ---------------------------------------------------------------------------
 
 export interface EmitOptions {
-  /** LPVB container bytes, or a placeholder spec (pipeline pre-pass that
-   * needs vmChecksums before constKey/pack). */
-  readonly container: Uint8Array | { readonly placeholderLength: number };
+  /** LPVB container bytes, a placeholder spec (pipeline pre-pass that
+   * needs vmChecksums before constKey/pack), or `null` for CONTAINERLESS
+   * mode (v1.1, CCP-M7 D-M5-20): the runtime is emitted without container
+   * bytes and receives them per entry call via `e.b` — the deployment
+   * shape of doc §8 step 10 (runtime embedded in the immutable init,
+   * container delivered per-session as the bundle). Integrity in that
+   * mode is SELF-CONSISTENCY: SHA-256 over the delivered container's
+   * hashed region vs the container's own hash field. */
+  readonly container: Uint8Array | { readonly placeholderLength: number } | null;
   /** 32-byte opcode permutation seed (M5 pack input) — its inverse map is
    * baked into the runtime; the seed itself is never emitted. */
   readonly opcodeSeed: Uint8Array;
@@ -56,6 +62,8 @@ export interface EmitResult {
   readonly lua: string;
   readonly dispatch: DispatchKind;
   readonly runtimeBuilt: boolean;
+  /** true when emitted without embedded container bytes (entry `b` mode). */
+  readonly containerless: boolean;
   /** FNV-1a32 + DJB2 over the code region (the emitted source with the
    * container blob literal removed) — fed into deriveConstKey (§10.2 item 9). */
   readonly vmChecksums: { readonly fnv: number; readonly djb2: number };
@@ -243,11 +251,14 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
 // ---------------------------------------------------------------------------
 
 export function emitRuntime(options: EmitOptions): EmitResult {
-  const placeholder = !ArrayBuffer.isView(options.container);
-  const blobLen = placeholder
-    ? (options.container as { placeholderLength: number }).placeholderLength
-    : (options.container as Uint8Array).length;
-  if (!Number.isInteger(blobLen) || blobLen < 42) throw new Error('bad container length');
+  const containerless = options.container === null || options.container === undefined;
+  const placeholder = !containerless && !ArrayBuffer.isView(options.container);
+  const blobLen = containerless
+    ? 0
+    : placeholder
+      ? (options.container as { placeholderLength: number }).placeholderLength
+      : (options.container as Uint8Array).length;
+  if (!containerless && (!Number.isInteger(blobLen) || blobLen < 42)) throw new Error('bad container length');
   if (options.opcodeSeed.length !== 32) throw new Error('opcodeSeed must be 32 bytes');
   if (options.vmSeed.length !== 32) throw new Error('vmSeed must be 32 bytes');
 
@@ -261,7 +272,9 @@ export function emitRuntime(options: EmitOptions): EmitResult {
       ? options.runtimeBuilt
       : rng.chance(0.5);
   const countHook = options.countHook === true;
-  const hexEmbed = rng.chance(0.5);
+  // containerless builds carry no blob literal, so the hex-decode helper
+  // would be dead code — always plain in that mode.
+  const hexEmbed = !containerless && rng.chance(0.5);
 
   // --- handler bodies: the single semantic source for all strategies ---
   // Loop/handler-local names are fixed (I, pcb, fr, rec) — see makeNames.
@@ -303,7 +316,7 @@ export function emitRuntime(options: EmitOptions): EmitResult {
   }
 
   // --- container bytes (real, or same-length dummy for the pre-pass) ---
-  const realContainer = placeholder ? null : (options.container as Uint8Array);
+  const realContainer = !containerless && !placeholder ? (options.container as Uint8Array) : null;
   const blobBytes: Uint8Array = realContainer ?? new Uint8Array(blobLen);
   const bhBytes: Uint8Array = realContainer
     ? sha256Raw(concat(realContainer.subarray(0, 5), realContainer.subarray(37, realContainer.length - 4)))
@@ -410,7 +423,7 @@ export function emitRuntime(options: EmitOptions): EmitResult {
   );
 
   head.push(junk(rng));
-  head.push(`local ${N.BH} =`);
+  if (!containerless) head.push(`local ${N.BH} =`);
 
   // ---- TAIL ---- (code region = head + tail; the container-dependent
   // literals (build hash, blob) live in the band between them and are
@@ -678,6 +691,31 @@ export function emitRuntime(options: EmitOptions): EmitResult {
   const dbgFill = countHook
     ? `\tif ${N.DBG} ~= nil then ${N.DBG}.count = ${N.CNT} ${N.DBG}.ops = ${N.OPC} end\n`
     : '';
+  // integrity section (§4): embedded builds pin the build-time container
+  // hash (BH literal); containerless builds (v1.1, CCP-M7 D-M5-20) do
+  // SELF-CONSISTENCY over the delivered container `e.b` — per-session
+  // watermarked containers (session hash written by the packer) flow
+  // through unchanged. Both legs select the same decoy derivation.
+  const integrity = containerless
+    ? `\tlocal bb = e.b\n` +
+      `\tlocal bh = nil\n` +
+      `\tlocal bstr = ${N.TYP}(bb) == "string" and #bb > 41\n` +
+      `\tif bstr then\n` +
+      `\t\tbh = ${N.SH}.sha256(bb:sub(1, 5) .. bb:sub(38, #bb - 4))\n` +
+      `\t\tif bh ~= bb:sub(6, 37) then good = false end\n` +
+      `\telse\n` +
+      `\t\tgood = false\n` +
+      `\tend\n` +
+      `\tif not good then\n` +
+      `\t\tif bh == nil then bh = ${N.SH}.sha256("") end\n` +
+      `\t\tck = ${N.HK}.hkdf_sha256(bh, bh:sub(1, 8), "const-key", 32)\n` +
+      `\tend\n` +
+      `\t${N.BL} = bstr and bb or ""\n`
+    : `\tlocal bh = ${N.SH}.sha256(${N.BL}:sub(1, 5) .. ${N.BL}:sub(38, #${N.BL} - 4))\n` +
+      `\tif bh ~= ${N.BH} then good = false end\n` +
+      `\tif not good then\n` +
+      `\t\tck = ${N.HK}.hkdf_sha256(bh, bh:sub(1, 8), "const-key", 32)\n` +
+      `\tend\n`;
   tail.push(
     `local ${N.ENTRY} = function(e)\n` +
     `\tlocal renv = e.env\n` +
@@ -690,11 +728,7 @@ export function emitRuntime(options: EmitOptions): EmitResult {
     `\tlocal sv = e.s\n` +
     `\tlocal good = ${N.TYP}(ck) == "string" and #ck == 32\n` +
     `\tif good and sv ~= nil and (${N.TYP}(sv) ~= "string" or #sv > 64) then good = false end\n` +
-    `\tlocal bh = ${N.SH}.sha256(${N.BL}:sub(1, 5) .. ${N.BL}:sub(38, #${N.BL} - 4))\n` +
-    `\tif bh ~= ${N.BH} then good = false end\n` +
-    `\tif not good then\n` +
-    `\t\tck = ${N.HK}.hkdf_sha256(bh, bh:sub(1, 8), "const-key", 32)\n` +
-    `\tend\n` +
+    integrity +
     `\t${N.CHAINK} = { ${N.HK}.hkdf_sha256(ck, "", "const-key", 32), w = 1 }\n` +
     `${dbgReset}` +
     `\tlocal protos, poofs, poofl, aads = ${N.DECODE}()\n` +
@@ -721,13 +755,16 @@ export function emitRuntime(options: EmitOptions): EmitResult {
 
   const headText = head.join('\n\n');
   const tailText = tail.join('\n\n');
-  const lua = headText + '\n' + strLit(bhBytes) + '\nlocal ' + N.BL + ' =\n' + blobLiteral + '\n' + tailText;
+  const lua = containerless
+    ? headText + '\nlocal ' + N.BL + ' = ""\n' + tailText
+    : headText + '\n' + strLit(bhBytes) + '\nlocal ' + N.BL + ' =\n' + blobLiteral + '\n' + tailText;
   const codeRegion = headText + '\n' + tailText;
 
   return {
     lua,
     dispatch,
     runtimeBuilt: dispatch === 'closure' && runtimeBuilt,
+    containerless,
     vmChecksums: { fnv: fnv1a32ts(codeRegion), djb2: djb2ts(codeRegion) },
     blobLength: blobLen,
     placeholder,
