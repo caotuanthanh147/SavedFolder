@@ -215,6 +215,20 @@ anomaly responses, survival chores). §26 ESC standing directive applies.
 | CS1 | 7 Days Cat-Sitting full pipeline: deobf analysis both places (wire table at call sites, Rule 2) + §26 ESC census + standard autofarm build (Rule 11 filter, §3) with the INLINE resolution pattern (user's clean-coding directive — no resolution/listener wrappers) + real-load harness + gates + delivery | glm1 | done | **DELIVERED Public 1d5c1b0** (folder mode: `cat/<both places>/7 Days Cat-Sitting.lua`, MD5 771dce16 identical to work/lua/SevenDaysCatSitting.lua, ls-remote verified; distinct filename from CS1-B's CatSitting.lua — FW1 both-land precedent, user picks). 7 toggles: AutoChores (6 chore flows incl. litter minigame driver, Chore_* attr-gated 30s self-healing), AutoPet, AutoAnomalies (attr-transition responders: Grandma->7 lights w/ On-attr, VoidOutside->8 blinds w/ BlindsClosed, Catzilla->TV w/ On, ToiletFace->flush, CreepyHead->TP+Stare at game cadence), AutoPhoto (SmilingMan + Misplaced sweep), AutoSleep (fail-safe gate: 6 chores + 11 flags + fridge-closed), AutoQueue, AutoOpenCrate. Gates: luac/lint 0/validate head873-tail18-0comments/REAL-LOAD harness 56/56 x3 — caught 1 REAL bug (7 prompt paths missing attachment layers, silent no-op class) + fridge path in 2nd pass. ESC: workspace-attr oracle wired as every feature's gate (FNAF-lesson correction). CS1-B cross-check corrections adopted (Tutorial.Skip Vote/Unvote, Ending.Vote bool — neither wired, banned-wire sweep clean). |
 | CS1-H | Independent real-load harness (deobf-backed, SH3 v4 pattern) vs delivered bytes — open lane for any glmN | (open) | open | Offered to glm2/glm3/glm4 (FW1-H/PST1-H pattern). |
 
+## Game round 2026-10-11 — 🎃 Parcel Tycoon [HALLOWEEN] (Public b405a45, single zip)
+
+User order: plain "next game" (standard autofarm per Rule 16/§3; no genre
+instructions). Force-push #4 (b405a45 20:44 +0700) wiped all LP1 module
+trees (LP1 paused anyway — canonical copies in work/lp/ untouched) and
+delivered ONE zip: `🎃 Parcel Tycoon [HALLOWEEN].zip` = single-place game,
+deobf 132,011 lines + game_dump 50,727 lines. No Template.lua in the zip —
+canonical 945-line template stands (md5 c42bde67 both copies verified).
+Clean-code inline directive + §26 ESC census apply (standing).
+
+| ID | Task | Owner | Status | Notes |
+|---|---|---|---|---|
+| PCT1 | Parcel Tycoon [HALLOWEEN] full pipeline: deobf analysis (wire table at call sites, Rule 2) + §26 ESC census + standard autofarm build (Rule 11 filter, §3) with inline resolution + real-load harness + gates + delivery | glm1 | in-progress (claimed 2026-10-11 ~14:50Z, before work) | Round open. |
+
 ## Big Project round 2026-10-10 — Lua Script Licensing & Protection Platform (Public 2a56aa9: doc.md v2 + HTTPSpy)
 
 User order: "next, it's not a game, this is a big project so I may run this a
