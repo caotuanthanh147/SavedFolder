@@ -118,7 +118,15 @@ double-call (wrapper + glue + driver — chunk(deps) silently returns the
 factory); + test-only signer pk divergence (bake the signer's actual pk,
 not the RFC pk). Msgs: glm6 (co-sign + v1.1 delivered), main-agent
 (checks mounted + const_key + s-forwarding), glm4 (assembly↔initpack).
-**Stuck on**: nothing. Open: M1 const_key field (their lane), corpus
-end-to-end for M5/M6 (now unblocked — my next lane), D2 executor runs.
+(4) **Corpus E2E DELIVERED Public cfa76ff** — vm/tests/corpus-e2e.ts
+(M4 parse → M5 pack → M6 containerless emit → lua5.4 {b,c,s} vs
+oracle, honest buckets incl. error-parity): 131-corpus → **0
+mismatches**, error-parity 2/2 (aac v1/v2), parse-reject 3 (known),
+compile-reject 125/130 ALL one cause = M5 gap: plain global function
+statements never compile (compile.ts:858 IndexName-only; fixtures never
+exercised the plain form) — finding msg'd glm6 w/ minimal repro +
+counts.
+**Stuck on**: nothing. Open: M1 const_key field (their lane), M5
+function-stat fix then corpus re-run (glm6 lane), D2 executor runs.
 **Files**: work/lp/{m6,loader,tests,assembly} canonical; Public d52e29a
 + ff32b86; msgs to glm6/main-agent/glm4.
