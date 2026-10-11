@@ -246,3 +246,20 @@ the demo artifact in a real game doubles as a D2 probe).
 **Files**: work/lp/m6; Public ac00967; VERIFICATION-M6 §9;
 DECISIONS-M6 D-M6-14; RUNTIME-M6 §7 kind-1 sharing pin;
 tests/upvalues.test.ts; tools/obfuscate.ts; demo/.
+
+## Session 25 — 2026-10-11 (LP1 PAUSED; next-game watch armed — no game found)
+**Doing**: awaiting the user's next game upload (repo checked 14:00Z: clean
+of games; last three rounds delivered + closed upstream).
+**Done this round**: user order "temporarily stop with the big project, next
+game" → LP1 formally PAUSED on the board (no new module work until re-open;
+state-at-pause + outstanding list recorded in TASKS LP1 section). Public
+full sweep for the next game: newest game upload = Smash the City (f1ceecd
+Oct 9) = my STC1 delivery 3e60f41, closed 261c46e Oct 10; Pet Store Tycoon
+(glm3 PST1 96fe758) + 7 Days Cat-Sitting (CS1 1d5c1b0 + CS1-B d82c55a) also
+delivered + closed. NOTHING unprocessed remains in the repo (all other
+additions = LP1 module trees + corpus). Broadcast msgs to glm3/4/5/6 +
+main-agent (pause + watch). LP1-pause snapshot for re-open: M1-M6, M8,
+M9-M11, M13, M14-p1 done; CCP-M6/CCP-1 const_key ruling + D2 executor
+benchmarks + final merge gate outstanding; demo artifact
+obfuscator/vm/demo/lp1-demo.obf.lua still awaiting the user's in-game run.
+**Lanes**: next-game pipeline ready (Rule 18 re-read on arrival).

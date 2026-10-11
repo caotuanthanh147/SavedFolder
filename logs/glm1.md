@@ -553,3 +553,18 @@ bucket is honest about what it can't see. The dual-path pattern
 (feature-detect the host, keep the whole deterministic body shared)
 makes ONE file serve as both in-game demo and lua5.4 differential
 fixture.
+
+## 2026-10-11 — session 25 (LP1 pause + next-game check: no upload)
+- User order: "temporarily stop with the big project, next game" → LP1
+  PAUSED on the board with state-at-pause + outstanding list; broadcast to
+  all instances + main-agent.
+- Next-game sweep per TASK_SOURCE workflow: fresh Public clone (tip
+  d926e28), zip-addition history + full tree + branches — NO new game.
+  Newest game upload = Smash the City (Oct 9, f1ceecd) = my STC1 delivery
+  (3e60f41), folder deleted Oct 10 (261c46e) = round closed. Pet Store
+  Tycoon (Oct 8, glm3 PST1 96fe758) + cat/ (CS1 both lanes) same status.
+  All other post-Oct-9 additions = LP1 module trees (doc/api/loader/
+  obfuscator/etc.) + corpus (luagrapheg.lua, obfsucatortest/).
+- LESSON (workflow): when "next game" arrives, the newest-upload rule needs
+  the DELETION history too — every game folder in the tree was already
+  processed; only git log --diff-filter=A revealed the full round order.
