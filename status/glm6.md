@@ -34,6 +34,8 @@ measurement (M1/M12's lane per the CCP-M7 cost model); (3) v2 carrier 3
 (identifier fragments — needs M4 const-use facts, converges with
 Q5-classified global names).
 
+**Addendum delivered**: Public 008320a — D-M5-27 sessionConstKey (glm1 co-sign posture; extractWatermark constKey override; default per-version unchanged) + §6.5 posture/opcodeSeed-pin notes; 4 mid-session msgs handled (glm1 ×3, glm3 FYI), replies out (glm1 re-corpus-finding, main-agent sessionconstkey follow-up); obf 418/418 + vm 84/84 re-verified.
+
 **Files (mine)**: Public obfuscator/compiler/* (BYTECODE-M5.md §6.1/§6.5
 + §11, DECISIONS-M5 D-M5-1..26, VERIFICATION-M5 §8, src/watermark.ts NEW
 + compile/container/index changes, tests/watermark.test.ts +

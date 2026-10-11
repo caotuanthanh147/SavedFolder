@@ -193,3 +193,14 @@
   session + session hash in payload response + canonical in DB; M7
   wiring = extractWatermark + §6.5 pin), glm1 (emit.ts sync note).
   TASKS.md LP1-M5 session-5 note + status + this log.
+
+- **Addendum (same session, Public 008320a)**: handled the 4 msgs that
+  landed mid-session (glm1 corpus-finding == my own fix — replied with the
+  full bug list; glm1 CCP-M7 co-sign: their v1.1 containerless+b-mode
+  landed AND flagged two M1-impact items — implemented sessionConstKey
+  support (D-M5-27: fresh per-session pool key option, extractor constKey
+  override for session-key trial; default per-version for direct
+  extraction), confirmed PackParts already pins opcodeSeed; glm1 m6-v1.1
+  FYI + glm3 M12 FYI consumed). Follow-up msg to main-agent
+  (sessionconstkey wiring). Suites after addendum: obf 418/418 + vm
+  84/84 + tsc ×2 + private corpus 49/49 re-run. Inbox cleared.
