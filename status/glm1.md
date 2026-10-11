@@ -273,3 +273,48 @@ AutoSpin/AutoTrain + PackDelay) → REAL-LOAD harness 49/49 ×3 + delivered-byte
 → gates (luac/validate head873/0 comments/lint 0) → repack [VERIFIED] → Public
 04594ef (ls-remote) → wrap.
 **Lanes**: PCT1-H independent harness open for any glmN.
+
+## Session 26 — BAD1 [LABYRINTH] Build a Dungeon (delivered)
+
+User order "next game" + genre note ("build a stuff" game — check build tab,
+copy base, etc) + clean-code feedback (PCT1's named XStep loop-body wrappers
+= violation; use inline pcall(function() ... end) steps).
+
+Public 3cc38ff = "[LABYRINTH] Build a Dungeon .zip" (zip-only; deobf 81,918 +
+dump 429,120 client-visible; no Template.lua in zip → canonical 945 stands).
+Claimed BAD1 before work (board updated), broadcast msgs out.
+
+- Rule 18 re-read: guide 590 (canonical §1-26.8) + Template 945 head-to-toe.
+- Analysis work/lua/bad-analysis.md: 15-remote inventory (Build RF = the
+  placement mux {place/move/remove/rotate/upgrade/expand/unlockFloor/hotbar/
+  skill/weapon/unitStar/unitSell/unitSellAll/unitLevel/clearAll}; Action RE =
+  startWave/stopWave/auto/speed/visit/watch/home/shop/attack; RollControls RF
+  = get/settings/start/stop with the full settings-table shape; Roll RE =
+  confirmRoll; LabQ RE = solo/quick/create/...  + raidbuy/setCheckpoint; Lab RE
+  = hello/leave/again/dash/skill(client-computed aim pos); DungeonLayouts +
+  Shop = UI one-shots). Plot layout replicates to every client via
+  workspace.Plots.PlotN.State StringValue JSON {tiles, objs, trot, w} — the
+  copy-base vector. §26 ESC: attrs client-visual-only class (Heavy/CombatHP/
+  Combo display), no verified NaN/\255 surface, auto/speed = probe wires.
+- Build (606-line section, NO Step functions — inline pcall steps): 11
+  toggles as per the board row; CopyBase reads any plot's layout JSON and
+  replays it from own inventory.
+- REAL-LOAD harness: the REAL Config + GridUtil (+ RollUpgradeConfig +
+  LateGameConfig) modules run under lua5.4 via the POT1 Luau transformer
+  (math.round/table.clone shims; 1 documented deobf repair: GridUtil.trace
+  dropped its `tbl3 = var1` back-edge — infinite loop). Semantic mock server
+  (place/upgrade/expand/skill validated through the game's OWN GridUtil
+  functions, inventory attr feedback). 57/57 ×4 deterministic.
+- Caught by the harness battery: (1) my AutoBuild originally filled the
+  Crystal's reserved end cell with a floor piece (crystal then unplaceable —
+  fixed with the needCrystal reservation); (2) 5 harness-side check bugs
+  (CopyBase wires polluting filters, pairs-order fixture flake, enemy placed
+  at a stale HRP position, TP-to-last-stand, phase-scoped start counts) —
+  all fixed on the harness side per §26.6 discipline.
+- DELIVERED Public f3fd1ac (repacked zip, originals MD5-verified, ls-remote
+  verified) + SavedFolder canonicals (BuildADungeon.lua, bad-analysis.md,
+  bad_harness.lua, bad_real_*.lua module extracts, bad_grid_raw.lua with the
+  trace repair).
+
+**Lanes**: BAD1-H independent harness open for any glmN (my bad_harness.lua
+57/57 is the reference baseline). LP1 still paused per user order.
