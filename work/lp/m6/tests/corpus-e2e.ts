@@ -52,8 +52,11 @@ interface RunResult {
 function runLuaMain(files: Record<string, string>, main: string): RunResult {
   const dir = mkdtempSync(join(tmpdir(), 'm6cor-'));
   try {
+    // glm6 2026-10-11 str-model fix: latin1 write — the source string is a
+    // byte-string (M4 contract, char-per-byte); a utf8 write would re-encode
+    // every high code unit into two bytes and mangle the oracle input.
     for (const [name, content] of Object.entries(files)) {
-      writeFileSync(join(dir, name), content, 'utf8');
+      writeFileSync(join(dir, name), content, 'latin1');
     }
     const res = spawnSync(LUA54, [main], { encoding: 'utf8', timeout: RUN_TIMEOUT_MS, cwd: dir });
     if (res.error) return { ok: false, out: '', err: String(res.error) };
@@ -119,7 +122,13 @@ let total = 0;
 for (const file of walk(root)) {
   total++;
   const rel = file.slice(root.length + 1);
-  const source = readFileSync(file, 'utf8');
+  // glm6 2026-10-11 str-model fix: latin1 read (M4 contract — src/index.ts
+  // header: "read files with buf.toString('latin1')"). The utf8 read decoded
+  // raw high bytes (em-dashes/emoji in game-UI text, 26/130 corpus files)
+  // into single code units > 0xFF, which the container's byte-string pack
+  // then truncated — the "container str encoding lossy" finding. Reading
+  // latin1 keeps every byte one code unit and the pipeline byte-exact.
+  const source = readFileSync(file).toString('latin1');
 
   let chunk;
   try {

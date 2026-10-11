@@ -167,6 +167,15 @@ Goto-free everywhere. Closure-strategy handlers return either nil
   (M4 analysis proves single-write-anywhere); conformant runtimes may
   trap on it. v1 containers carry zero kind-0 descriptors (M5 emits
   ref-only), so this is a forward pin, not a live path.
+- **kind-1 ('ref') upvalue SHARING (D-M6-14, 2026-10-11 fix)**: all
+  captures of the same parent register in a frame must observe ONE
+  cell (PUC findupval semantics) — sibling closures share state through
+  it, before AND after the frame returns (RETURN closes the shared cell
+  once for everyone). v1 runtimes created one cell per capture, so
+  siblings diverged at frame return (found via the standalone
+  obfuscate CLI demo; regression suite tests/upvalues.test.ts). A
+  CLOSEUP-closed register index is recyclable: the next capture of that
+  index opens a FRESH cell (scope-close register recycling).
 
 ## 8. Changes to this contract
 

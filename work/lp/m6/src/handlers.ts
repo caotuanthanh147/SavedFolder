@@ -175,10 +175,14 @@ for k = 1, #ds do
   local e = ds[k]
   local kd = e[1]
   if kd == 1 then
-    local cc = { 1, ${N.fr}, e[2] }
+    local cc = ${N.fr}.uv[e[2]]
+    if cc == nil or cc[1] ~= 1 then
+      cc = { 1, ${N.fr}, e[2] }
+      ${N.fr}.uv[e[2]] = cc
+      local ocx = ${N.fr}.oc
+      ocx[#ocx + 1] = cc
+    end
     ups[k] = cc
-    local ocx = ${N.fr}.oc
-    ocx[#ocx + 1] = cc
   elseif kd == 2 then
     ups[k] = ${N.rec}.u[e[2] + 1]
   else

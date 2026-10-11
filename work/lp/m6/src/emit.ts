@@ -618,7 +618,15 @@ export function emitRuntime(options: EmitOptions): EmitResult {
   );
   tail.push(junk(rng));
 
-  // upvalue cells {1, frame, reg} open / {0, value} closed
+  // upvalue cells {1, frame, reg} open / {0, value} closed.
+  // fr.uv = per-frame reg→cell cache (PUC findupval semantics,
+  // D-M6-14): the FIRST capture of a register creates the shared cell;
+  // every later capture of the same register in that frame REUSES it —
+  // sibling closures must observe one cell (writes through one are
+  // visible through the other, before and after the frame closes).
+  // CLOSEUP drops the cache entry when it closes the cell so a recycled
+  // register index (new local in a closed scope) opens a FRESH cell;
+  // the cc[1]~=1 guard in NEWCLOSURE covers a stale-closed hit defensively.
   tail.push(
     `local function ${N.CELLG}(c) if c[1] == 1 then return c[2].R[c[3] + 1] end return c[2] end\n` +
     `local function ${N.CELLS}(c, v) if c[1] == 1 then c[2].R[c[3] + 1] = v else c[2] = v end end\n` +
@@ -633,6 +641,7 @@ export function emitRuntime(options: EmitOptions): EmitResult {
     `\t\t\toc[w] = c\n` +
     `\t\telse\n` +
     `\t\t\t${N.CELLC}(c)\n` +
+    `\t\t\tfr.uv[c[3]] = nil\n` +
     `\t\tend\n` +
     `\tend\n` +
     `\tfor i = #oc, w + 1, -1 do oc[i] = nil end\n` +
@@ -681,7 +690,7 @@ export function emitRuntime(options: EmitOptions): EmitResult {
     `\t\t\tva.n = m\n` +
     `\t\tend\n` +
     `\tend\n` +
-    `\tlocal fr = { P = P, R = R, top = np, va = va, oc = {}, env = rec.env }\n` +
+    `\tlocal fr = { P = P, R = R, top = np, va = va, oc = {}, uv = {}, env = rec.env }\n` +
     `\tlocal pcb = { 1 }\n` +
     `\tlocal code = P.code\n` +
     `${padIn(loop, '\t')}\n` +

@@ -528,3 +528,28 @@ LESSON (sync.sh class): the dir argument is MANDATORY for every
 non-SavedFolder repo; 'cd' into the repo first is NOT sufficient.
 sync.sh's verify step can't catch this — it verifies the repo it
 was told (defaulted) to use.
+
+### Session 24 (2026-10-11) — M6 s3: CLI + demo + D-M6-14 + M5 finding #3
+
+Reset #4 recovery (token from worklog-archive grep → clones → deb
+lua5.4). User asked for a runnable obfuscated script → built the
+embedded one-artifact CLI + dual-path demo. TWO bugs surfaced by the
+first natural-style runnable guest (both invisible to the corpus
+model — deobf'd material restructures concat chains and dies at
+executor boundaries before UI-string code): (1) M6 upvalue cell
+sharing (MINE — fixed: fr.uv findupval cache + CLOSEUP invalidation,
+tests/upvalues.test.ts 4 regressions); (2) M5 compileCall arg-window
+misplacement (glm6's — filed with register-level trace + repros +
+proposed fix; demo works around via hoisted locals). Battery: vm
+117/117 + root 466/466 + compiler 83/83 + tsc ×3; demo differential
+BYTE-EQUAL × {embedded, chain, tree, watermarked}; determinism;
+luac; tamper legs; Luau-compat audit green. Public ac00967
+(ls-remote verified); canonical + TASKS s3 + status updated; glm6
+finding msg sent.
+
+LESSON (demo-as-oracle class): a RUNNABLE natural-style guest is a
+test class the corpus cannot replace — the corpus's own error-parity
+bucket is honest about what it can't see. The dual-path pattern
+(feature-detect the host, keep the whole deterministic body shared)
+makes ONE file serve as both in-game demo and lua5.4 differential
+fixture.

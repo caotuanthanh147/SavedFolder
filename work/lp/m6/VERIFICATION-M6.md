@@ -344,3 +344,98 @@ compiler: bun run typecheck  → clean (3 pre-existing errors in glm6's
 - Embedded-mode × sessionConstKey combination (not a deployment shape:
   embedding is per-version, session keys are per-session/b-mode; the
   mechanically-relevant combinations are covered).
+
+## 9. Session 23 addendum — standalone CLI + demo artifact + D-M6-14 fix (2026-10-11)
+
+User ask: "is the vm obfuscation done yet? if so obfuscate some script and
+then I'll run it in game." This session shipped the single-file
+(EMBEDDED) distribution path end-to-end and found one real M6 bug.
+
+### Shipped
+
+- `tools/obfuscate.ts` — standalone CLI: M4 parse → M5 compile+pack →
+  M6 embedded emit → self-executing artifact (`local entry =
+  (function() <runtime> end)()` + pcall entry call). `--seed`
+  (deterministic replay: vmSeed/opcodeSeed/constKey derived sha256
+  domain-separated + per-function pool nonces derived seed⊕source-hash
+  via the D-M5-24 poolNonces option — same (seed, source) rebuilds the
+  artifact byte-identically, never a nonce reuse across sources),
+  `--dispatch chain|tree|closure`, `--wm <hex16>` (watermarked pack).
+- `demo/lp1-demo.lua` — dual-path demo guest (Roblox executor visible
+  output: player/display name, workspace count, placeId, SetCore
+  notification, 3 task.wait ticks / plain-lua5.4 deterministic console
+  trace — same file runs under both, so the differential oracle works).
+- `demo/lp1-demo.obf.lua` — the delivered artifact (seed
+  `lp1-demo-001`, closure dispatch, 58,857 bytes).
+
+### Bug found → fixed → regression-covered (D-M6-14)
+
+- Symptom: `local inc, peek = mk()` siblings — `peek()` returned the
+  capture-time value (0), inc's writes invisible. Minimal repro
+  r11 (tests/upvalues.test.ts case 1).
+- Root cause: NEWCLOSURE created a fresh `{1, frame, reg}` cell PER
+  CAPTURE; the frame's RETURN closes every open cell (handlers.ts
+  RETURN handler), so each sibling snapshotted its own copy at return.
+  M5's descriptors were correct (both `{kind:'ref', reg:0}` — verified
+  via proto dump); the defect was purely in the runtime template.
+- Fix (D-M6-14): `fr.uv` reg→cell cache in NEWCLOSURE (first capture
+  creates + registers, later captures REUSE), CLOSEUP invalidates the
+  entry on close (register recycling), stale-closed defensive guard.
+  Files: src/handlers.ts (NEWCLOSURE), src/emit.ts (frame table +
+  CLOSEUP).
+- Regression suite `tests/upvalues.test.ts`: 4 tests (siblings × all
+  4 strategies × embedded AND containerless b-mode, scope-close
+  register recycling, open-frame writes, kd==2 cousin passthrough),
+  real M4 parser per case, real lua5.4 oracle. Pre-fix: 1 fail (the
+  sibling case). Post-fix: 4 pass.
+
+### Commands + outputs (2026-10-11, tree = 3c5328c + this change)
+
+- `bun test` (vm pkg): **117 pass, 0 fail** (113 prior + 4 new)
+- `bun test` (obfuscator root pkg): **466 pass, 0 fail**
+- `bun test` (compiler pkg): **83 pass, 0 fail**
+- `tsc --noEmit` ×3 (root, compiler, vm): clean
+- Demo differential (embedded artifact): `lua5.4 lp1-demo.lua` vs
+  `lua5.4 lp1-demo.obf.lua` — **BYTE-EQUAL** (oracle deterministic,
+  exit 0, all 27 output lines identical)
+- Strategy portfolio: demo source × dispatch chain / tree / closure —
+  **BYTE-EQUAL each**; watermarked pack (`--wm aabbccddeeff0011`) —
+  **BYTE-EQUAL**
+- Determinism: `--seed lp1-demo-001` × 2 builds — **byte-identical
+  artifacts** (poolNonces replay)
+- `luac5.4 -p lp1-demo.obf.lua` — clean
+- Tamper spot checks: blob ciphertext byte flip → exit 1, generic
+  `load failed`, zero stdout; wrong constKey in the wrapper → same
+  generic failure (§4 posture holds on the delivered artifact bytes)
+- Luau-compat audit of the artifact (grep, host-level): bit32 → bit →
+  pure-arithmetic fallback chain; `table.pack or` / `table.unpack or`
+  guarded; `math.tointeger` nil-guarded (D-M6-8); NO setfenv/getfenv/
+  loadstring/load; NO os.*; NO goto/backticks/compound-assign/`//`.
+  All host globals used exist in Roblox Luau executor environments.
+- Mini corpus (real game scripts through tests/corpus-e2e.ts):
+  lp1-demo.lua match; Snack.lua / Camera.lua / Potato.lua error-parity
+  class=call-nil (guest reaches its own executor-global boundary);
+  **0 MISMATCH**.
+
+### NOT-RUN (honest list)
+
+- Real Roblox executor run (the user runs the artifact in game — that
+  is the point of the delivery; no Roblox host exists in this sandbox).
+- Full 131-corpus re-run this session (corpus not present after the
+  sandbox reset; mini-corpus above + full suite battery instead).
+- Executor-side performance (D2 benchmarks unchanged, still pending
+  real executors).
+
+### M5 finding filed (NOT an M6 fix — glm6's module, msg sent)
+
+`compileCall` compiles FIXED args via `reserve(1)` (frontier) but emits
+`CALL A=base B=n+1` (window at base+1): any call compiled BELOW the
+live frontier misplaces its args. Reached through concat chains with
+2+ call operands (right-nested concat trees bypass the left-spine
+flattenConcat, placing call operands below the frontier). Repros
+r2/r7/r9/r12/r13 (minimal, deterministic); real-world pattern
+`"x=" .. tostring(a) .. "/" .. tostring(b)` common in hand-written UI
+code (Snack.lua L2299-2301); invisible to the 131-corpus (deobf'd
+material restructures concat chains; error-parity scripts die at
+executor boundaries before UI-string code). Demo works around it by
+hoisting calls to locals — artifact green; the compiler fix is glm6's.

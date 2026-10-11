@@ -172,3 +172,77 @@ logged: sync.sh REQUIRES the dir arg for non-default repos.
 executor benchmarks (mine, low priority).
 **Files**: work/lp/m6 canonical synced; Public 2f347b7;
 VERIFICATION-M6 §8; msgs/{glm6,main-agent}/.
+
+## Session 24 — 2026-10-11 — M6 s3: standalone CLI + in-game demo + D-M6-14 (Public ac00967)
+
+User: "is the vm obfuscation done yet? if so obfuscate some script and
+then I'll run it in game." Answer: YES (M4+M5+M6 all landed, corpus
+green) — so I built the one-artifact distribution path end-to-end.
+
+- **Sandbox FULLY RESET #4** at session start (SavedFolder + /tmp +
+~/.lua54 + ~/.git-credentials gone; my-project survived with the
+worklog + lua .deb files + TASK_SOURCE). Recovered in order: token
+grep from worklog-archive → /tmp/Public clone (tip 3c5328c = glm5's
+M14 pass 1) → SavedFolder clone → lua5.4.7 via dpkg-deb -x +
+~/.lua54/bin symlinks → vm suite smoke 9/9.
+- **tools/obfuscate.ts** (vm tree): single-file EMBEDDED CLI —
+  parse → compileProgram → pack → emitRuntime(container) →
+  `local entry = (function() <runtime> end)()` + pcall entry call.
+  --seed deterministic replay (seeds sha256-domain-separated +
+  per-function pool nonces via M5's D-M5-24 option, mixed with the
+  source hash: same (seed,source) → byte-identical artifact; seed
+  reuse across sources → distinct nonces, no AEAD reuse). --dispatch,
+  --wm (watermarked pack).
+- **demo/**: lp1-demo.lua dual-path guest (inRoblox branch: player/
+  display name, workspace children, placeId, SetCore notification,
+  3× task.wait ticks; else branch: identical deterministic console
+  trace under plain lua5.4 → differential oracle works on the same
+  file) + the DELIVERED ARTIFACT lp1-demo.obf.lua (58,857 bytes,
+  closure dispatch, reproducible seed) + DEMO.md (run instructions).
+- **D-M6-14 upvalue cell-sharing FIX** (found BY the demo — first
+  run diverged at `shared-upvalue peek=0`): NEWCLOSURE created a
+  fresh {1,frame,reg} cell PER CAPTURE; RETURN closes every open
+  cell → sibling captures of one register snapshot into divergent
+  boxes (peek stuck at capture-time value). M5 descriptors verified
+  correct first (proto dump: both {kind:'ref',reg:0}) — purely a
+  runtime-template defect. Fix: fr.uv reg→cell cache (PUC findupval
+  — first capture creates+registers, later REUSE), CLOSEUP
+  invalidates on close (register recycling after scope end), stale-
+  closed defensive guard. Regression suite tests/upvalues.test.ts:
+  4 tests, real M4 parser + real lua5.4 oracle, all 4 strategies,
+  embedded + containerless b-mode; pre-fix 1 fail → post-fix 4 pass.
+- **THIRD M5 FINDING** msg'd glm6 (their module, not fixed by me):
+  compileCall compiles FIXED args at reserve(1) frontier but CALL
+  reads the window at base+1 → any call compiled BELOW the live
+  frontier misplaces its args. Trigger: concat chains with 2+ call
+  operands (right-nested concat trees bypass the left-spine
+  flattenConcat → operand slots below frontier). Repros r2/r7/r13
+  (r7: g(2)'s arg written R7, CALL A=5 B=2 reads R6); real-world
+  pattern everywhere in hand-written UI strings (Snack L2299-2301);
+  invisible to the 131-corpus (deobf restructures concat chains +
+  game scripts die at executor boundaries before UI code — mini-
+  corpus Snack/Camera/Potato all error-parity call-nil, 0 MISMATCH).
+  Proposed fix: compile args INTO argStart+i window slots + sweep
+  the SELF path (same class) + consider flattening right-nested
+  concat trees (parity-shape). My demo works around it (hoisted
+  locals) — artifact green.
+- **Gates**: vm 117/117 (113+4 new) + root 466/466 + compiler 83/83
+  + tsc ×3 clean; demo differential BYTE-EQUAL (embedded artifact vs
+  oracle; also chain/tree dispatch + watermarked pack); determinism
+  byte-identical; luac5.4 -p; tamper legs (ciphertext byte flip /
+  wrong constKey) → generic 'load failed', zero stdout; Luau-compat
+  audit of the artifact: bit32→bit→arithmetic fallback chain,
+  guarded table.pack/unpack, nil-guarded math.tointeger, NO
+  setfenv/getfenv/loadstring/load, NO os.*, 5.1-syntax-clean →
+  runs in mainstream Roblox executors.
+- **Delivered**: Public ac00967 (ls-remote verified). Canonical
+  work/lp/m6 synced (incl. glm6's corpus-e2e L122/L56 latin1 fix that
+  postdated my copy). msgs/glm6 finding sent. TASKS M6 row s3.
+
+**Stuck on**: nothing. Open: M5 compileCall arg-window fix (glm6
+lane — third finding), M1 const_key wire field (CCP-M6/CCP-1,
+main-agent), D2 executor benchmarks (mine, needs real executors —
+the demo artifact in a real game doubles as a D2 probe).
+**Files**: work/lp/m6; Public ac00967; VERIFICATION-M6 §9;
+DECISIONS-M6 D-M6-14; RUNTIME-M6 §7 kind-1 sharing pin;
+tests/upvalues.test.ts; tools/obfuscate.ts; demo/.
