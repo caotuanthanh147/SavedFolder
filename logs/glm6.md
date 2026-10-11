@@ -73,3 +73,47 @@
 - DELIVERED Public c26c157 (ls-remote verified). TASKS row → done,
   status + this log + msgs (glm1: M6 unblock + container answer; glm3:
   AST interface consumed + delivery).
+
+## Session 4 — 2026-10-11 (IR review round + CCP-M7 ruling, Public e4b44ee)
+
+- Cold start after sandbox reset: repos re-cloned, token re-wired from the
+  local sandbox worklog (grep-verified, never echoed), bootstrap.sh glm6
+  (portable Lua 5.4.7 restored — the earlier 65 test failures were ONLY
+  the missing oracle binary, not regressions; merged tree 314/314 after).
+- Mandatory reading done in order: PROMPT.md, ONBOARDING.md, TASKS.md
+  (253 lines), Public/doc.md head-to-toe (1036 lines, v4), lessons.md,
+  status/*.md, my inbox (3 msgs).
+- **IR.md v0 review (glm3's request, blocking their s5)**: cross-checked
+  the draft against BYTECODE-M5.md + my actual emission code
+  (UpvalDesc/resolveNameForChild/CLOSEUPVALS loop-close). Found the §2.1
+  proof-scope hole ("anywhere ELSE that could assign it" misses the
+  val-eligible closure's own SETUPVAL) + the loop back-edge trap for
+  `assigned-before-capture-only`. Verified BOTH counterexamples on real
+  Lua 5.4 before writing them into the doc (§22.1 discipline). Amended
+  IR.md in place (sanctioned by D-M4-2 single-writer flow) → v1 REVIEWED
+  with pins C1-C5 + Q1/Q2/Q4 answers (Q1 premise correction: M13/api-pack
+  needs a compiler-output PackParts projection, not analysis JSON).
+- **CCP-M7 ruling (M5 owner's Tier-3 answer to main-agent)**: ACCEPT;
+  carriers 1+2 v1 via packWatermarked (pool order permutation w/
+  consistent K reindexing + junk unreferenced pool entries), carrier 3
+  deferred to v2 (needs M4 const-use facts — converges with IR.md's
+  ConstEntry), integrity = hash over final session bytes (no exclusion
+  regions / dual verification), delivery = api-side pack option A (B
+  rejected as primary: enumerable watermark space), no format version
+  bump (v1 runtimes consume watermarked containers transparently).
+  Ruling: obfuscator/compiler/CCP-M7-RULING.md; D-M5-20; glm1 M6
+  integrity confirm requested (non-blocking).
+- BYTECODE-M5.md additive notes: §5 kind-0 (val) runtime semantics
+  (immutable plain value frozen at NEWCLOSURE; SETUPVAL impossible-by-
+  construction; runtimes may trap) + §10 %* conformance requirement
+  (glm1's M6 finding — his wrapped guest env is now documented as
+  REQUIRED, with the honest note that my TS reference masks host-side
+  %* rejection).
+- VERIFICATION-M5.md §7 addendum: commands+outputs for every claim this
+  session (314/314; lua5.4 counterexample run; NOT-RUN list — no
+  packWatermarked implementation, no CPU benchmark yet).
+- Bookkeeping: TASKS.md LP1-M5 follow-up note; msgs to glm3 (s5
+  unblocked + amendment summary), main-agent (CCP-M7 ruling + M1 impact),
+  glm1 (integrity confirm ask + %* note landed); inbox cleared (3 msgs,
+  .gitkeep preserved); status + this log; Public push e4b44ee
+  ls-remote-verified; SavedFolder sync.sh.
