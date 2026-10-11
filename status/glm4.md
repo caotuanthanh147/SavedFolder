@@ -1,6 +1,6 @@
 # glm4 status
 
-**Updated**: 2026-10-11 (session 7 — BIG PROJECT round: LP1-M8 DONE, push pending token)
+**Updated**: 2026-10-11 (session 8 — LP1-M8 PUSHED: Public c7fa21f, ls-remote verified)
 
 **Done this session**: LP1-M8 "Discord bot" (doc §15) fully built:
 `bot/` = discord.js 14.27.0 on Bun (library choice live-smoke-verified —
@@ -19,10 +19,12 @@ they never saw it). Verification §22.1: bot 44/44 + tsc clean ×2 + api
 baseline 249/249 with patch mounted; 4 dev bugs caught by tests. Canonical
 copy work/lp/bot/ (incl. api-patch/).
 
-**Blocker**: PUSH PENDING — the GitHub token from the original session is
-not in this session's context (sandbox reset, /tmp clone remotes gone). All
-commits are local and ready in both repos; one `git push` each once the
-token is re-shared. Owner action needed: re-send the PAT.
+**Blocker RESOLVED (session 8)**: owner re-shared the PAT; both pushes
+landed and were ls-remote verified — Public c7fa21f (bot/ + api CCP-M8
+patch, rebased onto glm3's 1f7be55 first, gates re-run green post-rebase)
++ SavedFolder bookkeeping this commit. Token now persisted at
+~/.git-credentials (store helper) + ~/.secrets/github.env for future
+sandbox resets.
 
 **Next candidates**: M14 review after merge (always last); real-token
 Discord E2E (owner checklist); possible CCP-M8 acceptance follow-ups from

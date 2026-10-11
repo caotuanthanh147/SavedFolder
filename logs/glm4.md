@@ -195,3 +195,55 @@
   Fleet moved during the build: glm1 delivered M3 (ed8d843), glm6 claimed
   M5 — interop checked: M3 handshake.lua is a module factory; assembled
   init needs the entry wrapper per my msg.
+
+
+## Sessions 6–8 — 2026-10-10..11: BIG PROJECT LP1-M8 (Discord bot) — built, delivered, PUSHED
+
+- Session 6: claimed LP1-M8 in TASKS.md (pushed BEFORE work per protocol);
+  deps mapped — M1 admin API live incl. CCP-2 read endpoints; gaps → Tier-3
+  CCPs (keys/link, key detail, blacklist remove, leak lookup M7-dependent).
+- Session 7: full build. RESEARCH-M8 first (12 opened sources; live
+  discord.js-14.27-on-Bun smoke test — Bun 1.3.14 runs the lib, no
+  ws-adapter shims needed) → DECISIONS-M8 (16 rows) → code. bot/ =
+  discord.js on Bun, doc §15 full surface: 6 user cmds (all ephemeral,
+  /resethwid ownership-gated BEFORE the privileged call) + 5 admin cmds
+  (/key create|revoke|extend|info, /blacklist add, /whitelist, /stats over
+  glm3's real /admin/metrics + /admin/alerts, /leak lookup over M7),
+  defer-then-edit everywhere (3s deadline), AdminApi client normalizing
+  BOTH api error shapes, RoleSync (grant-on-redeem + guildMemberAdd +
+  hourly reconcile on real key rows — status AND expiry truth), scheduler
+  expiry reminders channel-posted only (Developer Policy §5, never DM).
+  **CCP-M8 filed to main-agent: P1 POST /admin/keys/link (plaintext-hash
+  lookup via the api's own hashKey path — check_key was unusable, it
+  consumes the HWID bind; discord-blacklist gate; 409 on foreign re-link),
+  P2 GET /admin/keys/:id, P3 POST /admin/blacklist/:id/remove, P4 REAL BUG
+  FOUND+FIXED — api Workers entry passed url.pathname only, so every
+  filtered admin GET was unfiltered over real HTTP (in-process tests embed
+  the query directly and never saw it; the bot is the first real HTTP
+  client). One-line tagged fix: path: url.pathname + url.search.**
+  Gates: bot 44/44 + tsc clean ×2; api baseline 249/249 with the patch
+  mounted; 4 dev bugs caught by tests (envelope error shape,
+  per-subcommand ephemeral, P4 itself, test-side 2^53 snowflake collision).
+  Session ended with everything local and BOTH pushes blocked: sandbox
+  reset ate the PAT — status file recorded the blocker honestly.
+- Session 8 (this one): owner re-shared the PAT → saved to
+  ~/.git-credentials (store helper) + ~/.secrets/github.env (survives
+  resets via the secrets path). Rebased session-7 commits onto the fleet's
+  overnight work (glm3's M4 s7 1f7be55 + glm6's M5 addendum 008320a —
+  obfuscator-only, no overlap with bot/api; both rebases clean). Gates
+  re-run green post-rebase (§22.1 discipline): bot 44/44 + tsc clean, api
+  249/249 with patch. **Pushed Public c7fa21f via sync.sh (ls-remote
+  verified == local HEAD)** — M8 delivery LIVE on origin. SavedFolder
+  bookkeeping this commit: TASKS row → done(Public c7fa21f), stale
+  "push pending" text corrected in never-sent msgs, status blocker
+  resolved, changelog + this log appended.
+- Inbox state: glm1's assembly-init note (M13 consumer info — no action),
+  glm3's M12 delivery (replied via the m8-stats msg: /stats consumes the
+  real frozen shapes, zero drift), main-agent's M10 endpoints note
+  (/mykeys + /stats already use /admin/users + payments surfaces). CCP-M8
+  ruling from main-agent still PENDING — api patch is additive + tagged
+  `// CCP-M8` + revertible; if the ruling changes the shapes, bot's
+  AdminApi client + tests are the swap surface.
+- NOT-RUN honest list (owner checklist, needs a real bot token): gateway
+  login, live command registration, real guild role ops, real channel
+  posts.

@@ -38,8 +38,9 @@ clearly tagged `// CCP-M8`; api baseline stays 249/249 with them mounted.
   green). VERIFICATION-M8.md §22.1 transcript attached to the commit.
 - NOT-RUN honest list: real gateway/login, live command registration, real
   guild role ops (need the owner's bot token — real-environment checklist).
-- Local commit ready in Public; **push pending — this session lost the PAT**
-  (sandbox reset). Nothing landed on origin yet.
+- **Pushed: Public c7fa21f (2026-10-11, ls-remote verified)** — the owner
+  re-shared the PAT; rebased onto glm3's 1f7be55 first, gates re-run green
+  post-rebase (bot 44/44 + tsc, api 249/249 with patch).
 
 If you'd rather implement P1–P3 differently, the bot degrades honestly: my
 tests + AdminApi client are the contract, swap the handler internals freely.
