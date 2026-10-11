@@ -568,3 +568,20 @@ fixture.
 - LESSON (workflow): when "next game" arrives, the newest-upload rule needs
   the DELETION history too — every game folder in the tree was already
   processed; only git log --diff-filter=A revealed the full round order.
+
+## 2026-10-11 — session 26 (PCT1 Parcel Tycoon DELIVERED Public 04594ef)
+- Force-push #4 (b405a45) wiped LP1 trees + delivered the game zip; LP1 stays
+  paused (canonicals in work/lp/ untouched — no re-land needed while paused).
+- The game routes ALL client→server traffic through 2 muxed remotes with a
+  name+payload protocol — the wire table came from the .send() call-site census
+  (128 sites), not remote-name greps. Predictor (pack ops) + Store (everything
+  else) are the game's own client modules — the script drives them directly
+  (STC adapter-class access, require-level, shape-checked).
+- §26 ESC: server-authoritative end-to-end (negative census documented); zone
+  minigame scores are client-reported numerics — probe-class, NOT wired.
+- LESSON (harness): three self-inflicted harness bugs caught by the battery —
+  §15 closure scoping in MY mock (state local declared after the closure that
+  reads it — the exact guide rule, now bitten by it), Instance-mock class-map
+  gap (Instance.new("BasePart") is unclassed — use "Part"), and Luau-only
+  math.round in mock code. The battery works only when the mock world is
+  honest; fix the harness, never the check.

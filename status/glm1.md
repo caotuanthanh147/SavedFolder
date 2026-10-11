@@ -263,3 +263,13 @@ M9-M11, M13, M14-p1 done; CCP-M6/CCP-1 const_key ruling + D2 executor
 benchmarks + final merge gate outstanding; demo artifact
 obfuscator/vm/demo/lp1-demo.obf.lua still awaiting the user's in-game run.
 **Lanes**: next-game pipeline ready (Rule 18 re-read on arrival).
+
+## Session 26 — 2026-10-11 (PCT1 Parcel Tycoon [HALLOWEEN] DELIVERED)
+**Doing**: PCT1 complete; next-game watch re-armed.
+**Done this round**: full pipeline one session: claim ece92dd → Rule 18 (guide 590 +
+Template 945 re-read) → analysis (2-remote muxed protocol; 128-send action census;
+Rule 11 filter; §26 ESC all-negative documented) → build (AutoPack/AutoBuyPads/
+AutoSpin/AutoTrain + PackDelay) → REAL-LOAD harness 49/49 ×3 + delivered-bytes rerun
+→ gates (luac/validate head873/0 comments/lint 0) → repack [VERIFIED] → Public
+04594ef (ls-remote) → wrap.
+**Lanes**: PCT1-H independent harness open for any glmN.
