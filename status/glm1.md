@@ -130,3 +130,37 @@ counts.
 function-stat fix then corpus re-run (glm6 lane), D2 executor runs.
 **Files**: work/lp/{m6,loader,tests,assembly} canonical; Public d52e29a
 + ff32b86; msgs to glm6/main-agent/glm4.
+
+## 2026-10-11 — session 22: M6 s2 — CCP-M7 v1 runtime-side integration + corpus class gate + str-encoding finding
+
+**Doing**: user "continue" (trigger ⑩+⑪ steady-state; board re-read:
+all 13 modules claimed/done — M8 landed by glm4 mid-session, M12 by
+glm3). My lanes only → M6 verification depth.
+**Done this round**: (1) glm6's D-M5-26 AAD sync to my emit.ts
+owner-ACCEPTED (semantically verified vs container.ts, adopted into
+canonical; their 2 msgs read + answered). (2) Corpus re-run after
+glm6's function-stat fix: compile-reject 125→0; NEW error-CLASS gate
+baked into corpus-e2e.ts (one-off scan: 71/71 class match, 0
+divergences; 56 oracle-parse files reach guest boundaries) — 127
+error-parity, 0 MISMATCH, exit 0. (3) tests/watermark-e2e.test.ts 28
+tests: watermarked containers through M6 LUA runtime — embedded
+per-version + containerless sessionConstKey (D-M5-27) ×10 fixtures ×4
+strategies == oracle; two-session rotation on ONE fixed runtime;
+cross-key denial; extractor lockstep; tamper posture. (4) corpus-e2e
+--wm mode (packWatermarked + extraction per file) → **SECOND M5
+FINDING**: container str encoding LOSSY >0xFF (Latin-1 truncation —
+pack charCodeAt&0xff; minimal repro em-dash oracle '—' vs protected
+'\u0014'; 26/130 files / 234 consts; surfaces as extractWatermark
+carrier1Ok=false — in-memory vs round-tripped divergence; junk
+carrier must stay byte-exact in the fix). --wm EXPECTED-RED until
+glm6 fixes. (5) 4 trivial tsc fixes in glm6's compiler pkg (their
+tsc×2 covered root+vm only; glm4's sweep had flagged too). Suites:
+vm 112/112 + root 446/446 + compiler 78/78 + tsc ×3 clean.
+DELIVERED Public 2f347b7 (fetch+rebase absorbed glm4's parallel M8
+pushes). Msgs: glm6 (finding + AAD accept + tsc), main-agent (M7
+carriers runtime-proven + const_key chain note).
+**Stuck on**: nothing. Open: M5 str-encoding fix (glm6 lane, my
+--wm gate guards), M1 const_key wire field (main-agent CCP-1), D2
+executor benchmarks (mine, low priority).
+**Files**: work/lp/m6 canonical synced; Public 2f347b7;
+VERIFICATION-M6 §8; msgs/{glm6,main-agent}/.

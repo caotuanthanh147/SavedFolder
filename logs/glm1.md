@@ -457,3 +457,53 @@ Pipeline state: full §8 6-10 chain now exists end-to-end in-repo:
 stub payload shape → checks → handshake (s-salt + const_key modeled) →
 containerless runtime. Awaiting M1's const_key field for production
 wiring (tracked, mocked both sides).
+
+---
+## Session 22 — 2026-10-11: M6 s2 (CCP-M7 v1 runtime-side + corpus class gate + str-encoding finding)
+
+Public 2f347b7. Read board: all 13 modules claimed; glm6's 2 inbox msgs
+(AAD sync heads-up + corpus-fix reply). vm 84/84 sanity on synced tree.
+
+1. AAD sync owner-review: emit.ts diff semantically verified vs
+   container.ts (i0/aadh/aads construction), ACCEPTED, adopted canonical.
+2. Corpus re-run: 131-corpus re-extracted from git 4e974c3 (1 zip.bak →
+   130 .lua). compile-reject 125→0 (glm6 fix works). Zero oracle-runnable
+   files (scan: all 130 fail under plain lua5.4) → match:0 honest.
+   error-parity 127. NEW: errClass() classifier + CLASS gate in
+   corpus-e2e.ts (oracle exec-error class must equal protected class);
+   one-off full scan first: 70 call-nil==call-nil + 1 index-nil==index-nil
+   = 71/71, 0 diffs; 56 oracle-parse (Luau-only syntax) → prot reaches
+   guest call-nil(51)/index-nil(5). Gate run: 0 MISMATCH, exit 0.
+3. watermark-e2e.test.ts (28): both modes ×10 fixtures ×4 strategies ==
+   oracle (per-version embedded; containerless sessionConstKey — v1.1
+   self-consistency accepts session-hashed containers, no decoy);
+   two-session rotation one runtime; cross-key denied; extractor
+   lockstep (version throws / session recovers / canonical null); tamper
+   (pool-blob flip, hash-field flip, carrier-region) never oracle.
+   First run 28/28.
+4. corpus-e2e --wm: 26/130 MISMATCH — all extractWatermark carrier1Ok=
+   false, wmMatch=true. Debug chain: proto census (children=indices
+   flat, not nested — script bug #1), rebuild-compare via
+   packWatermarked(recovered) showed 0 diffs (both sides round-tripped)
+   → hypothesis: representation divergence in-memory vs round-trip →
+   plain-pack canon-vs-loaded compare: em-dash U+2014 → '\u0014'
+   (0x2014&0xff). CONFIRMED: pack writes charCodeAt(i)&0xff per code
+   unit (container.ts ~L526), unpack fromCharCode byte (L419) — Latin-1
+   lossless only ≤0xFF. Census: 26/130 files, 234 consts (CoS 119).
+   Minimal repro print("em-dash:—end") oracle vs protected MISMATCH.
+   Finding msg'd glm6 (fix = their BYTECODE-M5 normative change; junk
+   carrier must stay byte-exact). --wm gate stays EXPECTED-RED.
+5. tsc: 4 pre-existing compiler-pkg errors (glm6 tsc×2 = root+vm only;
+   glm4 sweep also flagged) — fixed trivial (unused Insn/pack/x +
+   JSON kind annotation). All 3 packages tsc clean.
+6. VERIFICATION-M6 §8 (8.1-8.6). Battery: vm 112/112, root 446/446,
+   compiler 78/78, tsc ×3, corpus plain exit 0 / wm exit 1 expected.
+7. Deliver 2f347b7 via sync.sh (rebase absorbed glm4's M8 pushes);
+   TASKS M6 row + status + this log; msgs glm6 + main-agent.
+
+Lessons: (a) the extractor's carrier-1 cross-check is an accidental
+Unicode canary — cross-implementation compare surfaces representation
+bugs single-path testing can't; (b) corpus material without runnable
+oracles needs class-level gates to be meaningful; (c) when both sides
+of a debug compare round-trip identically, the divergence is in the
+representation, not the data.
