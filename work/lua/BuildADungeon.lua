@@ -678,6 +678,7 @@ local Window = Library:CreateWindow({
 AddInfo(Window)
 local Tabs = {
         Main = Window:AddTab("Main"),
+    Build = Window:AddTab("Build"),
     Player = Window:AddTab("Player"),
     Config = Window:AddTab("Config"),
 }
@@ -699,6 +700,8 @@ local TB_Tabs = {
         T1 = TB.Main.Right.Autofarm:AddTab("Config"),
     },
 }
+local A1 = Tabs.Build:AddLeftGroupbox("Build")
+local A2 = Tabs.Build:AddRightGroupbox("Material")
 local GB = {
     Player = {
         Left = {
@@ -871,16 +874,15 @@ Toggles.AntiAFK:OnChanged(function(state)
     end
 end)
 if Toggles.AntiAFK.Value then RunAntiAFK() end
-local BADFolder = GetObject(RS, "BAD")
-local Config = GetSafeModule(BADFolder, "Config")
-local GridUtil = GetSafeModule(BADFolder, "GridUtil")
-local RemotesFolder = GetObject(BADFolder, "Remotes")
-Remotes.Action = RemotesFolder and RemotesFolder:FindFirstChild("Action") or nil
-Remotes.Build = RemotesFolder and RemotesFolder:FindFirstChild("Build") or nil
-Remotes.RollControls = RemotesFolder and RemotesFolder:FindFirstChild("RollControls") or nil
-Remotes.LabQ = RemotesFolder and RemotesFolder:FindFirstChild("LabQ") or nil
+local BADFolder = RS:FindFirstChild("BAD") or RS:WaitForChild("BAD", 15)
+local Config = BADFolder and GetSafeModule(BADFolder, "Config")
+local GridUtil = BADFolder and GetSafeModule(BADFolder, "GridUtil")
+local RemotesFolder = BADFolder and (BADFolder:FindFirstChild("Remotes") or BADFolder:WaitForChild("Remotes", 15))
+Remotes.Action = RemotesFolder and RemotesFolder:FindFirstChild("Action")
+Remotes.Build = RemotesFolder and RemotesFolder:FindFirstChild("Build")
+Remotes.RollControls = RemotesFolder and RemotesFolder:FindFirstChild("RollControls")
+Remotes.LabQ = RemotesFolder and RemotesFolder:FindFirstChild("LabQ")
 Shared.RollActive = { Buildings = false, Monsters = false }
-Shared.Memo = { Place = {}, Upgrade = {} }
 
 local function PlotFolder(index)
     local plots = index and workspace:FindFirstChild("Plots") or nil
@@ -911,6 +913,175 @@ local function CountOf(id)
     end
     local ok, bag = pcall(HttpService.JSONDecode, HttpService, raw)
     return ok and type(bag) == "table" and bag[id] or 0
+end
+
+local BuildsFolder = "Yuri/BuildADungeon/Builds"
+local MatLabel = nil
+local BuildSources = {}
+
+local function PlotList()
+    local list = {}
+    local plots = workspace:FindFirstChild("Plots")
+    if plots then
+        for _, model in ipairs(plots:GetChildren()) do
+            local idx = model:GetAttribute("PlotIndex")
+            if idx then
+                local data = PlotData(idx)
+                if data and data.owner and data.owner ~= 0 then
+                    list[#list + 1] = { index = idx, name = data.name or ("Plot" .. idx), mine = data.owner == Plr.UserId }
+                end
+            end
+        end
+    end
+    table.sort(list, function(a, b)
+        if a.mine ~= b.mine then return a.mine end
+        return a.name < b.name
+    end)
+    return list
+end
+
+local function BlocksOfData(data)
+    local blocks = {}
+    for f = 1, #data.floors do
+        local floor = data.floors[f]
+        for k, id in pairs(floor.tiles or {}) do
+            local c, r = GridUtil.unkey(k)
+            blocks[#blocks + 1] = { id = id, f = f, c = c, r = r, rot = floor.trot and floor.trot[k] or 0 }
+        end
+    end
+    for f = 1, #data.floors do
+        local floor = data.floors[f]
+        for k, obj in pairs(floor.objs or {}) do
+            local c, r = GridUtil.unkey(k)
+            blocks[#blocks + 1] = { id = obj.id, f = f, c = c, r = r, rot = obj.rot or 0 }
+        end
+    end
+    return blocks
+end
+
+local function ListBuildFiles()
+    local files = {}
+    if not Support.FileIO then return files end
+    pcall(function()
+        if not isfolder(BuildsFolder) then return end
+        for _, name in ipairs(listfiles(BuildsFolder)) do
+            if name:sub(-5) == ".json" then
+                local short = name:match("([^/\\]+)%.json$")
+                if short then files[#files + 1] = short end
+            end
+        end
+    end)
+    table.sort(files)
+    return files
+end
+
+local function SaveBuildFile(name, blocks)
+    if not name or name == "" then
+        Library:Notify("Enter a file name first.", 3)
+        return false
+    end
+    if not Support.FileIO then
+        Library:Notify("File IO not supported by executor.", 4)
+        return false
+    end
+    if not blocks or #blocks == 0 then
+        Library:Notify("No placed items to save.", 4)
+        return false
+    end
+    local ok, json = pcall(function() return HttpService:JSONEncode({ version = 1, count = #blocks, blocks = blocks }) end)
+    if not ok or not json then
+        Library:Notify("Failed to encode build data.", 4)
+        return false
+    end
+    local path = BuildsFolder .. "/" .. name .. ".json"
+    pcall(function()
+        if makefolder then pcall(makefolder, BuildsFolder) end
+        writefile(path, json)
+    end)
+    Library:Notify("Build saved: " .. name, 4)
+    return true
+end
+
+local function DecodeBuildJSON(json)
+    if not json or json == "" then return nil end
+    local ok, data = pcall(function() return HttpService:JSONDecode(json) end)
+    if ok and type(data) == "table" and type(data.blocks) == "table" then return data end
+    return nil
+end
+
+local function ReadBuildFile(name)
+    if not Support.FileIO or not name or name == "" then return nil end
+    local path = BuildsFolder .. "/" .. name .. ".json"
+    if not isfile(path) then return nil end
+    local ok, json = pcall(readfile, path)
+    if not ok or type(json) ~= "string" then return nil end
+    return DecodeBuildJSON(json)
+end
+
+local function RefreshBuildSources()
+    if not Options.BuildSourceDropdown then return end
+    local values = {}
+    BuildSources = {}
+    for _, entry in ipairs(PlotList()) do
+        local label = (entry.mine and "[My Plot] " or "[Plot] ") .. entry.name
+        values[#values + 1] = label
+        BuildSources[label] = { kind = "Plot", index = entry.index }
+    end
+    for _, fname in ipairs(ListBuildFiles()) do
+        local label = "[File] " .. fname
+        values[#values + 1] = label
+        BuildSources[label] = { kind = "File", name = fname }
+    end
+    Options.BuildSourceDropdown:SetValues(values)
+end
+
+local function LoadSelectedBuildSource()
+    local sel = Options.BuildSourceDropdown and Options.BuildSourceDropdown.Value
+    if not sel or sel == "" then return nil end
+    local entry = BuildSources[sel]
+    if not entry then return nil end
+    if entry.kind == "Plot" then
+        local data = PlotData(entry.index)
+        if not data then return nil end
+        local blocks = BlocksOfData(data)
+        if #blocks == 0 then return nil end
+        return { version = 1, count = #blocks, blocks = blocks }
+    end
+    return ReadBuildFile(entry.name)
+end
+
+local function MaterialDisplay(data)
+    if not data or type(data.blocks) ~= "table" then return "No build selected." end
+    local reqs = {}
+    for i = 1, #data.blocks do
+        local b = data.blocks[i]
+        if b.id then reqs[b.id] = (reqs[b.id] or 0) + 1 end
+    end
+    local owned = {}
+    local own = PlotData(Plr:GetAttribute("PlotIndex"))
+    if own then
+        for f = 1, #own.floors do
+            local floor = own.floors[f]
+            for _, id in pairs(floor.tiles or {}) do owned[id] = (owned[id] or 0) + 1 end
+            for _, obj in pairs(floor.objs or {}) do owned[obj.id] = (owned[obj.id] or 0) + 1 end
+        end
+    end
+    local parts = {}
+    for id, need in pairs(reqs) do
+        local have = (owned[id] or 0) + CountOf(id)
+        if have < need then
+            local def = Config and Config.Items[id] or nil
+            parts[#parts + 1] = (def and def.name or id) .. " (x" .. (need - have) .. ")"
+        end
+    end
+    table.sort(parts)
+    if #parts == 0 then return "Ready (" .. #data.blocks .. " items)" end
+    return "Missing: " .. table.concat(parts, ", ")
+end
+
+local function UpdateMaterialLabel()
+    if MatLabel == nil then return end
+    MatLabel:SetText(MaterialDisplay(LoadSelectedBuildSource()))
 end
 
 local function Func_AutoWave()
@@ -967,6 +1138,7 @@ local function Func_AutoRoll()
 end
 
 local function Func_AutoBuild()
+    local attempted = {}
     while Toggles.AutoBuild.Value do
         local ok, err = pcall(function()
             if not (Remotes.Build and Config and GridUtil) then
@@ -1012,7 +1184,7 @@ local function Func_AutoBuild()
             for _, cell in ipairs(cells) do
                 if not (needCrystal and cell == cells[#cells]) then
                 local k = GridUtil.key(cell.c, cell.r)
-                if not floor.tiles[k] and not Shared.Memo.Place["1:" .. k] then
+                if not floor.tiles[k] and not attempted["1:" .. k] then
                     local prefs = cell.turn and { "Crossroads", "CorridorT", "CorridorEnd", "WoodFloor" } or { "YellowCorridor", "CorridorEnd", "Crossroads", "CorridorT", "WoodFloor" }
                     local pick = nil
                     for _, id in ipairs(prefs) do
@@ -1032,7 +1204,7 @@ local function Func_AutoBuild()
                     if pick then
                         local res = Remotes.Build:InvokeServer({ action = "place", id = pick, f = 1, c = cell.c, r = cell.r, rot = pick == "YellowCorridor" and 1 or 0 })
                         if res and res.ok == false then
-                            Shared.Memo.Place["1:" .. k] = true
+                            attempted["1:" .. k] = true
                         end
                         return
                     end
@@ -1056,14 +1228,14 @@ local function Func_AutoBuild()
             end
             for _, cell in ipairs(cells) do
                 local k = GridUtil.key(cell.c, cell.r)
-                if floor.tiles[k] and not floor.objs[k] and not Shared.Memo.Place["1:" .. k] then
+                if floor.tiles[k] and not floor.objs[k] and not attempted["1:" .. k] then
                     for id, def in pairs(Config.Items) do
                         if def.kind == "trap" and CountOf(id) > 0 then
                             local fits = GridUtil.canPlaceObject(floor, def, cell.c, cell.r, 0)
                             if fits then
                                 local res = Remotes.Build:InvokeServer({ action = "place", id = id, f = 1, c = cell.c, r = cell.r, rot = 0 })
                                 if res and res.ok == false then
-                                    Shared.Memo.Place["1:" .. k] = true
+                                    attempted["1:" .. k] = true
                                 end
                                 return
                             end
@@ -1076,7 +1248,7 @@ local function Func_AutoBuild()
             if pop < maxPop then
                 for _, cell in ipairs(cells) do
                     local k = GridUtil.key(cell.c, cell.r)
-                    if floor.tiles[k] and not floor.objs[k] and not Shared.Memo.Place["1:" .. k] then
+                    if floor.tiles[k] and not floor.objs[k] and not attempted["1:" .. k] then
                         local best, bestDef, bestPow = nil, nil, -1
                         for id, def in pairs(Config.Items) do
                             if def.kind == "monster" and CountOf(id) > 0 then
@@ -1089,7 +1261,7 @@ local function Func_AutoBuild()
                         if best and GridUtil.canPlaceObject(floor, bestDef, cell.c, cell.r, 0) then
                             local res = Remotes.Build:InvokeServer({ action = "place", id = best, f = 1, c = cell.c, r = cell.r, rot = 0 })
                             if res and res.ok == false then
-                                Shared.Memo.Place["1:" .. k] = true
+                                attempted["1:" .. k] = true
                             end
                             return
                         end
@@ -1102,22 +1274,23 @@ local function Func_AutoBuild()
     end
 end
 
-local function Func_CopyBase()
-    while Toggles.CopyBase.Value do
+local function Func_LoadBuild()
+    while Toggles.LoadBuild.Value do
         local ok, err = pcall(function()
             if not (Remotes.Build and Config and GridUtil) then
                 return
             end
-            local srcIndex = tonumber(string.match(Options.CopyFrom.Value or "", "%(Plot(%d+)%)"))
-            if not srcIndex then
+            local src = LoadSelectedBuildSource()
+            if not src then
+                Library:Notify("Select a build source first.", 3)
                 return
             end
-            local src = PlotData(srcIndex)
-            local own = PlotData(Plr:GetAttribute("PlotIndex"))
-            if not (src and own and own.floors[1]) then
+            local index = Plr:GetAttribute("PlotIndex")
+            local own = PlotData(index)
+            if not (own and own.floors[1]) then
                 return
             end
-            local folder = PlotFolder(Plr:GetAttribute("PlotIndex"))
+            local folder = PlotFolder(index)
             local char = GetCharacter()
             if folder and char then
                 local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -1126,48 +1299,59 @@ local function Func_CopyBase()
                     TPTo(folder)
                 end
             end
-            for f = 1, math.min(#src.floors, #own.floors) do
-                local sf, of = src.floors[f], own.floors[f]
-                for k, id in pairs(sf.tiles) do
-                    if not of.tiles[k] then
-                        local def = Config.Items[id]
-                        if def and def.kind ~= "special" and CountOf(id) > 0 and not Shared.Memo.Place[f .. ":" .. k] then
-                            local c, r = GridUtil.unkey(k)
-                            if GridUtil.inBounds(of, c, r) then
-                                local res = Remotes.Build:InvokeServer({ action = "place", id = id, f = f, c = c, r = r, rot = sf.trot and sf.trot[k] or 0 })
-                                if res and res.ok == false then
-                                    Shared.Memo.Place[f .. ":" .. k] = true
-                                end
-                                return
-                            end
-                        end
+            local ownedNow = {}
+            for id in pairs(Config.Items) do
+                local n = CountOf(id)
+                if n > 0 then ownedNow[id] = n end
+            end
+            local pop = Plr:GetAttribute("Pop") or 0
+            local maxPop = Plr:GetAttribute("MaxPop") or math.huge
+            local placed, skipped = 0, 0
+            for i = 1, #src.blocks do
+                if not Toggles.LoadBuild.Value then break end
+                local b = src.blocks[i]
+                local def = Config.Items[b.id]
+                local floor = b.f >= 1 and b.f <= #own.floors and own.floors[b.f] or nil
+                if not (def and floor) or def.kind == "special" then
+                    skipped = skipped + 1
+                elseif def.kind == "floor" then
+                    local k = GridUtil.key(b.c, b.r)
+                    if floor.tiles[k] or (ownedNow[b.id] or 0) <= 0 or not GridUtil.inBounds(floor, b.c, b.r) then
+                        skipped = skipped + 1
+                    else
+                        Remotes.Build:InvokeServer({ action = "place", id = b.id, f = b.f, c = b.c, r = b.r, rot = b.rot or 0 })
+                        ownedNow[b.id] = ownedNow[b.id] - 1
+                        floor.tiles[k] = b.id
+                        placed = placed + 1
+                        task.wait(Options.PlaceDelay.Value)
                     end
-                end
-                for k, obj in pairs(sf.objs or {}) do
-                    if not of.objs[k] and of.tiles[k] then
-                        local def = Config.Items[obj.id]
-                        if def and CountOf(obj.id) > 0 and not Shared.Memo.Place[f .. ":" .. k] then
-                            local c, r = GridUtil.unkey(k)
-                            if def.kind ~= "monster" or (Plr:GetAttribute("Pop") or 0) + (def.pop or 1) <= (Plr:GetAttribute("MaxPop") or math.huge) then
-                                if GridUtil.canPlaceObject(of, def, c, r, obj.rot or 0) then
-                                    local res = Remotes.Build:InvokeServer({ action = "place", id = obj.id, f = f, c = c, r = r, rot = obj.rot or 0 })
-                                    if res and res.ok == false then
-                                        Shared.Memo.Place[f .. ":" .. k] = true
-                                    end
-                                    return
-                                end
-                            end
-                        end
+                else
+                    local k = GridUtil.key(b.c, b.r)
+                    if floor.objs[k] or not floor.tiles[k] or (ownedNow[b.id] or 0) <= 0 then
+                        skipped = skipped + 1
+                    elseif def.kind == "monster" and pop + (def.pop or 1) > maxPop then
+                        skipped = skipped + 1
+                    elseif not GridUtil.canPlaceObject(floor, def, b.c, b.r, b.rot or 0) then
+                        skipped = skipped + 1
+                    else
+                        Remotes.Build:InvokeServer({ action = "place", id = b.id, f = b.f, c = b.c, r = b.r, rot = b.rot or 0 })
+                        ownedNow[b.id] = ownedNow[b.id] - 1
+                        floor.objs[k] = { id = b.id, rot = b.rot or 0, lvl = 1 }
+                        if def.kind == "monster" then pop = pop + (def.pop or 1) end
+                        placed = placed + 1
+                        task.wait(Options.PlaceDelay.Value)
                     end
                 end
             end
+            Library:Notify(("LoadBuild done: %d placed, %d skipped."):format(placed, skipped), 5)
         end)
-        if not ok then notyuri("CopyBase", err) end
-        task.wait(Options.PlaceDelay.Value)
+        if not ok then notyuri("LoadBuild", err) end
+        task.wait(5)
     end
 end
 
 local function Func_AutoUpgrade()
+    local attempted = {}
     while Toggles.AutoUpgrade.Value do
         local ok, err = pcall(function()
             if not (Remotes.Build and Config) then
@@ -1184,7 +1368,7 @@ local function Func_AutoUpgrade()
                 local floor = data.floors[f]
                 for k, obj in pairs(floor.objs or {}) do
                     local tag = f .. ":" .. k
-                    if not Shared.Memo.Upgrade[tag] then
+                    if not attempted[tag] then
                         local def = Config.Items[obj.id]
                         if def then
                             local cost, currency = nil, nil
@@ -1211,7 +1395,7 @@ local function Func_AutoUpgrade()
                 local c, r = GridUtil.unkey(pickK)
                 local res = Remotes.Build:InvokeServer({ action = "upgrade", f = pickF, c = c, r = r })
                 if res and res.ok == false then
-                    Shared.Memo.Upgrade[pickF .. ":" .. pickK] = true
+                    attempted[pickF .. ":" .. pickK] = true
                 end
             end
         end)
@@ -1380,22 +1564,6 @@ TB_Tabs.Autofarm.T1:AddDropdown("RollStopAt", {
     Default = "Legendary",
 })
 TB_Tabs.Autofarm.T1:AddDivider()
-TB_Tabs.Autofarm.T1:AddToggle("AutoBuild", { Text = "Auto Build", Default = false })
-TB_Tabs.Autofarm.T1:AddSlider("PlaceDelay", {
-    Text = "Place Delay",
-    Default = 0.3,
-    Min = 0.15,
-    Max = 2,
-    Rounding = 2,
-    Compact = true,
-})
-TB_Tabs.Autofarm.T1:AddToggle("CopyBase", { Text = "Copy Base", Default = false })
-TB_Tabs.Autofarm.T1:AddDropdown("CopyFrom", {
-    Text = "Copy From",
-    Values = {},
-    Default = "",
-})
-TB_Tabs.Autofarm.T1:AddDivider()
 TB_Tabs.Autofarm.T1:AddToggle("AutoUpgrade", { Text = "Auto Upgrade", Default = false })
 TB_Tabs.Autofarm.T1:AddToggle("AutoExpand", { Text = "Auto Expand", Default = false })
 TB_Tabs.Autofarm.T1:AddToggle("AutoSkill", { Text = "Auto Skill", Default = false })
@@ -1408,23 +1576,66 @@ TB_Tabs.Autofarm.T1:AddDropdown("QueueDiff", {
     Default = "novice",
 })
 
-do
-    local names = {}
-    local plots = workspace:FindFirstChild("Plots")
-    local own = Plr:GetAttribute("PlotIndex")
-    if plots then
-        for _, model in ipairs(plots:GetChildren()) do
-            local idx = model:GetAttribute("PlotIndex")
-            if idx and idx ~= own then
-                names[#names + 1] = (model:GetAttribute("OwnerName") or ("Plot" .. idx)) .. " (Plot" .. idx .. ")"
-            end
+A1:AddToggle("AutoBuild", { Text = "Auto Build", Default = false })
+A1:AddSlider("PlaceDelay", {
+    Text = "Place Delay",
+    Default = 0.3,
+    Min = 0.15,
+    Max = 2,
+    Rounding = 2,
+    Compact = true,
+})
+A1:AddDivider()
+A1:AddDropdown("BuildSourceDropdown", {
+    Text = "Select Build to Load",
+    Values = {},
+    Default = "",
+    Multi = false,
+    Searchable = true,
+    Callback = function()
+        UpdateMaterialLabel()
+    end,
+})
+MatLabel = A2:AddLabel("No build selected.", true)
+A1:AddToggle("LoadBuild", { Text = "Load Build", Default = false })
+A1:AddInput("BuildSaveName", {
+    Text = "File Name",
+    Default = "",
+    Placeholder = "yuriyuri",
+})
+A1:AddButton({
+    Text = "Save Build",
+    Func = function()
+        local data = PlotData(Plr:GetAttribute("PlotIndex"))
+        local blocks = data and BlocksOfData(data) or nil
+        if SaveBuildFile(Options.BuildSaveName and Options.BuildSaveName.Value or "", blocks) then
+            RefreshBuildSources()
         end
-    end
-    if next(names) then
-        Options.CopyFrom:SetValues(names)
-        Options.CopyFrom:SetValue(names[1])
-    end
-end
+    end,
+})
+A1:AddButton({
+    Text = "Save Selected",
+    Func = function()
+        local saveName = Options.BuildSaveName and Options.BuildSaveName.Value or ""
+        if not saveName or saveName == "" then
+            Library:Notify("Enter a file name first.", 3)
+            return
+        end
+        local data = LoadSelectedBuildSource()
+        if not data then
+            Library:Notify("Select a build source first.", 3)
+            return
+        end
+        if SaveBuildFile(saveName, data.blocks) then
+            RefreshBuildSources()
+        end
+    end,
+})
+
+task.spawn(function()
+    task.wait(2)
+    RefreshBuildSources()
+end)
 
 Toggles.AutoWave:OnChanged(function(state)
     Thread("AutoWave", Func_AutoWave, state)
@@ -1448,21 +1659,12 @@ Toggles.AutoRoll:OnChanged(function(state)
     Thread("AutoRoll", Func_AutoRoll, state)
 end)
 Toggles.AutoBuild:OnChanged(function(state)
-    if not state then
-        Shared.Memo.Place = {}
-    end
     Thread("AutoBuild", Func_AutoBuild, state)
 end)
-Toggles.CopyBase:OnChanged(function(state)
-    if not state then
-        Shared.Memo.Place = {}
-    end
-    Thread("CopyBase", Func_CopyBase, state)
+Toggles.LoadBuild:OnChanged(function(state)
+    Thread("LoadBuild", Func_LoadBuild, state)
 end)
 Toggles.AutoUpgrade:OnChanged(function(state)
-    if not state then
-        Shared.Memo.Upgrade = {}
-    end
     Thread("AutoUpgrade", Func_AutoUpgrade, state)
 end)
 Toggles.AutoExpand:OnChanged(function(state)

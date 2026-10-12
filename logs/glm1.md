@@ -585,3 +585,15 @@ fixture.
   gap (Instance.new("BasePart") is unclassed — use "Part"), and Luau-only
   math.round in mock code. The battery works only when the mock world is
   honest; fix the harness, never the check.
+
+---
+## Session 28 — 2026-10-12 — BAD1-R1 feedback round (glm1)
+
+User feedback on BAD1: lost Build tab + bad copy + repeat clean-code
+violation. Gameref found (backup/ reference scripts, not in any repo —
+persisted to my-project/upload/gameref/). Rework: Build tab per gameref
+(BuildSourceDropdown/LoadBuild/Save Build/Save Selected/MatLabel), CopyBase/
+CopyFrom replaced, resolution block guarded, Shared.Memo dropped, OwnerName
+invention removed (data.name/data.owner are the real fields). Harness 67/67
+x3 + delivered-bytes x2. Delivered Public b02c4ed. TASKS BAD1-R1 row +
+canonicals synced.

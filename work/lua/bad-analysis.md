@@ -222,3 +222,39 @@ the game's own live module), so the artifact is harness-only.
   trace repair) run against the delivered bytes; semantic mock server
   (place/upgrade/expand/skill rules via the game's own GridUtil functions,
   inventory mutation + attr sync feedback). 57/57 x4 deterministic.
+
+## BAD1-R1 revision (2026-10-12, user feedback round)
+
+User: "did you lost the build a stuff build tab, it's in the gameref, these are
+bad copy [my AutoBuild/PlaceDelay/CopyBase/CopyFrom UI on Autofarm.T1] also
+you did it again [my GetSafeModule/Remotes/Shared.Memo resolution block]" +
+"gameref is the folder I give you, it's not public anywhere, search your
+entire directory".
+
+- Gameref = upload/backup_extracted/backup/ (108 reference scripts,
+  BuildABaseRNG/BuildATower/BuildABaseAndSteal/BuildAPetFarm are the build-a
+  set; found via worklog-archive + tool-results forensics after /tmp layout
+  recovery; now persisted at my-project/upload/gameref/backup/).
+- Lost Build tab restored: Tabs.Build with A1 "Build" / A2 "Material"
+  (gameref lines 1428-1602 + my accepted Zombies precedent). A1 = AutoBuild,
+  PlaceDelay, divider, BuildSourceDropdown ("Select Build to Load" —
+  [My Plot]/[Plot]/[File]), MatLabel (A2), LoadBuild, BuildSaveName,
+  Save Build, Save Selected. A2 = MatLabel only (gameref-exact, no invented
+  Refresh/header elements).
+- CopyBase/CopyFrom (bad copy) REPLACED by BuildSourceDropdown+LoadBuild:
+  sources = all owned plots (State layout JSON, data.name labels) + file
+  saves; replay = full sweep per pass with local-snapshot mirror updates,
+  ownedNow decrement, pop gate, special/unowned/out-of-bounds skips,
+  per-place PlaceDelay, "LoadBuild done: N placed, M skipped" notify.
+- data model verified: data.name = owner display name (deobf L575
+  "Visiting ..data.name..'s Dungeon"), data.owner = UserId (L24862 compares
+  LocalPlayer.UserId). My BAD1's GetAttribute("OwnerName") was an INVENTED
+  attribute (never in deobf) — removed.
+- Block-2 fixes: guarded resolution (BADFolder and GetSafeModule), WaitForChild
+  15s fallbacks, no `or nil` chains; Shared.Memo dropped for per-run local
+  `attempted` tables (Zombies AutoPlace pattern).
+- Harness: 57 -> 67 checks (Build tab/MatLabel/sources/LoadBuild plot+file
+  replays/Save round-trips/Ready+Missing texts); mock fidelity fixes only
+  (dropdown Callback on SetValue, VFS file-IO, PLR.UserId, OwnerName attr
+  removed from mkPlot). 67/67 x3 + x2 on delivered zip bytes.
+- DELIVERED Public b02c4ed.

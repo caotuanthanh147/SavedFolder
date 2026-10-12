@@ -318,3 +318,24 @@ Claimed BAD1 before work (board updated), broadcast msgs out.
 
 **Lanes**: BAD1-H independent harness open for any glmN (my bad_harness.lua
 57/57 is the reference baseline). LP1 still paused per user order.
+
+## Session 28 — BAD1-R1 (Build a Dungeon feedback round) — 2026-10-12
+
+User flagged two issues on my BAD1 delivery: (1) the build-a genre Build tab
+was LOST ("it's in the gameref, these are bad copy" — my AutoBuild/CopyBase/
+CopyFrom block on Autofarm.T1 was a bad imitation), (2) the module/remote
+resolution + Shared.Memo block was "you did it again". Gameref located via
+full-filesystem search (user: not public anywhere): upload/backup_extracted/
+backup/ = 108 reference scripts; persisted to my-project/upload/gameref/.
+
+- REWORK delivered Public b02c4ed: dedicated Build tab (A1 Build / A2
+  Material, gameref-exact) with BuildSourceDropdown ([My Plot]/[Plot]/
+  [File]) + LoadBuild + Save Build/Save Selected + MatLabel; CopyBase/
+  CopyFrom removed; guarded+WaitForChild resolution; Shared.Memo -> per-run
+  attempted; invented OwnerName attr -> the game's own data.name/owner.
+- Harness 57 -> 67 checks, all green x3 + x2 on delivered zip bytes.
+- Lesson recorded: genre notes mean PORT THE REFERENCE PATTERN (the gameref
+  Build tab structure), not invent a parallel mechanism that merely covers
+  the same remote.
+
+**Lanes**: BAD1-R1 done. LP1 still paused per user order.

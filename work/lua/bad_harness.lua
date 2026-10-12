@@ -540,6 +540,7 @@ do
         table.insert(MockState.Notifies, tostring(msg))
     end
     function Library:SetDPIScale(n) end
+    function Library:SetNotifySide(n) end
     function Library:OnUnload(fn)
         self.__unloadHandlers = self.__unloadHandlers or {}
         table.insert(self.__unloadHandlers, fn)
@@ -572,6 +573,13 @@ do
             end
             el.Multi = info.Multi
             el.Text = info.Text
+            local rawSetValue = el.SetValue
+            function el:SetValue(v)
+                rawSetValue(self, v)
+                if info.Callback then
+                    info.Callback(v)
+                end
+            end
             Library.Options[idx] = el
             return el
         end
@@ -792,9 +800,43 @@ end
 
 G.os = setmetatable({ clock = function() return Sched.now end, date = function() return "00:00:00" end, time = function() return 0 end }, { __index = os })
 
-G.isfile = function() return false end
+local VFS = {}
+local function vfsPath(path)
+    return string.match(path, "^(.*)/([^/]+)$")
+end
+G.isfolder = function(path)
+    return VFS[path] ~= nil
+end
+G.listfiles = function(path)
+    local out = {}
+    local folder = VFS[path]
+    if folder then
+        for name in pairs(folder) do
+            out[#out + 1] = path .. "/" .. name
+        end
+    end
+    table.sort(out)
+    return out
+end
+G.makefolder = function(path)
+    VFS[path] = VFS[path] or {}
+end
+G.writefile = function(path, content)
+    local dir, name = vfsPath(path)
+    if dir then
+        VFS[dir] = VFS[dir] or {}
+        VFS[dir][name] = content
+    end
+end
+G.readfile = function(path)
+    local dir, name = vfsPath(path)
+    return dir and VFS[dir] and VFS[dir][name] or nil
+end
+G.isfile = function(path)
+    local dir, name = vfsPath(path)
+    return dir ~= nil and VFS[dir] ~= nil and VFS[dir][name] ~= nil
+end
 G.delfile = function() end
-G.writefile = function() end
 local NotyuriLog = {}
 G.appendfile = function(_, line)
     table.insert(NotyuriLog, line)
@@ -947,6 +989,7 @@ local function addModule(parent, name, srcOrTbl)
 end
 
 local PLR = Instance.new("Player", "czhigh")
+PLR.UserId = 1
 PLR.Idled = Signal.new()
 PLR.CameraMaxZoomDistance = 128
 local Services = {}
@@ -1065,10 +1108,9 @@ mkStand(3, "Monsters")
 
 local PlotsFolder = Instance.new("Folder", "Plots")
 WS:AddChild(PlotsFolder)
-local function mkPlot(idx, ownerName, dataTbl, waveActive)
+local function mkPlot(idx, dataTbl, waveActive)
     local plot = Instance.new("Model", "Plot" .. idx)
     plot:SetAttribute("PlotIndex", idx)
-    plot:SetAttribute("OwnerName", ownerName)
     plot:SetAttribute("WaveActive", waveActive and true or false)
     local shell = Instance.new("Part", "Shell")
     shell.CFrame = CFrame.new(Vector3.new(idx * 124, 0, 0))
@@ -1102,9 +1144,9 @@ local SrcPlotData = {
         w = 1,
     } },
 }
-local MyPlot = mkPlot(1, "czhigh", MyPlotData, false)
-local SrcPlot = mkPlot(2, "proplayer", SrcPlotData, false)
-mkPlot(3, "idleplayer", { name = "idleplayer", owner = 3, wave = 1, floors = { { tiles = {}, trot = {}, objs = {}, w = 1 } } }, false)
+local MyPlot = mkPlot(1, MyPlotData, false)
+local SrcPlot = mkPlot(2, SrcPlotData, false)
+mkPlot(3, { name = "idleplayer", owner = 3, wave = 1, floors = { { tiles = {}, trot = {}, objs = {}, w = 1 } } }, false)
 
 local EnemiesFolder = Instance.new("Folder", "BADEnemies")
 WS:AddChild(EnemiesFolder)
@@ -1409,51 +1451,157 @@ check("real load: no ERROR notify", (function()
     end
     return true
 end)())
-for _, id in ipairs({ "AutoWave", "AutoStart", "AutoSpeed", "AutoRoll", "AutoBuild", "CopyBase", "AutoUpgrade", "AutoExpand", "AutoSkill", "AutoAttack", "AutoQueue" }) do
+for _, id in ipairs({ "AutoWave", "AutoStart", "AutoSpeed", "AutoRoll", "AutoBuild", "LoadBuild", "AutoUpgrade", "AutoExpand", "AutoSkill", "AutoAttack", "AutoQueue" }) do
     check("toggle registered: " .. id, Library.Toggles[id] ~= nil)
 end
-for _, id in ipairs({ "RollWhat", "RollStopAt", "CopyFrom", "QueueDiff", "PlaceDelay" }) do
+for _, id in ipairs({ "RollWhat", "RollStopAt", "BuildSourceDropdown", "BuildSaveName", "QueueDiff", "PlaceDelay" }) do
     check("element registered: " .. id, Library.Options[id] ~= nil)
 end
 check("SaveManager folder", SaveManager.Folder == "Yuri/BuildADungeon")
-check("CopyFrom populated with other plots", (function()
-    local vals = Library.Options.CopyFrom.Values
-    return vals ~= nil and #vals == 2 and string.find(vals[1], "proplayer", 1, true) ~= nil and string.find(vals[2], "idleplayer", 1, true) ~= nil
+check("Build tab present", (function()
+    for _, t in ipairs(MockState.Tabs) do
+        if t == "Build" then return true end
+    end
+    return false
 end)())
-check("no game SafeLabels (only template Info + Menu bind labels)", #MockState.AllLabels == 2)
+local MatLabelRef = nil
+for _, l in ipairs(MockState.AllLabels) do
+    if l.Text == "No build selected." then
+        MatLabelRef = l
+    end
+end
+check("MatLabel created on Material groupbox", MatLabelRef ~= nil)
+pump(3)
+check("BuildSourceDropdown populated [My Plot] first then [Plot] sources", (function()
+    local vals = Library.Options.BuildSourceDropdown.Values
+    return vals ~= nil and #vals == 3 and vals[1] == "[My Plot] czhigh" and vals[2] == "[Plot] idleplayer" and vals[3] == "[Plot] proplayer"
+end)())
+check("no game SafeLabels beyond MatLabel (template Info + Menu bind + MatLabel)", #MockState.AllLabels == 3)
 
-check("CopyBase: floor wire copied with src rot", (function()
-    Library.Options.CopyFrom:SetValue((Library.Options.CopyFrom.Values or {})[1])
-    Library.Toggles.CopyBase:SetValue(true)
-    pump(1.5)
-    local ws = wiresFor(BuildRemote, function(w)
-        return w.args[1] and w.args[1].action == "place" and w.args[1].id == "WoodFloor"
-    end)
-    Library.Toggles.CopyBase:SetValue(false)
+local LoadBuildT0 = nil
+check("LoadBuild: floor wire from plot source with src rot", (function()
+    LoadBuildT0 = Sched.now
+    Library.Options.BuildSourceDropdown:SetValue("[Plot] proplayer")
+    Library.Toggles.LoadBuild:SetValue(true)
+    pump(2)
+    Library.Toggles.LoadBuild:SetValue(false)
     pump(0.5)
-    return #ws == 1 and ws[1].args[1].f == 1 and ws[1].args[1].c == 6 and ws[1].args[1].r == 2 and ws[1].args[1].rot == 1
-end)())
-check("CopyBase: obj wire copied", (function()
     local ws = wiresFor(BuildRemote, function(w)
-        return w.args[1] and w.args[1].action == "place" and w.args[1].id == "SpikeTrap"
+        return w.t >= LoadBuildT0 and w.args[1] and w.args[1].action == "place" and w.args[1].id == "WoodFloor"
     end)
-    return #ws == 1 and ws[1].args[1].c == 6 and ws[1].args[1].r == 2 and ws[1].args[1].rot == 0
+    if #ws ~= 1 then
+        return false
+    end
+    local r = ws[1].args[1]
+    return r.f == 1 and r.c == 6 and r.r == 2 and r.rot == 1
 end)())
-check("CopyBase: unowned + special skipped", (function()
+check("LoadBuild: obj wire placed on copied floor", (function()
+    local ws = wiresFor(BuildRemote, function(w)
+        return w.t >= LoadBuildT0 and w.args[1] and w.args[1].action == "place" and w.args[1].id == "SpikeTrap"
+    end)
+    if #ws ~= 1 then
+        return false
+    end
+    local r = ws[1].args[1]
+    return r.c == 6 and r.r == 2 and r.rot == 0
+end)())
+check("LoadBuild: unowned + special + no-tile skipped", (function()
     for _, w in ipairs(wiresFor(BuildRemote)) do
-        local r = w.args[1]
-        if r and r.action == "place" and (r.id == "CrystalHall" or r.id == "Crystal" or r.id == "StoneWall") then
-            if w.t < 200 then
+        if w.t >= LoadBuildT0 and w.args[1] and w.args[1].action == "place" then
+            local id = w.args[1].id
+            if id == "CrystalHall" or id == "Crystal" or id == "StoneWall" or id == "Skeleton" then
                 return false
             end
         end
     end
     return true
 end)())
-check("CopyBase: stops after toggle off", (function()
+check("LoadBuild: done notify with placed/skipped counts", (function()
+    for _, n in ipairs(MockState.Notifies) do
+        if string.find(n, "LoadBuild done: 2 placed, 4 skipped.", 1, true) then
+            return true
+        end
+    end
+    return false
+end)())
+check("LoadBuild: stops after toggle off", (function()
     local before = #wiresFor(BuildRemote)
-    pump(1.5)
+    pump(6)
     return #wiresFor(BuildRemote) == before
+end)())
+check("MatLabel shows missing items for selected source", (function()
+    Library.Options.BuildSourceDropdown:SetValue("[Plot] proplayer")
+    if MatLabelRef == nil then return false end
+    local txt = MatLabelRef.Text
+    if not string.find(txt, "^Missing: ", 1) then
+        return false
+    end
+    return string.find(txt, Config.Items.CrystalHall.name .. " (x1)", 1, true) ~= nil
+        and string.find(txt, Config.Items.StoneWall.name .. " (x1)", 1, true) ~= nil
+end)())
+check("Save Build writes my current layout to file + dropdown gains [File]", (function()
+    Library.Options.BuildSaveName:SetValue("czbuild")
+    local btn = nil
+    for _, b in ipairs(MockState.Buttons) do
+        if b.Text == "Save Build" then
+            btn = b
+        end
+    end
+    if not btn then return false end
+    btn.Func()
+    local folder = VFS["Yuri/BuildADungeon/Builds"]
+    if not (folder and folder["czbuild.json"]) then
+        return false
+    end
+    for _, v in ipairs(Library.Options.BuildSourceDropdown.Values) do
+        if v == "[File] czbuild" then return true end
+    end
+    return false
+end)())
+check("Saved build file decodes with both blocks", (function()
+    local folder = VFS["Yuri/BuildADungeon/Builds"]
+    local data = jsonDecode(folder["czbuild.json"])
+    if not (data and data.version == 1 and data.count == 2 and #data.blocks == 2) then
+        return false
+    end
+    local sawFloor, sawTrap = false, false
+    for _, b in ipairs(data.blocks) do
+        if b.id == "WoodFloor" and b.c == 6 and b.r == 2 and b.rot == 1 then sawFloor = true end
+        if b.id == "SpikeTrap" and b.c == 6 and b.r == 2 and b.rot == 0 then sawTrap = true end
+    end
+    return sawFloor and sawTrap
+end)())
+check("LoadBuild: file source replays onto a fresh plot", (function()
+    Server.plotData = { name = "czhigh", owner = 1, wave = 5, floors = { { tiles = {}, trot = {}, objs = {}, w = 1 } }, uxp = {}, ustar = {}, skills = {}, best = 1, ulvl = {} }
+    syncWorld()
+    local t0 = Sched.now
+    Library.Options.BuildSourceDropdown:SetValue("[File] czbuild")
+    Library.Toggles.LoadBuild:SetValue(true)
+    pump(2)
+    Library.Toggles.LoadBuild:SetValue(false)
+    pump(0.5)
+    local ws = wiresFor(BuildRemote, function(w)
+        return w.t >= t0 and w.args[1] and w.args[1].action == "place" and w.args[1].id == "WoodFloor"
+    end)
+    return #ws == 1 and Server.plotData.floors[1].tiles["6,2"] == "WoodFloor" and Server.plotData.floors[1].objs["6,2"] ~= nil
+end)())
+check("Save Selected copies selected source to file", (function()
+    Library.Options.BuildSaveName:SetValue("stolenbase")
+    Library.Options.BuildSourceDropdown:SetValue("[Plot] proplayer")
+    local btn = nil
+    for _, b in ipairs(MockState.Buttons) do
+        if b.Text == "Save Selected" then
+            btn = b
+        end
+    end
+    if not btn then return false end
+    btn.Func()
+    local folder = VFS["Yuri/BuildADungeon/Builds"]
+    if not (folder and folder["stolenbase.json"]) then
+        return false
+    end
+    local data = jsonDecode(folder["stolenbase.json"])
+    return data ~= nil and data.count == 6 and #data.blocks == 6
 end)())
 
 local AutoBuildT0 = nil
@@ -1528,6 +1676,20 @@ check("AutoBuild: stops after toggle off", (function()
     local before = #wiresFor(BuildRemote)
     pump(1.5)
     return #wiresFor(BuildRemote) == before
+end)())
+check("MatLabel shows Ready for own full build", (function()
+    Library.Options.BuildSaveName:SetValue("myfull")
+    local btn = nil
+    for _, b in ipairs(MockState.Buttons) do
+        if b.Text == "Save Build" then
+            btn = b
+        end
+    end
+    if not btn then return false end
+    btn.Func()
+    Library.Options.BuildSourceDropdown:SetValue("[File] myfull")
+    if MatLabelRef == nil then return false end
+    return string.find(MatLabelRef.Text, "^Ready %(", 1) ~= nil
 end)())
 
 check("AutoWave: startWave fired for idle plot", (function()
