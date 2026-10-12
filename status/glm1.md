@@ -339,3 +339,19 @@ backup/ = 108 reference scripts; persisted to my-project/upload/gameref/.
   the same remote.
 
 **Lanes**: BAD1-R1 done. LP1 still paused per user order.
+
+## Session 29 (2026-10-12) — DGF1
+- Claimed DGF1 at 03:50Z (previous instance), full build resumed+delivered this session.
+- Public 38d2cc7: Don't Get Fired script in the game folder (folder-mode). 93/93 x3.
+- Harness lesson: toggle-on runs cycle-1 SYNCHRONOUSLY — always set mock state BEFORE
+  SetValue(true), and rate-gates (0.8s submit / 3s hack-attempt / 7s squishy) need
+  pump windows sized past them, not 1.5s.
+- Section fidelity fixes found by call-site re-verification: AutoHack lateLocked
+  (RoundEndsAt-60 + DayOff) + HackUntil busy gate (no re-start during an active
+  hack round, from HackUpdate.RoundEnd); AutoVerity MeetingJoined/ReturnToMenu
+  gate; AutoHalloween Climax QTE window (HwQteAt-0.05<=now<=HwQteEnd) + Climax
+  Dodge shield per HwQteId.
+- Template.lua changed by the user (e4ea30a): Plr is now a lazy LocalPlayer proxy
+  (962 lines). Game sections must never compare a Player instance to `Plr` or pass
+  it where the instance is required.
+- LP1 still paused per user order.

@@ -597,3 +597,49 @@ CopyFrom replaced, resolution block guarded, Shared.Memo dropped, OwnerName
 invention removed (data.name/data.owner are the real fields). Harness 67/67
 x3 + delivered-bytes x2. Delivered Public b02c4ed. TASKS BAD1-R1 row +
 canonicals synced.
+
+---
+## Session 29 (2026-10-12) — DGF1 Don't Get Fired At Work! [LIMITED SKIN EVENT! ]
+
+Resumed the claimed DGF1 (context died mid-build last session: analysis + section
+draft + real-module extracts existed; harness missing). Rule 18 re-read (guide 590
++ the NEW Template.lua 962 — user-pushed e4ea30a makes Plr a lazy LocalPlayer proxy;
+game-section boundary moved to after L890). Re-verified every wire at call sites
+(SubmitEmail view+rate gates, ThrowPaper target classes + war-team rules, hack
+start gate + lateLocked + chart notes {t,d}, BossQuiz compliment options EN+ES,
+OfficeEvent payloads incl. the -0.15s dance lead, Alien/Hw gates + warn ids,
+Verity lead math verbatim, LaptopFight hitbox, CareerConfig API + Rank-attr-as-
+index, state field names incl. Interrupt/AnswerResult/SmacksLeft).
+
+Three section fidelity gaps found+fixed during verification: AutoHack missing the
+game's lateLocked gate + could re-fire "start" during an active hack round (added
+HackUntil from HackUpdate.RoundEnd); AutoVerity missing the game's MeetingJoined ∧
+not-ReturnToMenu throw gate; AutoHalloween Climax missing the QTE window check +
+the Climax-Dodge shield (per HwQteId). VerityPath needed a real-module repair
+lane: none — the POT1 transformer (continue/if-expr) sufficed; Vector3 mock needed
+__div/__index Unit/Lerp + CFrame LookVector patches (game-layer, documented).
+
+Harness dgf_harness.lua = BAD1 prelude (with its 3 mock fixes) + DGF game layer:
+7 REAL modules (Career/Alien/HackRhythm/Halloween/LaptopFight/VerityConfig/
+VerityPath) loaded through the transformer; real HackRhythm.Chart generates the
+tap-test chart; the Verity aim check validates the thrown dir against a twin
+VerityPath built from the same real module + seed; mock server implements the
+email classifier (IsScam-first), playtime bitmask, upgrade ladder w/ rank gates,
+war-team paper targeting, dodge/zap/warn gates, QTE windows. 93 checks.
+
+Harness war (all mock-side, per fix-the-harness-not-the-check): EquipTool must
+SWAP tools (Roblox unequips the held one — the relax loop saw the stale PaperTool
+forever); toggle-on runs cycle-1 synchronously so state must be set BEFORE
+SetValue(true) (bit me twice: AutoHack stale view/readyAt, AutoRelax stale boss
+state); RoundEnd windows must be sized vs the pump horizon (HackUntil expiry);
+Vector3 lacked Lerp/Unit/div.
+
+Gates: luac5.4 -p OK; lua_lint 0 errors game section (16 inherited template
+region); head 890 verbatim vs Template 962 + tail verbatim (folder-only
+SetFolder edit); 0 comments; 93/93 x3 deterministic.
+
+DELIVERED Public 38d2cc7 (folder-mode: "Don't Get Fired At Work! ... .lua"
+committed into the game folder; push race #1: detached-HEAD clone from last
+session's forensics — fixed the branch ref, no force-push). Canonicals in
+work/lua/: DontGetFired.lua, dgf-analysis.md, dgf_harness.lua, dgf_section.lua,
+dgf_game_layer.lua, dgf_transform_modules.lua, dgf_real/ (7 raw + 7 transformed).
