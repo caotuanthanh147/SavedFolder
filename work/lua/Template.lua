@@ -34,7 +34,24 @@ Services = setmetatable({}, {
         end
 })
 local Players = Services.Players
-local Plr = Players.LocalPlayer
+local Plr = setmetatable({}, {
+    __index = function(_, key)
+        local lp = Players.LocalPlayer
+        if not lp then return nil end
+        local val = lp[key]
+        if type(val) == "function" then
+            return function(_, ...)
+                return val(lp, ...)
+            end
+        end
+        return val
+    end,
+    __newindex = function(_, key, value)
+        local lp = Players.LocalPlayer
+        if not lp then return end
+        lp[key] = value
+    end,
+})
 local Lighting = Services.Lighting
 local RS = Services.ReplicatedStorage
 local RunService = Services.RunService
