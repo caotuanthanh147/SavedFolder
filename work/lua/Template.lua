@@ -34,24 +34,11 @@ Services = setmetatable({}, {
         end
 })
 local Players = Services.Players
-local Plr = setmetatable({}, {
-    __index = function(_, key)
-        local lp = Players.LocalPlayer
-        if not lp then return nil end
-        local val = lp[key]
-        if type(val) == "function" then
-            return function(_, ...)
-                return val(lp, ...)
-            end
-        end
-        return val
-    end,
-    __newindex = function(_, key, value)
-        local lp = Players.LocalPlayer
-        if not lp then return end
-        lp[key] = value
-    end,
-})
+local Plr = Players.LocalPlayer
+while not Plr do
+    task.wait()
+    Plr = Players.LocalPlayer
+end
 local Lighting = Services.Lighting
 local RS = Services.ReplicatedStorage
 local RunService = Services.RunService
@@ -145,8 +132,11 @@ local function GetSafeModule(parent, name)
     return nil
 end
 local Remotes = {
+    -- e.g. OrderItem = RemotesRoot and GetObject(RemotesRoot, "Plot.OrderItem"),
 }
+
 local Modules = {
+    -- e.g. ActivePlot = ModulesRoot and GetSafeModule(ModulesRoot, "ActivePlot"),
 }
 local Flags = {}
 local Shared = {
@@ -188,6 +178,30 @@ function AddMultiDropdown(group, id, config)
         Callback = config.Callback,
     })
     return Options[id]
+end
+function MultiToggle(Config)
+    local Parent
+    local Children = {}
+    Parent = Config.Group:AddToggle(Config.Id, {
+        Text = Config.Text,
+        Default = Config.Default or false,
+        Disabled = Config.Disabled,
+        Callback = function(Value)
+            for _, Child in ipairs(Children) do
+                Child.TextLabel.Parent.Visible = Value
+                Child:SetVisible(Value)
+            end
+        end,
+    })
+    for _, ChildConfig in ipairs(Config.Children) do
+        table.insert(Children, Config.Group:AddToggle(ChildConfig.Id, {
+            Text = ChildConfig.Text,
+            Default = ChildConfig.Default or false,
+            Disabled = ChildConfig.Disabled,
+            Visible = Parent.Value,
+        }))
+    end
+    return Parent, Children
 end
 function SafeLabel(target, id, text)
     if type(target) == "string" then
@@ -383,19 +397,25 @@ local function TPTo(target, offset)
     hrp.CFrame = cframe
     return true
 end
-local function TweenTo(speed, target, offset, arive)
+local function TweenTo(speed, target, offset, arive, toggle)
     local char = GetCharacter()
     if not char then return false end
-    local cframe = GetPosition(target)
-    if not cframe then return false end
-    if offset then
-        cframe = cframe * CFrame.new(offset)
+    local live = typeof(target) == "function"
+    local function Resolve()
+        local resolved = live and target() or GetPosition(target)
+        if not resolved then return nil end
+        if offset then
+            resolved = resolved * CFrame.new(offset)
+        end
+        return resolved
     end
+    local cframe = Resolve()
+    if not cframe then return false end
     local goal = cframe.Position
     if Connections.ActiveTween then
         local previous = Connections.ActiveTween
         Connections.ActiveTween = nil
-        Thread("Tween", nil, false)
+        previous.Connection:Disconnect()
         previous.Hum.PlatformStand = previous.WasPlatformStand
         task.spawn(previous.Caller, false)
     end
@@ -409,39 +429,42 @@ local function TweenTo(speed, target, offset, arive)
     }
     Connections.ActiveTween = state
     hum.PlatformStand = true
-    Thread("Tween", function()
-        local reached = false
-        while true do
-            local _, delta = RunService.Stepped:Wait()
-            local current = GetCharacter()
-            if not current then break end
-            for _, part in ipairs(current:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-            local hrp = current.HumanoidRootPart
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            local diff = goal - hrp.Position
-            local dist = diff.Magnitude
-            if arive and dist <= arive then
-                reached = true
-                break
-            end
-            local stepDist = speed * delta
-            if dist <= stepDist then
-                hrp.CFrame = cframe
-                reached = true
-                break
-            end
-            hrp.CFrame = hrp.CFrame + diff.Unit * stepDist
-        end
+    local function Finish(reached)
+        state.Connection:Disconnect()
         if Connections.ActiveTween == state then
             Connections.ActiveTween = nil
         end
         hum.PlatformStand = wasPlatformStand
         task.spawn(caller, reached)
-    end, true)
+    end
+    state.Connection = RunService.Heartbeat:Connect(function(delta)
+        if toggle and not toggle.Value then return Finish(false) end
+        local current = GetCharacter()
+        if not current then return Finish(false) end
+        if live then
+            cframe = Resolve()
+            if not cframe then return Finish(false) end
+            goal = cframe.Position
+        end
+        for _, part in ipairs(current:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+        local hrp = current.HumanoidRootPart
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        local diff = goal - hrp.Position
+        local dist = diff.Magnitude
+        if arive and dist <= arive then
+            return Finish(true)
+        end
+        local stepDist = speed * delta
+        if dist <= stepDist then
+            hrp.CFrame = cframe
+            return Finish(true)
+        end
+        hrp.CFrame = hrp.CFrame + diff.Unit * stepDist
+    end)
     return coroutine.yield()
 end
 local function FuncTPW()
