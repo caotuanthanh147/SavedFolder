@@ -70,22 +70,20 @@ local repo = "https://raw.githubusercontent.com/iLove-yuri/Linoria/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
-getgenv().ayasemiyatongekissazumirisa = true
 local Options = Library.Options
 local Toggles = Library.Toggles
+getgenv().ayasemiyatongekissazumirisa = true
 Library.ShowToggleFrameInKeybinds = true
 Library.ShowCustomCursor = true
 Library.NotifySide = "Left"
 local function AddInfo(Window)
     local InfoTab = Window:AddTab("Info")
-    local InfoLeft = InfoTab:AddLeftGroupbox("Information")
     local statusText = isLimitedExecutor and "<font color='#FFA500'>Semi-Working</font>" or "<font color='#00FF00'>Working</font>"
     local extraNote = isLimitedExecutor
         and "<b>NOTE:</b> May experiencing bugs for some features!"
         or "All features should works properly!"
-    InfoLeft:AddLabel("<b>Executor:</b> " .. executorDisplayName .. "\n<b>Status:</b> " .. statusText .. "\n" .. extraNote, true)
-    local InfoRight = InfoTab:AddRightGroupbox("Others")
-    InfoRight:AddButton({
+    InfoTab:AddLeftGroupbox("Information"):AddLabel("<b>Executor:</b> " .. executorDisplayName .. "\n<b>Status:</b> " .. statusText .. "\n" .. extraNote, true)
+    InfoTab:AddLeftGroupbox("Information"):AddButton({
         Text = "Join Discord Server",
         Func = function()
             local inviteCode = "6pCsSbVd3E"
@@ -132,11 +130,10 @@ local function GetSafeModule(parent, name)
     return nil
 end
 local Remotes = {
-    -- e.g. OrderItem = RemotesRoot and GetObject(RemotesRoot, "Plot.OrderItem"),
+    
 }
-
 local Modules = {
-    -- e.g. ActivePlot = ModulesRoot and GetSafeModule(ModulesRoot, "ActivePlot"),
+    
 }
 local Flags = {}
 local Shared = {
@@ -231,29 +228,44 @@ function SafeLabel(target, id, text)
     end, true)
     return label
 end
-function AddSliderToggle(Config, ...)
+function AddOptionToggle(Config, ...)
     local Handlers = {...}
-    local Toggle, Slider
+    local Toggle, Option
     Toggle = Config.Group:AddToggle(Config.Id, {
         Text = Config.Text,
         Default = Config.DefaultToggle or false,
         Disabled = Config.Disabled,
         Callback = function(state)
-            if Slider then Slider:SetVisible(state) end
+            if Option then Option:SetVisible(state) end
             for _, Handler in ipairs(Handlers) do
-                Handler(state, Toggle, Slider)
+                Handler(state, Toggle, Option)
             end
         end,
     })
-    Slider = Config.Group:AddSlider(Config.Id .. "Value", {
-        Text = Config.Text,
-        Default = Config.Default,
-        Min = Config.Min,
-        Max = Config.Max,
-        Rounding = Config.Rounding or 0,
-        Compact = true,
-        Visible = false
-    })
+    if Config.Type == "Input" then
+        Option = Config.Group:AddInput(Config.Id .. "Value", {
+            Text = Config.Text,
+            Default = tostring(Config.Default),
+            AllowNull = true,
+            ClearTextOnFocus = false,
+            Visible = false,
+            Callback = function(value)
+                local number = tonumber(value)
+                if number then Option.Value = number end
+            end
+        })
+        Option.Value = Config.Default
+    else
+        Option = Config.Group:AddSlider(Config.Id .. "Value", {
+            Text = Config.Text,
+            Default = Config.Default,
+            Min = Config.Min,
+            Max = Config.Max,
+            Rounding = Config.Rounding or 0,
+            Compact = true,
+            Visible = false
+        })
+    end
     return Toggles[Config.Id], Options[Config.Id .. "Value"]
 end
 local function SafeConnect(key, getSignalFn, handler)
@@ -340,13 +352,6 @@ local function CommaFormat(n)
     local s = tostring(n)
     return s:reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
 end
-local function Abbreviate(n)
-    local abbrev = {{1e12, "T"}, {1e9, "B"}, {1e6, "M"}, {1e3, "K"}}
-    for _, v in ipairs(abbrev) do
-        if n >= v[1] then return string.format("%.1f%s", n / v[1], v[2]) end
-    end
-    return tostring(n)
-end
 local function GetCharacter()
     local c = Plr.Character
     return (c and c:FindFirstChild("HumanoidRootPart") and c:FindFirstChildOfClass("Humanoid")) and c or nil
@@ -402,39 +407,32 @@ local function TweenTo(speed, target, offset, arive, toggle)
     if not char then return false end
     local live = typeof(target) == "function"
     local function Resolve()
-        local resolved = live and target() or GetPosition(target)
-        if not resolved then return nil end
-        if offset then
-            resolved = resolved * CFrame.new(offset)
-        end
-        return resolved
+        local r = live and target() or GetPosition(target)
+        if r and offset then r = r * CFrame.new(offset) end
+        return r
     end
     local cframe = Resolve()
     if not cframe then return false end
-    local goal = cframe.Position
     if Connections.ActiveTween then
-        local previous = Connections.ActiveTween
+        local prev = Connections.ActiveTween
         Connections.ActiveTween = nil
-        previous.Connection:Disconnect()
-        previous.Hum.PlatformStand = previous.WasPlatformStand
-        task.spawn(previous.Caller, false)
+        prev.Connection:Disconnect()
+        prev.Hum.PlatformStand = prev.WasPlatformStand
+        task.spawn(prev.Caller, false)
     end
     local hum = char:FindFirstChildOfClass("Humanoid")
-    local wasPlatformStand = hum.PlatformStand
     local caller = coroutine.running()
     local state = {
         Caller = caller,
         Hum = hum,
-        WasPlatformStand = wasPlatformStand,
+        WasPlatformStand = hum.PlatformStand,
     }
     Connections.ActiveTween = state
     hum.PlatformStand = true
     local function Finish(reached)
         state.Connection:Disconnect()
-        if Connections.ActiveTween == state then
-            Connections.ActiveTween = nil
-        end
-        hum.PlatformStand = wasPlatformStand
+        if Connections.ActiveTween == state then Connections.ActiveTween = nil end
+        hum.PlatformStand = state.WasPlatformStand
         task.spawn(caller, reached)
     end
     state.Connection = RunService.Heartbeat:Connect(function(delta)
@@ -444,7 +442,6 @@ local function TweenTo(speed, target, offset, arive, toggle)
         if live then
             cframe = Resolve()
             if not cframe then return Finish(false) end
-            goal = cframe.Position
         end
         for _, part in ipairs(current:GetDescendants()) do
             if part:IsA("BasePart") and part.CanCollide then
@@ -453,17 +450,13 @@ local function TweenTo(speed, target, offset, arive, toggle)
         end
         local hrp = current.HumanoidRootPart
         hrp.AssemblyLinearVelocity = Vector3.zero
-        local diff = goal - hrp.Position
+        local diff = cframe.Position - hrp.Position
         local dist = diff.Magnitude
-        if arive and dist <= arive then
-            return Finish(true)
-        end
-        local stepDist = speed * delta
-        if dist <= stepDist then
+        if (arive and dist <= arive) or dist <= speed * delta then
             hrp.CFrame = cframe
             return Finish(true)
         end
-        hrp.CFrame = hrp.CFrame + diff.Unit * stepDist
+        hrp.CFrame = hrp.CFrame + diff.Unit * (speed * delta)
     end)
     return coroutine.yield()
 end
@@ -474,7 +467,7 @@ local function FuncTPW()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if char and hum and hum.Health > 0 then
             if hum.MoveDirection.Magnitude > 0 then
-                local speed = Options.TPWValue.Value
+                local speed = tonumber(Options.TPWValue.Value)
                 char:TranslateBy(hum.MoveDirection * speed * delta * 10)
             end
         end
@@ -750,20 +743,20 @@ local GB = {
         },
     },
 }
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "WS", Text = "WalkSpeed", Default = 16, Min = 16, Max = 1000 })
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "TPW", Text = "TPWalk", Default = 1, Min = 1, Max = 30, Rounding = 1 })
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "JP", Text = "JumpPower", Default = 50, Min = 0, Max = 500 })
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "HH", Text = "HipHeight", Default = 2, Min = 0, Max = 10, Rounding = 1 })
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "WS", Text = "WalkSpeed", Default = 16, Min = 16, Max = 1000 })
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "TPW", Text = "TPWalk", Default = 1, Min = 1, Max = 30, Rounding = 1 })
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "JP", Text = "JumpPower", Default = 50, Min = 0, Max = 500 })
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "HH", Text = "HipHeight", Default = 2, Min = 0, Max = 10, Rounding = 1 })
 GB.Player.Left.General:AddToggle("Noclip", { Text = "Noclip" })
 GB.Player.Left.General:AddToggle("AntiKnockback", {
     Text = "Anti Knockback",
     Default = false,
 })
 GB.Player.Left.General:AddToggle("Disable3DRender", { Text = "Disable 3D Rendering" })
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "Grav", Text = "Gravity", Default = 196, Min = 0, Max = 500, Rounding = 1})
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "Zoom", Text = "Camera Zoom", Default = 128, Min = 128, Max = 10000 })
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "FOV", Text = "Field of View", Default = 70, Min = 30, Max = 120 })
-AddSliderToggle({ Group = GB.Player.Left.General, Id = "LimitFPS", Text = "Set Max FPS", Disabled = not Support.FPS, Default = 60, Min = 5, Max = 360 })
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "Grav", Text = "Gravity", Default = 196, Min = 0, Max = 500, Rounding = 1})
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "Zoom", Text = "Camera Zoom", Default = 128, Min = 128, Max = 10000 })
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "FOV", Text = "Field of View", Default = 70, Min = 30, Max = 120 })
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "LimitFPS", Text = "Set Max FPS", Disabled = not Support.FPS, Default = 60, Min = 5, Max = 360 })
 GB.Player.Left.General:AddToggle("FPSBoost", { Text = "FPS Boost" })
 GB.Player.Left.Server:AddToggle("AntiAFK", {
     Text = "Anti AFK",
@@ -787,26 +780,26 @@ GB.Player.Left.Server:AddToggle("AutoReconnect", { Text = "Auto Reconnect" })
 GB.Player.Left.Server:AddToggle("NoGameplayPaused", { Text = "No Gameplay Paused"})
 GB.Player.Left.Server:AddButton({ Text = "Serverhop", Func = function() Serverhop() end })
 GB.Player.Left.Server:AddButton({ Text = "Rejoin", Func = function() Services.TeleportService:Teleport(game.PlaceId, Plr) end })
-AddSliderToggle({ Group = GB.Player.Left.Server, Id = "AutoServerhop", Text = "Auto Serverhop (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
+AddOptionToggle({ Group = GB.Player.Left.Server, Id = "AutoServerhop", Text = "Auto Serverhop (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
     Thread("AutoServerhop", function()
         local lastHop = tick()
         while Toggles.AutoServerhop.Value do
             task.wait(5)
             if not Toggles.AutoServerhop.Value then break end
-            if (tick() - lastHop) >= (Options.AutoServerhopValue.Value * 60) then
+            if (tick() - lastHop) >= (tonumber(Options.AutoServerhopValue.Value) * 60) then
                 Serverhop()
                 break
             end
         end
     end, state)
 end)
-AddSliderToggle({ Group = GB.Player.Left.Server, Id = "AutoRejoin", Text = "Auto Rejoin (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
+AddOptionToggle({ Group = GB.Player.Left.Server, Id = "AutoRejoin", Text = "Auto Rejoin (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
     Thread("AutoRejoin", function()
         local lastRejoin = tick()
         while Toggles.AutoRejoin.Value do
             task.wait(5)
             if not Toggles.AutoRejoin.Value then break end
-            if (tick() - lastRejoin) >= (Options.AutoRejoinValue.Value * 60) then
+            if (tick() - lastRejoin) >= (tonumber(Options.AutoRejoinValue.Value) * 60) then
                 TeleportService:Teleport(game.PlaceId, Plr)
                 break
             end
@@ -816,7 +809,7 @@ end)
 GB.Player.Right.Game:AddToggle("InstantPP", { Text = "Instant Prompt" })
 GB.Player.Right.Game:AddToggle("Fullbright", { Text = "Fullbright" })
 GB.Player.Right.Game:AddToggle("NoFog", { Text = "No Fog" })
-AddSliderToggle({ Group = GB.Player.Right.Game, Id = "OverrideTime", Text = "Time Of Day", Default = 12, Min = 0, Max = 24, Rounding = 1 })
+AddOptionToggle({ Group = GB.Player.Right.Game, Id = "OverrideTime", Text = "Time Of Day", Default = 12, Min = 0, Max = 24, Rounding = 1 })
 Toggles.AntiKnockback:OnChanged(function(state)
     Thread("AntiKnockback", Func_AntiKnockback, state)
 end)
@@ -829,13 +822,13 @@ end)
 Connections.Player_General = RunService.Stepped:Connect(function()
     local Hum = Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
     if Hum then
-        if Toggles.WS.Value then Hum.WalkSpeed = Options.WSValue.Value end
-        if Toggles.JP.Value then Hum.JumpPower = Options.JPValue.Value Hum.UseJumpPower = true end
-        if Toggles.HH.Value then Hum.HipHeight = Options.HHValue.Value end
+        if Toggles.WS.Value then Hum.WalkSpeed = tonumber(Options.WSValue.Value) end
+        if Toggles.JP.Value then Hum.JumpPower = tonumber(Options.JPValue.Value) Hum.UseJumpPower = true end
+        if Toggles.HH.Value then Hum.HipHeight = tonumber(Options.HHValue.Value) end
     end
-    workspace.Gravity = Toggles.Grav.Value and Options.GravValue.Value or 192
-    if Toggles.FOV.Value then workspace.CurrentCamera.FieldOfView = Options.FOVValue.Value end
-    if Toggles.Zoom.Value then Plr.CameraMaxZoomDistance = Options.ZoomValue.Value end
+    workspace.Gravity = Toggles.Grav.Value and tonumber(Options.GravValue.Value) or 192
+    if Toggles.FOV.Value then workspace.CurrentCamera.FieldOfView = tonumber(Options.FOVValue.Value) end
+    if Toggles.Zoom.Value then Plr.CameraMaxZoomDistance = tonumber(Options.ZoomValue.Value) end
 end)
 task.spawn(function()
     while task.wait() do
@@ -844,7 +837,7 @@ task.spawn(function()
             Lighting.ClockTime = 14
             Lighting.GlobalShadows = false
         elseif Toggles.OverrideTime.Value then
-            Lighting.ClockTime = Options.OverrideTimeValue.Value
+            Lighting.ClockTime = tonumber(Options.OverrideTimeValue.Value)
         end
         if Toggles.NoFog.Value then Lighting.FogEnd = 9e9 end
         if Library.Unloaded then break end
@@ -852,7 +845,7 @@ task.spawn(function()
 end)
 Options.LimitFPSValue:OnChanged(function()
     if Toggles.LimitFPS.Value then
-        setfpscap(Options.LimitFPSValue.Value)
+        setfpscap(tonumber(Options.LimitFPSValue.Value))
     end
 end)
 Toggles.LimitFPS:OnChanged(function(v)
