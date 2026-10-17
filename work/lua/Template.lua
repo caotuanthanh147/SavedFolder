@@ -55,16 +55,9 @@ local assetName = "game name"
 if v and Asset then
     assetName = Asset.Name
 end
-local executorName = (identifyexecutor and identifyexecutor() or "Unknown"):lower()
-local executorDisplayName = (identifyexecutor and identifyexecutor() or "Unknown")
-local LimitedExecutors = {"xeno", "solara",}
-local isLimitedExecutor = false
-for _, name in ipairs(LimitedExecutors) do
-    if string.find(executorName, name) then
-        isLimitedExecutor = true
-        break
-    end
-end
+local executorDisplayName = identifyexecutor and identifyexecutor() or "Unknown"
+local executorName = executorDisplayName:lower()
+local isLimitedExecutor = executorName:find("xeno") ~= nil or executorName:find("solara") ~= nil
 local l,f={},"1log.txt";if isfile and isfile(f)then delfile(f)end;if writefile then writefile(f,"")end;function notyuri(...)local t=table.create(select("#",...))for i=1,select("#",...)do t[i]=tostring(select(i,...))end local s=("[%s] %s"):format(os.date("%H:%M:%S"),table.concat(t," "));l[#l+1]=s;if appendfile then appendfile(f,s.."\n")end end
 local repo = "https://raw.githubusercontent.com/iLove-yuri/Linoria/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
@@ -83,7 +76,7 @@ local function AddInfo(Window)
         and "<b>NOTE:</b> May experiencing bugs for some features!"
         or "All features should works properly!"
     InfoTab:AddLeftGroupbox("Information"):AddLabel("<b>Executor:</b> " .. executorDisplayName .. "\n<b>Status:</b> " .. statusText .. "\n" .. extraNote, true)
-    InfoTab:AddLeftGroupbox("Information"):AddButton({
+    InfoTab:AddRightGroupbox("Information"):AddButton({
         Text = "Join Discord Server",
         Func = function()
             local inviteCode = "6pCsSbVd3E"
@@ -130,13 +123,16 @@ local function GetSafeModule(parent, name)
     return nil
 end
 local Remotes = {
-    
+    -- e.g. OrderItem = RemotesRoot and GetObject(RemotesRoot, "Plot.OrderItem"),
 }
+
 local Modules = {
-    
+    -- e.g. ActivePlot = ModulesRoot and GetSafeModule(ModulesRoot, "ActivePlot"),
 }
 local Flags = {}
 local Shared = {
+    OldGrav = workspace.Gravity,
+    Labels = {},
 }
 local Connections = {
     Player_General = nil,
@@ -527,7 +523,7 @@ local function Func_AutoReconnect()
         if not Toggles.AutoReconnect.Value then return end
         task.delay(2, function()
             pcall(function()
-                local promptOverlay = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
+                local promptOverlay = Services.CoreGui:FindFirstChild("RobloxPromptGui")
                 if promptOverlay then
                     local errorPrompt = promptOverlay.promptOverlay:FindFirstChild("ErrorPrompt")
                     if errorPrompt and errorPrompt.Visible then
@@ -543,7 +539,7 @@ end
 local function Func_NoGameplayPaused()
     while Toggles.NoGameplayPaused.Value do
         local success, err = pcall(function()
-            local pauseGui = game:GetService("CoreGui").RobloxGui:FindFirstChild("CoreScripts/NetworkPause")
+            local pauseGui = Services.CoreGui.RobloxGui:FindFirstChild("CoreScripts/NetworkPause")
             if pauseGui then
                 pauseGui:Destroy()
             end
@@ -753,7 +749,8 @@ GB.Player.Left.General:AddToggle("AntiKnockback", {
     Default = false,
 })
 GB.Player.Left.General:AddToggle("Disable3DRender", { Text = "Disable 3D Rendering" })
-AddOptionToggle({ Group = GB.Player.Left.General, Id = "Grav", Text = "Gravity", Default = 196, Min = 0, Max = 500, Rounding = 1})
+
+AddOptionToggle({ Group = GB.Player.Left.General, Id = "Grav", Text = "Gravity", Default = workspace.Gravity, Min = 0, Max = 500, Rounding = 1})
 AddOptionToggle({ Group = GB.Player.Left.General, Id = "Zoom", Text = "Camera Zoom", Default = 128, Min = 128, Max = 10000 })
 AddOptionToggle({ Group = GB.Player.Left.General, Id = "FOV", Text = "Field of View", Default = 70, Min = 30, Max = 120 })
 AddOptionToggle({ Group = GB.Player.Left.General, Id = "LimitFPS", Text = "Set Max FPS", Disabled = not Support.FPS, Default = 60, Min = 5, Max = 360 })
@@ -779,32 +776,25 @@ end)
 GB.Player.Left.Server:AddToggle("AutoReconnect", { Text = "Auto Reconnect" })
 GB.Player.Left.Server:AddToggle("NoGameplayPaused", { Text = "No Gameplay Paused"})
 GB.Player.Left.Server:AddButton({ Text = "Serverhop", Func = function() Serverhop() end })
-GB.Player.Left.Server:AddButton({ Text = "Rejoin", Func = function() Services.TeleportService:Teleport(game.PlaceId, Plr) end })
-AddOptionToggle({ Group = GB.Player.Left.Server, Id = "AutoServerhop", Text = "Auto Serverhop (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
-    Thread("AutoServerhop", function()
-        local lastHop = tick()
-        while Toggles.AutoServerhop.Value do
-            task.wait(5)
-            if not Toggles.AutoServerhop.Value then break end
-            if (tick() - lastHop) >= (tonumber(Options.AutoServerhopValue.Value) * 60) then
-                Serverhop()
-                break
+GB.Player.Left.Server:AddButton({ Text = "Rejoin", Func = function() TeleportService:Teleport(game.PlaceId, Plr) end })
+local function AddTimer(Config, Action)
+    AddOptionToggle(Config, function(state)
+        Thread(Config.Id, function()
+            local lastRun = tick()
+            while Toggles[Config.Id].Value do
+                task.wait(5)
+                if not Toggles[Config.Id].Value then break end
+                if (tick() - lastRun) >= (tonumber(Options[Config.Id .. "Value"].Value) * 60) then
+                    Action()
+                    break
+                end
             end
-        end
-    end, state)
-end)
-AddOptionToggle({ Group = GB.Player.Left.Server, Id = "AutoRejoin", Text = "Auto Rejoin (Minutes)", Default = 30, Min = 0, Max = 300 }, function(state)
-    Thread("AutoRejoin", function()
-        local lastRejoin = tick()
-        while Toggles.AutoRejoin.Value do
-            task.wait(5)
-            if not Toggles.AutoRejoin.Value then break end
-            if (tick() - lastRejoin) >= (tonumber(Options.AutoRejoinValue.Value) * 60) then
-                TeleportService:Teleport(game.PlaceId, Plr)
-                break
-            end
-        end
-    end, state)
+        end, state)
+    end)
+end
+AddTimer({ Group = GB.Player.Left.Server, Id = "AutoServerhop", Text = "Auto Serverhop (Minutes)", Default = 30, Min = 0, Max = 300 }, Serverhop)
+AddTimer({ Group = GB.Player.Left.Server, Id = "AutoRejoin", Text = "Auto Rejoin (Minutes)", Default = 30, Min = 0, Max = 300 }, function()
+    TeleportService:Teleport(game.PlaceId, Plr)
 end)
 GB.Player.Right.Game:AddToggle("InstantPP", { Text = "Instant Prompt" })
 GB.Player.Right.Game:AddToggle("Fullbright", { Text = "Fullbright" })
@@ -826,22 +816,20 @@ Connections.Player_General = RunService.Stepped:Connect(function()
         if Toggles.JP.Value then Hum.JumpPower = tonumber(Options.JPValue.Value) Hum.UseJumpPower = true end
         if Toggles.HH.Value then Hum.HipHeight = tonumber(Options.HHValue.Value) end
     end
-    workspace.Gravity = Toggles.Grav.Value and tonumber(Options.GravValue.Value) or 192
+    if Toggles.Grav.Value then workspace.Gravity = tonumber(Options.GravValue.Value) end
     if Toggles.FOV.Value then workspace.CurrentCamera.FieldOfView = tonumber(Options.FOVValue.Value) end
     if Toggles.Zoom.Value then Plr.CameraMaxZoomDistance = tonumber(Options.ZoomValue.Value) end
-end)
-task.spawn(function()
-    while task.wait() do
-        if Toggles.Fullbright.Value then
-            Lighting.Brightness = 2
-            Lighting.ClockTime = 14
-            Lighting.GlobalShadows = false
-        elseif Toggles.OverrideTime.Value then
-            Lighting.ClockTime = tonumber(Options.OverrideTimeValue.Value)
-        end
-        if Toggles.NoFog.Value then Lighting.FogEnd = 9e9 end
-        if Library.Unloaded then break end
+    if Toggles.Fullbright.Value then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.GlobalShadows = false
+    elseif Toggles.OverrideTime.Value then
+        Lighting.ClockTime = tonumber(Options.OverrideTimeValue.Value)
     end
+    if Toggles.NoFog.Value then Lighting.FogEnd = 9e9 end
+end)
+Toggles.Grav:OnChanged(function(v)
+    if not v then workspace.Gravity = Shared.OldGrav end
 end)
 Options.LimitFPSValue:OnChanged(function()
     if Toggles.LimitFPS.Value then
@@ -863,7 +851,7 @@ end)
 Toggles.NoGameplayPaused:OnChanged(function(state)
     Thread("NoGameplayPaused", SafeLoop("Anti-Pause", Func_NoGameplayPaused), state)
 end)
-game:GetService("ProximityPromptService").PromptButtonHoldBegan:Connect(function(prompt)
+Services.ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt)
     if Toggles.InstantPP and Toggles.InstantPP.Value then
         prompt.HoldDuration = 0
     end
@@ -871,9 +859,8 @@ end)
 local antiAFKConn = nil
 local function RunAntiAFK()
     if antiAFKConn then antiAFKConn:Enable() return end
-    local GC = getconnections or get_signal_cons
-    if GC then
-        local conns = GC(Players.LocalPlayer.Idled)
+    if getconnections then
+        local conns = getconnections(Players.LocalPlayer.Idled)
         local target = conns and conns[1]
         if target and target.Disable then
             target:Disable()
